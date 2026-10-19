@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+langgraph
+langchain-groq
+pyyaml
+openpyxl
+httpx
+pytest
+rich
+arize-phoenix
+arize-phoenix-otel
+openinference-instrumentation-langchain
