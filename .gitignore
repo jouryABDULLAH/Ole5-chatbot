@@ -1,0 +1,4 @@
+*.log
+/chatbot-pack
+/docs
+/venv
