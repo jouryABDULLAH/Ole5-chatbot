@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>T2 Ticketing System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root { --paper: #FBFCFB; --ink: #1E2A2C; --muted: #5F6D6B; --line: #DCE3E0; --accent: #0E5A4C; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: var(--paper); color: var(--ink);
+           font: 16px/1.6 "IBM Plex Sans Arabic", system-ui, sans-serif; }
+    header { display: flex; align-items: center; gap: 12px; padding: 18px 32px; border-bottom: 1px solid var(--line); }
+    .mark { width: 12px; height: 12px; border-radius: 3px; background: var(--accent); }
+    header strong { font-weight: 600; font-size: 15px; }
+    main { max-width: 640px; padding: 72px 32px; }
+    h1 { margin: 0 0 12px; font-size: 28px; line-height: 1.25; font-weight: 600; }
+    p { margin: 0; color: var(--muted); max-width: 56ch; }
+    a { color: var(--accent); }
+    @media (max-width: 600px) { header, main { padding-inline: 16px; } main { padding-block: 40px; } }
+  </style>
+</head>
+<body>
+  <header><span class="mark" aria-hidden="true"></span><strong>T2 Ticketing System</strong></header>
+  <main>
+    <h1>Support</h1>
+    <p>This page stands in for the ticket system. Open the chat to ask a question or report a problem. To see the sign-in step in Arabic, add <a href="?lang=ar">?lang=ar</a> to the address.</p>
+  </main>
+  <t2-chat></t2-chat>
+  <script>
+    const lang = new URLSearchParams(location.search).get("lang");
+    if (lang) document.querySelector("t2-chat").setAttribute("lang", lang);
+  </script>
+  <script src="t2-chat.js"></script>
+</body>
+</html>
