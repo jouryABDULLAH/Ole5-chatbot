@@ -94,3 +94,18 @@ def test_identity_comes_from_the_session_not_the_body():
     extra = client.post(f"/chat/sessions/{sid}/messages", json={"text": "hi", "email": "rich@example.com"})
     assert extra.status_code == 422
     assert sessions.current_identity(sid).product == "OLE5"
+
+
+def test_knowledge_document_is_served_rendered(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from ole5_chat.api import app
+    from ole5_chat.config import get_settings
+    (tmp_path / "kb" / "ole5").mkdir(parents=True)
+    (tmp_path / "kb" / "ole5" / "نظام OLE5 — قاعدة المعرفة.md").write_text("# عنوان\n\n- بند", encoding="utf-8")
+    monkeypatch.setenv("KB_EXPORT_DIR", str(tmp_path / "kb"))
+    get_settings.cache_clear()
+    client = TestClient(app)
+    page = client.get("/chat/kb/OLE5/نظام OLE5 — قاعدة المعرفة")
+    assert page.status_code == 200 and "<h1>عنوان</h1>" in page.text and "<li>بند</li>" in page.text
+    assert client.get("/chat/kb/OLE5/missing").status_code == 404
+    assert client.get("/chat/kb/OLE5/..%2F..%2Fetc").status_code == 404

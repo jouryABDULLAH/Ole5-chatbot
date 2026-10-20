@@ -76,6 +76,7 @@
     .bot { max-width:92%; font-size:15px; line-height:1.65; white-space:pre-wrap; }
     .me { align-self:flex-end; max-width:82%; padding:9px 14px; border-radius:14px; border-end-end-radius:4px;
           background:var(--soft); font-size:15px; line-height:1.6; white-space:pre-wrap; }
+    .src a { color:var(--accent); text-decoration:underline; text-underline-offset:3px; }
     .src { margin-top:8px; padding-inline-start:10px; border-inline-start:2px solid var(--accent);
            color:var(--muted); font-size:13px; line-height:1.5; white-space:normal; }
     .writing { color:var(--muted); font-size:14px; display:flex; align-items:center; gap:8px; }
@@ -235,7 +236,10 @@
         const last = i === lines.length - 1;
         if (last && this.view.sources.length) {
           const label = this.view.sources.length > 1 ? this.t.sources : this.t.source;
-          bubble.append(el("div", { class: "src" }, `${label}: ${this.view.sources.join(", ")}`));
+          const links = this.view.sources.flatMap((s, j) => [j ? ", " : null,
+            el("a", { href: `${this.api}/chat/kb/${encodeURIComponent(this.view.product)}/${encodeURIComponent(s)}`,
+                      target: "_blank", rel: "noopener" }, s)]);
+          bubble.append(el("div", { class: "src" }, `${label}: `, ...links));
         }
         log.append(bubble);
       });

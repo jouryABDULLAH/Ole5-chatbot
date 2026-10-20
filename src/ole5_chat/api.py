@@ -1,9 +1,9 @@
-"""HTTP API of the chat service: start a session with an email, send messages, attach files, read the conversation back, submit the ticket, serve the attached files, list the customer's tickets."""
+"""HTTP API of the chat service: start a session with an email, send messages, attach files, read the conversation back, submit the ticket, serve the attached files and the knowledge base documents a source names, list the customer's tickets."""
 
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Response, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from langchain_core.messages import BaseMessage
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -50,6 +50,7 @@ class SessionView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     session_id: str
+    product: str
     product_name: str
     language: str
     phase: Step
@@ -83,7 +84,8 @@ def _attachment(f: dict) -> AttachmentView:
 def _view(session_id: str, state: ChatState) -> SessionView:
     who, draft = state["identity"], state.get("ticket_draft")
     numbers = [t["ticket_number"] for t in state["created_tickets"]]
-    return SessionView(session_id=session_id, product_name=products.load(who.product).name, language=who.language,
+    return SessionView(session_id=session_id, product=who.product, product_name=products.load(who.product).name,
+                       language=who.language,
                        phase=state["phase"], messages=[_line(m) for m in state["messages"]],
                        sources=state["sources"], ticket_draft=draft, draft_ready=bool(draft and draft.classified),
                        ticket_number=numbers[-1] if numbers else None, ticket_numbers=numbers,
@@ -157,6 +159,26 @@ def read_attachment(att_id: str) -> FileResponse:
     if path is None:
         raise HTTPException(status_code=404, detail="Attachment not found")
     return FileResponse(path, filename=attachments.file_name(path))
+
+
+KB_PAGE = """<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>{title}</title>
+<style>body{{max-width:860px;margin:40px auto;padding:0 20px;font-family:"IBM Plex Sans Arabic",system-ui,sans-serif;
+line-height:1.8;color:#1E2A2C}}h1,h2,h3{{line-height:1.4}}code{{background:#EAF1EE;padding:1px 5px;border-radius:4px}}
+table{{border-collapse:collapse}}td,th{{border:1px solid #DCE3E0;padding:6px 10px}}</style></head><body>{body}</body></html>"""
+
+
+@app.get("/chat/kb/{product}/{title}", response_class=HTMLResponse)
+def read_document(product: str, title: str) -> HTMLResponse:
+    from markdown_it import MarkdownIt
+
+    tenant = get_settings().kb_tenants.get(product.upper())
+    folder = get_settings().kb_export_dir / tenant if tenant else None
+    wanted = f"{title}.md"
+    path = next((f for f in folder.iterdir() if f.name == wanted), None) if folder and folder.is_dir() else None
+    if path is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    body = MarkdownIt().render(path.read_text(encoding="utf-8"))
+    return HTMLResponse(KB_PAGE.format(title=title, body=body))
 
 
 @app.get("/chat/tickets")
