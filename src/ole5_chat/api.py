@@ -16,7 +16,7 @@ from ole5_chat.tickets import client as ticket_api
 from ole5_chat.tickets.client import TicketApiError
 from ole5_chat.tickets.submit import SubmitRefused
 
-app = FastAPI(title="Ole5 chat")
+app = FastAPI(title="Ole5 chat", telemetry={"tracing": False})
 
 
 class StartSession(BaseModel):
