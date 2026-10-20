@@ -1,0 +1,32 @@
+[project]
+name = "ole5-chat"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.evalkit]
+# evals = "evals"                  # folder with task.py and datasets/<suite>.json
+# prefix = "Ole5-chatbot"          # Phoenix dataset and prompt names (default: [project] name, else the folder)
+# model = "openai/gpt-oss-120b"    # Groq model for error analysis, entry detection and the judges
+# graders = ["correctness", "tools_called"]   # every suite's graders (these are the default)
+# snapshots = ".evalkit"           # where snapshots are stored
+# commit_snapshots = false         # true: commit snapshots to share them
+# tracing = true                   # false: the project sends its own traces to Phoenix
+# detect_with_llm = true           # false: entry detection without the LLM review
+entry = "src/ole5_chat/agent/graph.py"
+roots = ["src"]
+
+[tool.evalkit.suites.answerable]
+graders = ["correctness", "evals.graders:phase_matches", "evals.graders:language_matches", "evals.graders:sources_match", "evals.graders:draft_matches"]
+
+[tool.evalkit.suites.unanswerable]
+graders = ["hallucination", "evals.graders:phase_matches", "evals.graders:language_matches", "evals.graders:sources_match", "evals.graders:draft_matches"]
+
+[tool.evalkit.suites.conversations]
+graders = ["correctness", "evals.graders:phase_matches", "evals.graders:language_matches", "evals.graders:sources_match", "evals.graders:draft_matches"]

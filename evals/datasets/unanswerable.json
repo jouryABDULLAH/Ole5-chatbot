@@ -1,0 +1,364 @@
+{
+  "cases": [
+    {
+      "id": "schedule-send-ar",
+      "input": {
+        "message": "هل يمكن جدولة إرسال مراسلة في وقت لاحق؟"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "schedule-send-en",
+      "input": {
+        "message": "Can I schedule a correspondence to be sent later?"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "teams-ar",
+      "input": {
+        "message": "هل يتكامل Ole5 مع Microsoft Teams؟"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "teams-en",
+      "input": {
+        "message": "Does Ole5 integrate with Microsoft Teams?"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "dark-mode-ar",
+      "input": {
+        "message": "هل يوجد وضع ليلي (داكن) للنظام؟"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "dark-mode-en",
+      "input": {
+        "message": "Is there a dark mode for the system?"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "out-of-office-ar",
+      "input": {
+        "message": "كيف أضبط رداً تلقائياً أثناء إجازتي؟"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "out-of-office-en",
+      "input": {
+        "message": "How do I set an out-of-office auto-reply while I'm on leave?"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "usb-token-ar",
+      "input": {
+        "message": "هل يمكن التوقيع باستخدام توكن USB؟"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "usb-token-en",
+      "input": {
+        "message": "Can I sign using a USB token?"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "ipad-ar",
+      "input": {
+        "message": "هل يعمل تطبيق الجوال على iPad؟"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "ipad-en",
+      "input": {
+        "message": "Does the mobile app work on iPad?"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "authenticator-ar",
+      "input": {
+        "message": "هل يمكن تفعيل التحقق بخطوتين عبر Google Authenticator؟"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "authenticator-en",
+      "input": {
+        "message": "Can I enable two-step verification with Google Authenticator?"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "outlook-ar",
+      "input": {
+        "message": "هل يمكن مزامنة المراسلات مع Outlook؟"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "outlook-en",
+      "input": {
+        "message": "Can Ole5 sync correspondence with Outlook?"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "whatsapp-ar",
+      "input": {
+        "message": "هل تصل تنبيهات المراسلات عبر واتساب؟"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "whatsapp-en",
+      "input": {
+        "message": "Do correspondence notifications arrive on WhatsApp?"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "safari-mac-ar",
+      "input": {
+        "message": "هل يعمل Ole5 على Safari في أجهزة Mac؟"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "safari-mac-en",
+      "input": {
+        "message": "Does Ole5 work on Safari on a Mac?"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "french-trap-ar",
+      "input": {
+        "message": "هل يمكن تغيير لغة النظام إلى الفرنسية؟"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "french-trap-en",
+      "input": {
+        "message": "Can the system language be changed to French?"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "csv-trap-ar",
+      "input": {
+        "message": "كيف أصدّر نتائج البحث بصيغة CSV؟"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "csv-trap-en",
+      "input": {
+        "message": "How do I export search results as CSV?"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "import-trap-ar",
+      "input": {
+        "message": "كيف أستورد جهات خارجية من نظام آخر مباشرة دون ملف؟"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "import-trap-en",
+      "input": {
+        "message": "How do I import external contacts directly from another system without a file?"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "account-status-ar",
+      "input": {
+        "message": "متى ستتم الموافقة على طلبي؟"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "account-status-en",
+      "input": {
+        "message": "When will my request be approved?"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "migration-always-ticket-ar",
+      "input": {
+        "message": "أحتاج ترحيل بياناتنا القديمة إلى النظام"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    },
+    {
+      "id": "migration-always-ticket-en",
+      "input": {
+        "message": "I need our old data migrated into the system"
+      },
+      "expected": {
+        "context": "The knowledge base says nothing about this. The reply must state no fact about the product, no limit, no 'not supported', and must offer a ticket.",
+        "phase": "offer_ticket",
+        "sources": [],
+        "draft": null
+      }
+    }
+  ]
+}

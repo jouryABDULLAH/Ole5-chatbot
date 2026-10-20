@@ -1,0 +1,446 @@
+{
+  "cases": [
+    {
+      "id": "greeting-only-ar",
+      "input": {
+        "turns": [
+          "مرحبا"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "phase": "greet",
+            "draft": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "greeting-only-en",
+      "input": {
+        "turns": [
+          "Hello"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "phase": "greet",
+            "draft": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "greeting-plus-question-ar",
+      "input": {
+        "turns": [
+          "السلام عليكم، كيف أستعيد كلمة المرور؟"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "phase": "answer",
+            "sources": [
+              "نظام OLE5 — حلول المشكلات الشائعة"
+            ],
+            "answer": "يبدأ الرد برد التحية (وعليكم السلام)، ثم: عند طلب استعادة كلمة المرور يجب كتابة اسم المستخدم متبوعاً بنطاق البيئة الخاص بالجهة.",
+            "draft": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "vague-then-question-ar",
+      "input": {
+        "turns": [
+          "عندي سؤال",
+          "كم مدة صلاحية جلسة رابط الدخول الآمن؟"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "phase": "ask",
+            "draft": null
+          },
+          {
+            "phase": "answer",
+            "sources": [
+              "نظام OLE5 — حلول المشكلات الشائعة"
+            ],
+            "answer": "جلسة رابط الدخول الآمن تنتهي صلاحيتها بعد 8 ساعات.",
+            "draft": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "ticket-to-confirm-en",
+      "input": {
+        "turns": [
+          "The mobile app closes by itself when I open the Inbox",
+          "yes please",
+          "Android 14, app version 3.2, it started yesterday, the error says Unexpected error"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "phase": "offer_ticket",
+            "sources": [],
+            "draft": null
+          },
+          {
+            "phase": "collect",
+            "draft": {
+              "ready": false
+            }
+          },
+          {
+            "phase": [
+              "collect",
+              "confirm"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ticket-to-confirm-ar",
+      "input": {
+        "turns": [
+          "تطبيق الجوال يغلق من نفسه عند فتح صندوق الوارد",
+          "نعم من فضلك",
+          "أندرويد 14، نسخة التطبيق 3.2، بدأت أمس، ونص الخطأ Unexpected error"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "phase": "offer_ticket",
+            "sources": [],
+            "draft": null
+          },
+          {
+            "phase": "collect",
+            "draft": {
+              "ready": false
+            }
+          },
+          {
+            "phase": [
+              "collect",
+              "confirm"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "dont-know-ar",
+      "input": {
+        "turns": [
+          "عندي bug في البرنامج، النظام لا يفتح عندي",
+          "نعم افتح تذكرة",
+          "لا أعلم",
+          "لا أستطيع الإجابة"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "phase": "offer_ticket",
+            "draft": null
+          },
+          {
+            "phase": "collect",
+            "draft": {
+              "ready": false
+            }
+          },
+          {
+            "phase": [
+              "collect",
+              "confirm"
+            ]
+          },
+          {
+            "phase": "confirm",
+            "draft": {
+              "ready": true,
+              "missing_empty": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "urgent-ar",
+      "input": {
+        "turns": [
+          "النظام كله لا يفتح لأي مستخدم في الجهة منذ الصباح",
+          "نعم"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "phase": "offer_ticket",
+            "draft": null
+          },
+          {
+            "phase": "confirm",
+            "draft": {
+              "ready": true,
+              "urgent": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "urgent-en",
+      "input": {
+        "turns": [
+          "No user in our organization can sign in to Ole5 since this morning",
+          "yes"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "phase": "offer_ticket",
+            "draft": null
+          },
+          {
+            "phase": "confirm",
+            "draft": {
+              "ready": true,
+              "urgent": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "decline-ticket-ar",
+      "input": {
+        "turns": [
+          "هل يمكن جدولة إرسال مراسلة في وقت لاحق؟",
+          "لا شكراً"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "phase": "offer_ticket",
+            "draft": null
+          },
+          {
+            "phase": "ask",
+            "draft": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "cancel-at-collect-en",
+      "input": {
+        "turns": [
+          "The mobile app closes when I open the Inbox",
+          "yes",
+          "never mind, cancel the ticket"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "phase": "offer_ticket",
+            "draft": null
+          },
+          {
+            "phase": "collect",
+            "draft": {
+              "ready": false
+            }
+          },
+          {
+            "phase": "ask",
+            "draft": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "detour-at-collect-en",
+      "input": {
+        "turns": [
+          "The mobile app closes when I open the Inbox",
+          "yes",
+          "by the way, how do I reset my password?",
+          "Android 14, app 3.2, since yesterday, error Unexpected error"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "phase": "offer_ticket",
+            "draft": null
+          },
+          {
+            "phase": "collect",
+            "draft": {
+              "ready": false
+            }
+          },
+          {
+            "phase": "answer",
+            "sources": [
+              "نظام OLE5 — حلول المشكلات الشائعة"
+            ],
+            "draft": {
+              "ready": false
+            }
+          },
+          {
+            "phase": [
+              "collect",
+              "confirm"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "detour-at-confirm-ar",
+      "input": {
+        "turns": [
+          "النظام كله لا يفتح لأي مستخدم في الجهة",
+          "نعم",
+          "كم مدة صلاحية جلسة رابط الدخول الآمن؟"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "phase": "offer_ticket",
+            "draft": null
+          },
+          {
+            "phase": "confirm",
+            "draft": {
+              "ready": true
+            }
+          },
+          {
+            "phase": "answer",
+            "sources": [
+              "نظام OLE5 — حلول المشكلات الشائعة"
+            ],
+            "draft": {
+              "ready": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "change-at-confirm-ar",
+      "input": {
+        "turns": [
+          "النظام كله لا يفتح لأي مستخدم في الجهة",
+          "نعم",
+          "غيّر الأولوية إلى منخفضة"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "phase": "offer_ticket",
+            "draft": null
+          },
+          {
+            "phase": "confirm",
+            "draft": {
+              "ready": true
+            }
+          },
+          {
+            "phase": "confirm",
+            "draft": {
+              "ready": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "language-switch",
+      "input": {
+        "turns": [
+          "كيف أستعيد كلمة المرور؟",
+          "And how long does the secure login session last?",
+          "شكراً"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "phase": "answer",
+            "sources": [
+              "نظام OLE5 — حلول المشكلات الشائعة"
+            ],
+            "draft": null
+          },
+          {
+            "phase": "answer",
+            "sources": [
+              "نظام OLE5 — حلول المشكلات الشائعة"
+            ],
+            "language": "en",
+            "draft": null
+          },
+          {
+            "phase": "ask",
+            "language": "ar",
+            "draft": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "unanswerable-during-ticket-en",
+      "input": {
+        "turns": [
+          "The mobile app closes when I open the Inbox",
+          "yes",
+          "also, does Ole5 integrate with Teams?"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "phase": "offer_ticket",
+            "draft": null
+          },
+          {
+            "phase": "collect",
+            "draft": {
+              "ready": false
+            }
+          },
+          {
+            "phase": "collect",
+            "sources": [],
+            "draft": {
+              "ready": false
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

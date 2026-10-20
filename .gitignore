@@ -9,3 +9,7 @@ __pycache__/
 kb_export/
 uploads/
 /sheets
+*.egg-info/
+exp_results/
+.evalkit/
+_to_delete/
