@@ -1,4 +1,4 @@
-"""Conversations. One LangGraph thread per session id, kept by MemorySaver; the session is also what identifies the customer. Submit writes its result into the session with update_state: the closing message, the ticket added to created_tickets, and the draft cleared so a second Submit is refused and a new problem starts a new ticket."""
+"""Conversations. One LangGraph thread per session id, kept by MemorySaver; the session is also what identifies the customer, and every trace of it carries the session id so Phoenix groups them. Submit writes its result into the session with update_state: the closing message, the ticket added to created_tickets, and the draft cleared so a second Submit is refused and a new problem starts a new ticket."""
 
 import threading
 import uuid
@@ -6,6 +6,7 @@ import uuid
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
+from openinference.instrumentation import using_session
 
 from ole5_chat import attachments
 from ole5_chat.agent.graph import build
@@ -31,7 +32,8 @@ def _config(session_id: str) -> dict:
 def start(email: str) -> tuple[str, ChatState]:
     identity = lookup(email)
     session_id = uuid.uuid4().hex
-    return session_id, _graph.invoke(initial_state(identity), _config(session_id))
+    with using_session(session_id):
+        return session_id, _graph.invoke(initial_state(identity), _config(session_id))
 
 
 def get(session_id: str) -> ChatState:
@@ -47,7 +49,8 @@ def current_identity(session_id: str) -> Identity:
 
 def send(session_id: str, text: str) -> ChatState:
     get(session_id)
-    return _graph.invoke({"messages": [HumanMessage(content=text)]}, _config(session_id))
+    with using_session(session_id):
+        return _graph.invoke({"messages": [HumanMessage(content=text)]}, _config(session_id))
 
 
 _submit_lock = threading.Lock()
@@ -73,7 +76,7 @@ def detach(session_id: str, att_id: str) -> bool:
 
 
 def submit(session_id: str) -> ChatState:
-    with _submit_lock:
+    with _submit_lock, using_session(session_id):
         state = get(session_id)
         ticket, closing, corrections = submit_ticket(state, ticket_api.ticket_client())
         _graph.update_state(_config(session_id), {

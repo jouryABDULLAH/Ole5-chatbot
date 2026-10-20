@@ -11,5 +11,6 @@ pytest
 rich
 arize-phoenix
 arize-phoenix-otel
+openinference-instrumentation
 openinference-instrumentation-langchain
 python-multipart
