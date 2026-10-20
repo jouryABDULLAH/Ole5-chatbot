@@ -8,6 +8,7 @@ from typing import TypeVar
 from groq import BadRequestError
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
+from openinference.instrumentation.langchain import get_current_span
 from pydantic import BaseModel, ValidationError
 
 from ole5_chat.config import get_settings
@@ -49,6 +50,8 @@ def structured(system: str, messages: list[BaseMessage], schema: type[T], node: 
             log.warning("%s  llm schema=%s attempt=%d rejected by Groq: %s", node, schema.__name__, attempt + 1, error)
             continue
         ms = int((time.perf_counter() - started) * 1000)
+        if (reasoning := reply.additional_kwargs.get("reasoning_content")) and (span := get_current_span()):
+            span.set_attribute("llm.reasoning", reasoning)
         try:
             result = schema.model_validate_json(_clean(reply.text))
             log.info("%s  llm schema=%s attempt=%d ms=%d", node, schema.__name__, attempt + 1, ms)
