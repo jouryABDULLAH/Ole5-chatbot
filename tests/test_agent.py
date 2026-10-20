@@ -281,3 +281,11 @@ def test_products_differ_in_the_router_prompt(model):
     sessions.send(chat("ole5@example.com"), "x")
     rich_prompt, ole5_prompt = model.calls[0][1], model.calls[2][1]
     assert "whitelisting an IP or a user" in rich_prompt and "data migration requests" in ole5_prompt
+
+
+def test_offer_ticket_gets_no_passages(model):
+    sid = chat()
+    model.add(RouterDecision(intent="question", language="en", queries=["How do I use the archive?"]),
+              Reply(say="I don't have an answer for this."))
+    sessions.send(sid, "archive?")
+    assert "STUB-02 Archive" not in respond_prompt(model) and "No search was run" in respond_prompt(model)

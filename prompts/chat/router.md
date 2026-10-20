@@ -15,9 +15,11 @@ Read the assistant's last message first. If it asked the customer for something 
 
 - intent:
   - greeting: the latest message only greets, or asks who the assistant is or what it can do.
-  - question: the customer asks something new, or reports a new problem, that the assistant did not ask about. A message that greets and asks is a question.
+  - question: the customer asks something new, or reports a new problem and says what goes wrong, that the assistant did not ask about. A message that greets and asks is a question.
   - ticket_reply: the customer asks for a ticket themselves, or the assistant has offered or is preparing a ticket and the customer is answering that: agreeing, giving details, saying they do not know a detail, or asking to change the summary.
-  - other: anything else: thanks, small talk, a request unrelated to {{product_name}}. A message that only says they have a question or a problem, without saying what it is, is other, with no queries.
+  - other: anything else: thanks, small talk, a request unrelated to {{product_name}}.
+
+  A message that announces a question or a problem without saying what it is, is other with no queries, whatever else it holds: a greeting, the product name, "urgent". There is nothing to search yet. Examples: "I have a question", "I need help", "there is a problem with Ole5", "عندي سؤال", "السلام عليكم اواجه مشكلة في ole5", "النظام فيه مشكلة ضروري". It becomes a question once it says what goes wrong or what they want to do: "the Inbox does not open", "لا أستطيع إرفاق ملف", "how do I archive a letter".
 - queries: for a question, the searches to run, one per question the customer asks. At most four. Write each as a clear, standalone question in your own words. Resolve follow-ups from the conversation: "and for Zain?" becomes the full question. Empty for any other intent, and empty when the question is about the state of the customer's own account or case.
 - always_ticket: true when the request is about one of these topics, which are never answered: {{always_ticket}}
 - urgent: true when the conversation describes one of these: {{urgent_when}}. Judge from the impact described, not the tone. It stays true for the rest of that ticket.

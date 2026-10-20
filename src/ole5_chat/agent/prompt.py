@@ -62,7 +62,7 @@ def respond(state: ChatState) -> str:
         ask_before_ticket=_json(config.ask_before_ticket),
         step=state["step"],
         ticket=ticket_status(state.get("ticket_draft"), state.get("attachments") or []),
-        evidence=Retrieval.from_json(retrieval).render() if retrieval else NOT_SEARCHED,
+        evidence=Retrieval.from_json(retrieval).render() if retrieval and state["step"] == "answer" else NOT_SEARCHED,
         schema=schema_text(Reply),
     )
 
