@@ -43,9 +43,16 @@ def save(session_id: str, file_name: str, data: bytes, already: int) -> dict:
 
 
 def find(att_id: str) -> Path | None:
-    if not ID.match(att_id):
+    root = get_settings().attachments_dir
+    if not ID.match(att_id) or not root.is_dir():
         return None
-    return next(get_settings().attachments_dir.glob(f"*/{att_id}-*"), None)
+    prefix = f"{att_id}-"
+    return next((f for folder in root.iterdir() if folder.is_dir() for f in folder.iterdir()
+                 if f.name.startswith(prefix)), None)
+
+
+def file_name(path: Path) -> str:
+    return path.name[33:]
 
 
 def delete(att_id: str) -> None:

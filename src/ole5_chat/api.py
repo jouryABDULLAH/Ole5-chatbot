@@ -156,7 +156,7 @@ def read_attachment(att_id: str) -> FileResponse:
     path = attachments.find(att_id)
     if path is None:
         raise HTTPException(status_code=404, detail="Attachment not found")
-    return FileResponse(path, filename=path.name.split("-", 1)[1])
+    return FileResponse(path, filename=attachments.file_name(path))
 
 
 @app.get("/chat/tickets")

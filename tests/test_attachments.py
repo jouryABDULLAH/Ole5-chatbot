@@ -33,6 +33,7 @@ def test_upload_is_listed_and_served_by_its_link():
     assert client.get(f"/chat/sessions/{sid}").json()["attachments"] == [added]
     served = client.get(f"/chat/attachments/{added['id']}")
     assert served.status_code == 200 and served.content == b"png-bytes"
+    assert 'filename="screen.png"' in served.headers["content-disposition"]
 
 
 def test_type_size_and_count_limits(monkeypatch):

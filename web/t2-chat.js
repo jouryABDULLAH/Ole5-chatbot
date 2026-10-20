@@ -8,7 +8,8 @@
       placeholder: "Write a message", send: "Send", writing: "Writing a reply",
       source: "Source", sources: "Sources",
       summary: "Ticket summary", submit: "Submit ticket", submitting: "Submitting",
-      fields: { queue: "Queue", type: "Type", subtype: "Subtype", priority: "Priority", title: "Title", summary: "Summary" },
+      fields: { queue: "Queue", type: "Type", subtype: "Subtype", priority: "Priority", title: "Title", summary: "Summary",
+                attachments: "Attachments" },
       notSet: "Not set", failed: "The message was not sent. Try again.",
       unreachable: "The chat service cannot be reached. Check that it is running, then try again.",
       restart: "Start a new chat",
@@ -23,7 +24,8 @@
       placeholder: "اكتب رسالتك", send: "إرسال", writing: "جارٍ كتابة الرد",
       source: "المصدر", sources: "المصادر",
       summary: "ملخص التذكرة", submit: "إرسال التذكرة", submitting: "جارٍ الإرسال",
-      fields: { queue: "القائمة", type: "النوع", subtype: "النوع الفرعي", priority: "الأولوية", title: "العنوان", summary: "الملخص" },
+      fields: { queue: "القائمة", type: "النوع", subtype: "النوع الفرعي", priority: "الأولوية", title: "العنوان", summary: "الملخص",
+                attachments: "المرفقات" },
       notSet: "غير محدد", failed: "لم تُرسل الرسالة. حاول مرة أخرى.",
       unreachable: "تعذّر الوصول إلى خدمة المحادثة. تأكد من تشغيلها ثم حاول مرة أخرى.",
       restart: "بدء محادثة جديدة",
@@ -85,7 +87,7 @@
     .card h3 { margin:0; padding:12px 16px; font-size:14px; font-weight:600; border-bottom:1px solid var(--line); }
     .card dl { margin:0; padding:6px 16px; display:grid; grid-template-columns:auto 1fr; gap:6px 16px; font-size:14px; }
     .card dt { color:var(--muted); }
-    .card dd { margin:0; line-height:1.5; }
+    .card dd { margin:0; line-height:1.5; white-space:pre-line; overflow-wrap:anywhere; }
     .card dd.missing { color:var(--muted); font-style:italic; }
     .card .actions { padding:12px 16px 16px; display:flex; flex-direction:column; gap:8px; }
     .card .note { margin:0; color:var(--muted); font-size:13px; }
@@ -274,6 +276,9 @@
         rows.append(el("dt", {}, this.t.fields[key]),
                     el("dd", { class: value ? null : "missing", dir: "auto" }, value || this.t.notSet));
       }
+      const files = this.view.attachments || [];
+      if (files.length) rows.append(el("dt", {}, this.t.fields.attachments),
+                                    el("dd", { dir: "auto" }, files.map((f) => f.file_name).join("\n")));
       return el("div", { class: "card" }, el("h3", {}, this.t.summary), rows,
         el("div", { class: "actions" },
            el("button", { class: "primary", type: "button", disabled: this.busy, onclick: () => this.submitTicket() },
