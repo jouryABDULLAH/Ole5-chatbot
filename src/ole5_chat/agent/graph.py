@@ -1,4 +1,4 @@
-"""The conversation graph, one invoke per customer message. The first run sends the fixed chat.yaml greeting; every later message goes router, search when needed, respond, classify at confirm, validate. A reply that breaks a rule goes back to respond once."""
+"""The conversation graph, one invoke per customer message. The first run sends the fixed chat.yaml greeting. Every later message goes to the router, the only node that routes: its model call reports facts about the message, code picks the step from them, and search and classify hand back to it. Then respond writes the text for that step and validate checks it."""
 
 import logging
 
@@ -7,23 +7,16 @@ from langgraph.graph import END, START, StateGraph
 
 from ole5_chat import llm, products, values
 from ole5_chat.agent import prompt
-from ole5_chat.agent.contracts import Classification, Reply, RouterDecision
+from ole5_chat.agent.contracts import Classification, Reply, RouterDecision, Step
 from ole5_chat.agent.state import ChatState, TicketDraft
-from ole5_chat.agent.validate import NO_ANSWER, SORRY, check_ticket
+from ole5_chat.agent.validate import SORRY, check_ticket
 from ole5_chat.knowledge.contracts import Retrieval, merge
 from ole5_chat.knowledge.search import search as kb_search
 
 log = logging.getLogger(__name__)
 
 MAX_SEARCHES = 4
-
-RETRY_NO_DIRECT = ("No passage answers this question directly. Do not answer it. Say in one line that you don't "
-                   "have an answer for this and ask: \"Would you like me to open a ticket?\". Use step offer_ticket. "
-                   "If the customer greeted you, keep addressing the greeting first.")
-RETRY_ALWAYS_TICKET = ("This topic is never answered. Do not answer it. Say in one line that you don't have an "
-                       "answer for this and ask whether they would like a ticket. Use step offer_ticket. "
-                       "If the customer greeted you, keep addressing the greeting first.")
-RETRY_CREATED = "The step created is set only when the ticket is submitted. Choose another step."
+EXTRA_QUESTION = "unanswered question"
 
 
 def _short(text: str, limit: int = 90) -> str:
@@ -37,6 +30,30 @@ def _direct_documents(state: ChatState) -> list[str]:
     return list(dict.fromkeys(e.document for e in Retrieval.from_json(state["last_retrieval"]).direct))
 
 
+def _new_draft(state: ChatState) -> TicketDraft:
+    return TicketDraft(product=values.catalog(state["identity"].product).service)
+
+
+def _with_details(draft: TicketDraft, decision: RouterDecision) -> TicketDraft:
+    unknown = list(dict.fromkeys([*draft.unknown, *decision.unknown]))
+    return draft.model_copy(update={"collected": {**draft.collected, **decision.collected}, "unknown": unknown,
+                                    "missing": [m for m in decision.missing if m not in unknown],
+                                    "classified": False})
+
+
+def _ticket_step(draft: TicketDraft, decision: RouterDecision) -> Step:
+    return "confirm" if decision.urgent or decision.proceed or not draft.missing else "collect"
+
+
+def _no_answer(draft: TicketDraft | None, decision: RouterDecision, question: str) -> tuple[Step, TicketDraft | None]:
+    if draft is None:
+        return "offer_ticket", None
+    asked = draft.collected.get(EXTRA_QUESTION)
+    collected = {**draft.collected, EXTRA_QUESTION: f"{asked}; {question}" if asked else question}
+    draft = draft.model_copy(update={"collected": collected, "classified": False})
+    return ("confirm" if not draft.missing else "collect"), draft
+
+
 def route(state: ChatState) -> str:
     return "router" if state["messages"] else "greet"
 
@@ -45,26 +62,70 @@ def greet(state: ChatState) -> dict:
     who = state["identity"]
     log.info("greet  product=%s language=%s", who.product, who.language)
     return {"messages": [AIMessage(content=products.load(who.product).greet(who.language))],
-            "phase": "greet", "sources": [], "reply": None}
+            "phase": "greet", "step": None, "sources": [], "reply": None}
 
 
-def router(state: ChatState) -> dict:
+def _decide(state: ChatState) -> dict:
     try:
         decision = llm.structured(prompt.router(state), state["messages"], RouterDecision, node="router")
         corrections = []
     except llm.ModelFailed as exc:
         decision = RouterDecision(intent="other", language=state["identity"].language)
         corrections = [f"router failed: {exc}"]
-    log.info("router  intent=%s always_ticket=%s urgent=%s language=%s queries=%s",
-             decision.intent, decision.always_ticket, decision.urgent, decision.language, decision.queries)
-    return {"decision": decision, "last_retrieval": None, "reply": None, "retry_note": None, "retried": False,
+
+    draft = state.get("ticket_draft")
+    question = state["messages"][-1].text
+    step: Step | None
+    if decision.cancel_ticket:
+        step, draft = "ask", None
+    elif decision.intent == "greeting":
+        step = "greet"
+    elif decision.intent == "other":
+        step = "ask"
+    elif decision.always_ticket and draft is None and state["phase"] != "offer_ticket":
+        step = "offer_ticket"
+    elif decision.intent == "ticket_reply":
+        draft = _with_details(draft or _new_draft(state), decision)
+        step = _ticket_step(draft, decision)
+    elif decision.always_ticket or not decision.queries or (decision.urgent and draft is None):
+        step, draft = _no_answer(draft, decision, question)
+    else:
+        step = None
+
+    log.info("router  intent=%s step=%s always_ticket=%s urgent=%s proceed=%s cancel=%s language=%s queries=%s "
+             "missing=%s unknown=%s", decision.intent, step or "search", decision.always_ticket, decision.urgent,
+             decision.proceed, decision.cancel_ticket, decision.language, decision.queries,
+             draft.missing if draft else None, draft.unknown if draft else None)
+    return {"decision": decision, "step": step, "ticket_draft": draft, "reply": None,
             "corrections": state["corrections"] + corrections}
 
 
+def _after_search(state: ChatState) -> dict:
+    retrieval = Retrieval.from_json(state["last_retrieval"])
+    if retrieval.error:
+        log.warning("router  search failed error=%s, treated as no answer", retrieval.error)
+    if retrieval.direct:
+        step, draft = "answer", state.get("ticket_draft")
+    else:
+        step, draft = _no_answer(state.get("ticket_draft"), state["decision"], state["messages"][-1].text)
+    log.info("router  after search step=%s direct=%d", step, len(retrieval.direct))
+    return {"step": step, "ticket_draft": draft}
+
+
+def router(state: ChatState) -> dict:
+    if state["step"] is None and state.get("last_retrieval") is None:
+        return _decide(state)
+    if state["step"] is None:
+        return _after_search(state)
+    log.info("router  after classify step=%s", state["step"])
+    return {}
+
+
 def after_router(state: ChatState) -> str:
-    decision = state["decision"]
-    if decision.intent == "question" and decision.queries and not decision.always_ticket:
+    if state["step"] is None:
         return "search"
+    if state["step"] == "confirm" and not state["ticket_draft"].classified:
+        return "classify"
     return "respond"
 
 
@@ -77,35 +138,6 @@ def search(state: ChatState) -> dict:
     log.info("search  verdict=%s passages=%d direct=%d documents=%s error=%s",
              result.verdict.value, len(result.evidence), len(result.direct), result.documents, result.error)
     return {"last_retrieval": result.as_json()}
-
-
-def respond(state: ChatState) -> dict:
-    messages = state["messages"]
-    if state.get("retry_note"):
-        messages = [*messages,
-                    AIMessage(content=state["reply"].say),
-                    HumanMessage(content=f"Note from the system, not the customer: {state['retry_note']} "
-                                         "Write the reply again.")]
-    try:
-        reply = llm.structured(prompt.respond(state), messages, Reply, node="respond")
-        corrections = []
-    except llm.ModelFailed as exc:
-        reply = Reply(say=SORRY[state["decision"].language], step="ask")
-        corrections = [f"respond failed: {exc}"]
-    log.info("respond  retry=%s step=%s say=%r sources=%s collected=%s missing=%s", bool(state.get("retry_note")),
-             reply.step, _short(reply.say), reply.sources, reply.collected, reply.missing)
-    update = {"reply": reply, "retry_note": None, "corrections": state["corrections"] + corrections}
-    collecting = reply.step in ("collect", "confirm")
-    if collecting or reply.missing:
-        draft = state.get("ticket_draft") or TicketDraft(product=values.catalog(state["identity"].product).service)
-        missing = reply.missing if collecting else list(dict.fromkeys([*draft.missing, *reply.missing]))
-        update["ticket_draft"] = draft.model_copy(update={"collected": {**draft.collected, **reply.collected},
-                                                          "missing": missing})
-    return update
-
-
-def after_respond(state: ChatState) -> str:
-    return "classify" if state["reply"].step == "confirm" else "validate"
 
 
 def classify(state: ChatState) -> dict:
@@ -127,62 +159,51 @@ def classify(state: ChatState) -> dict:
         messages = [*messages, AIMessage(content=result.model_dump_json()),
                     HumanMessage(content="These values were refused: " + "; ".join(problems)
                                  + ". Choose each from its list exactly as written.")]
-    draft = state["ticket_draft"].model_copy(update=fields)
+    draft = state["ticket_draft"].model_copy(update={**fields, "classified": True})
+    log.info("classify  checked queue=%s type=%s subtype=%s priority=%s urgent=%s reason=%r refused=%s",
+             draft.queue, draft.type, draft.subtype, draft.priority, draft.urgent, _short(draft.reason or ""),
+             problems)
     return {"ticket_draft": draft, "corrections": state["corrections"] + problems}
 
 
-def _violation(state: ChatState) -> str | None:
-    reply, decision = state["reply"], state["decision"]
-    if reply.step == "created":
-        return RETRY_CREATED
-    if reply.step == "answer" and decision.always_ticket:
-        return RETRY_ALWAYS_TICKET
-    if reply.step == "answer" and not _direct_documents(state):
-        return RETRY_NO_DIRECT
-    return None
+def respond(state: ChatState) -> dict:
+    step = state["step"]
+    try:
+        reply = llm.structured(prompt.respond(state), state["messages"], Reply, node="respond")
+        corrections = []
+    except llm.ModelFailed as exc:
+        reply = Reply(say=SORRY[state["decision"].language])
+        corrections = [f"respond failed: {exc}"]
+        if step == "answer":
+            step = "ask"
+    log.info("respond  step=%s say=%r sources=%s", step, _short(reply.say), reply.sources)
+    return {"reply": reply, "step": step, "corrections": state["corrections"] + corrections}
 
 
 def validate(state: ChatState) -> dict:
-    reply, decision = state["reply"], state["decision"]
-    problem = _violation(state)
-    if problem and not state["retried"]:
-        log.info("validate  model_step=%s sent back to respond: %s", reply.step, problem)
-        return {"retry_note": problem, "retried": True,
-                "corrections": state["corrections"] + [f"sent back to respond: {problem}"]}
-
-    corrections: list[str] = []
-    step, say, sources = reply.step, reply.say, reply.sources
-    if problem == RETRY_CREATED:
-        corrections.append("step created still set after the retry: changed to ask")
-        step = "ask"
-    elif problem:
-        corrections.append(f"still broken after the retry, standard no-answer text used: {problem}")
-        step, say = "offer_ticket", NO_ANSWER[decision.language]
+    reply, step = state["reply"], state["step"]
+    sources: list[str] = []
     if step == "answer":
         direct = _direct_documents(state)
-        sources = [s for s in sources if s in direct] or direct
-    else:
-        sources = []
-
-    log.info("validate  model_step=%s final_step=%s sources=%s corrections=%s", reply.step, step, sources, corrections)
-    return {"messages": [AIMessage(content=say)], "phase": step, "sources": sources, "retry_note": None,
-            "corrections": state["corrections"] + corrections}
-
-
-def after_validate(state: ChatState) -> str:
-    return "respond" if state.get("retry_note") else END
+        sources = [s for s in reply.sources if s in direct] or direct
+        dropped = [s for s in reply.sources if s not in direct]
+        if dropped:
+            log.info("validate  dropped sources not in a DIRECT passage: %s", dropped)
+    log.info("validate  step=%s sources=%s", step, sources)
+    return {"messages": [AIMessage(content=reply.say)], "phase": step, "step": None, "sources": sources,
+            "last_retrieval": None}
 
 
 def build(checkpointer):
     g = StateGraph(ChatState)
-    for name, node in (("greet", greet), ("router", router), ("search", search), ("respond", respond),
-                       ("classify", classify), ("validate", validate)):
+    for name, node in (("greet", greet), ("router", router), ("search", search), ("classify", classify),
+                       ("respond", respond), ("validate", validate)):
         g.add_node(name, node)
     g.add_conditional_edges(START, route, ["greet", "router"])
-    g.add_conditional_edges("router", after_router, ["search", "respond"])
-    g.add_edge("search", "respond")
-    g.add_conditional_edges("respond", after_respond, ["classify", "validate"])
-    g.add_edge("classify", "validate")
-    g.add_conditional_edges("validate", after_validate, ["respond", END])
+    g.add_conditional_edges("router", after_router, ["search", "classify", "respond"])
+    g.add_edge("search", "router")
+    g.add_edge("classify", "router")
+    g.add_edge("respond", "validate")
+    g.add_edge("validate", END)
     g.add_edge("greet", END)
     return g.compile(checkpointer=checkpointer)

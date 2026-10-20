@@ -1,4 +1,4 @@
-"""The Submit flow: checks the confirmed draft again, creates the ticket with the summary and the conversation, classifies it with an internal note, records it in tickets.xlsx, and returns the closing message."""
+"""The Submit flow: checks the ready draft again, creates the ticket with the summary and the conversation, classifies it with an internal note, records it in tickets.xlsx, and returns the closing message."""
 
 import logging
 from datetime import datetime, timezone
@@ -32,6 +32,7 @@ def internal_note(draft, corrections: list[str]) -> str:
     collected = "; ".join(f"{k}: {v}" for k, v in draft.collected.items()) or "nothing"
     urgent = f"yes, {draft.urgent_reason}" if draft.urgent else "no"
     lines = [f"Collected: {collected}", f"Missing: {'; '.join(draft.missing) or 'nothing'}",
+             f"Customer does not know: {'; '.join(draft.unknown) or 'nothing'}",
              f"Confidence: {draft.confidence or 'not set'}", f"Why this queue: {draft.queue_reason or 'not given'}",
              f"Urgent: {urgent}"]
     if corrections:
@@ -40,11 +41,9 @@ def internal_note(draft, corrections: list[str]) -> str:
 
 
 def check(state: ChatState) -> None:
-    if state.get("created_ticket"):
-        raise SubmitRefused(f"ticket {state['created_ticket']['ticket_number']} was already created")
-    if state["phase"] != "confirm" or not state.get("ticket_draft"):
+    draft = state.get("ticket_draft")
+    if draft is None or not draft.classified:
         raise SubmitRefused("there is no ticket summary to submit")
-    draft = state["ticket_draft"]
     empty = [f for f in REQUIRED if not getattr(draft, f)]
     if empty:
         raise SubmitRefused("the ticket is missing: " + ", ".join(empty))
@@ -57,6 +56,8 @@ def check(state: ChatState) -> None:
 def submit(state: ChatState, api: TicketApi) -> tuple[dict, str, list[str]]:
     check(state)
     who, draft = state["identity"], state["ticket_draft"]
+    log.info("tickets  sending queue=%s type=%s subtype=%s priority=%s urgent=%s reason=%r title=%r",
+             draft.queue, draft.type, draft.subtype, draft.priority, draft.urgent, draft.reason, draft.title)
     created = api.create(
         ticket={"Title": draft.title, "Service": draft.product, "Queue": draft.queue, "State": "new",
                 "Priority": draft.priority, "Type": draft.type, "CustomerUser": who.email},

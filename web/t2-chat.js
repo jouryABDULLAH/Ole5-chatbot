@@ -204,7 +204,7 @@
         }
         log.append(bubble);
       });
-      if (this.view.phase === "confirm" && this.view.ticket_draft) log.append(this.card(this.view.ticket_draft));
+      if (this.view.draft_ready && this.view.ticket_draft) log.append(this.card(this.view.ticket_draft));
       if (this.busy) log.append(el("div", { class: "writing" }, el("span", { class: "dots", "aria-hidden": "true" },
                                     el("i"), el("i"), el("i")), this.t.writing));
       if (this.error) log.append(el("p", { class: "error", role: "alert" }, this.error));

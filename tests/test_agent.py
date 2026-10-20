@@ -1,12 +1,19 @@
-"""The agent graph with a scripted model and the stand-in knowledge base: greeting, answers, ticket offers, never-answered topics and value checks."""
+"""The agent graph with a scripted model and the stand-in knowledge base: the router picks the step in code from what its model call reports, for greetings, answers, ticket offers, the ticket flow, detours, cancels and failures."""
+
+import logging
 
 import pytest
 
 from ole5_chat import sessions
 from ole5_chat.agent import graph
 from ole5_chat.agent.contracts import Classification, Reply, RouterDecision
-from ole5_chat.agent.validate import NO_ANSWER, check_ticket
+from ole5_chat.agent.validate import check_ticket
+from ole5_chat.knowledge.contracts import Retrieval, Verdict
 from ole5_chat.values import catalog
+
+GOOD = Classification(queue="Ole5 Technical", type="Mobile App Issue", subtype="Application crash",
+                      reason="Issue - app crashes on Inbox", priority="Medium", title="App crash",
+                      summary="The app crashes on the Inbox screen.", confidence="high", queue_reason="tech")
 
 
 @pytest.fixture
@@ -27,83 +34,86 @@ def chat(email="ole5@example.com"):
     return sid
 
 
-def test_hi_gets_a_greeting_from_respond_and_no_search(model, searches):
+def ticket_reply(**fields):
+    return RouterDecision(intent="ticket_reply", language="en", **fields)
+
+
+def respond_prompt(model):
+    return [system for schema, system in model.calls if schema is Reply][-1]
+
+
+def collecting(model, sid):
+    model.add(ticket_reply(collected={"problem": "app crashes"}, missing=["screen"]), Reply(say="Which screen?"))
+    return sessions.send(sid, "yes open a ticket")
+
+
+def confirming(model, sid):
+    collecting(model, sid)
+    model.add(ticket_reply(collected={"screen": "Inbox"}), GOOD, Reply(say="Your summary is ready."))
+    return sessions.send(sid, "the Inbox screen")
+
+
+def test_first_message_is_the_fixed_greeting_without_a_model_call(model):
+    state = sessions.get(chat())
+    assert state["messages"][0].text == "أهلاً، كيف يمكنني مساعدتك في Ole5؟"
+    assert model.calls == []
+
+
+def test_hi_is_greeted_without_a_search(model, searches):
     sid = chat()
-    model.add(RouterDecision(intent="greeting", language="ar"), Reply(say="أهلاً بك، كيف أساعدك؟", step="greet"))
+    model.add(RouterDecision(intent="greeting", language="ar"), Reply(say="أهلاً بك، كيف أساعدك؟"))
     state = sessions.send(sid, "مرحبا")
     assert state["phase"] == "greet"
     assert state["messages"][-1].text == "أهلاً بك، كيف أساعدك؟"
     assert searches == []
     assert [c[0] for c in model.calls] == [RouterDecision, Reply]
-
-
-def test_first_message_is_the_fixed_greeting_without_a_model_call(model):
-    sid = chat()
-    state = sessions.get(sid)
-    assert state["messages"][0].text == "أهلاً، كيف يمكنني مساعدتك في Ole5؟"
-    assert model.calls == []
-
-
-def test_ticket_offer_written_by_respond_is_kept(model):
-    sid = chat()
-    offer = "ليس لدي إجابة على هذا السؤال. هل تريد أن أفتح لك تذكرة؟"
-    model.add(RouterDecision(intent="question", queries=["كيف أغير الباشورد"], language="ar"),
-              Reply(say=offer, step="offer_ticket"))
-    state = sessions.send(sid, "كيف اعيد صياغة الباشورد في حسابي")
-    assert state["messages"][-1].text == offer
+    assert "Step: greet" in respond_prompt(model)
 
 
 def test_covered_question_is_answered_with_sources(model, searches):
     sid = chat()
     model.add(RouterDecision(intent="question", language="en", queries=["How do I reset my password?"]),
-              Reply(say="Choose Forgot password on the sign-in page.", step="answer", sources=["STUB-01 Signing in"]))
-    state = sessions.send(sid, "I forgot my password")
+              Reply(say="Choose Forgot password on the sign-in page.", sources=["STUB-01 Signing in", "Made up"]))
+    state = sessions.send(sid, "hi, I forgot my password")
     assert searches == ["How do I reset my password?"]
     assert state["phase"] == "answer"
     assert state["sources"] == ["STUB-01 Signing in"]
-    assert "STUB-01 Signing in" in model.calls[-1][1]
+    assert "Step: answer" in respond_prompt(model) and "STUB-01 Signing in" in respond_prompt(model)
+    assert state["last_retrieval"] is None and state["step"] is None
 
 
-def test_uncovered_answer_is_sent_back_and_respond_rewrites_it(model):
+def test_uncovered_question_gets_a_ticket_offer_chosen_in_code(model):
     sid = chat()
-    offer = "I don't have an answer for this. Would you like me to open a ticket?"
     model.add(RouterDecision(intent="question", language="en", queries=["How do I export a report?"]),
-              Reply(say="Go to Reports and press Export.", step="answer", sources=["Made up"]),
-              Reply(say=offer, step="offer_ticket"))
+              Reply(say="I don't have an answer for this. Would you like a ticket?", sources=["Made up"]))
     state = sessions.send(sid, "how do I export a report?")
     assert state["phase"] == "offer_ticket"
-    assert state["messages"][-1].text == offer
     assert state["sources"] == []
-    assert [c[0] for c in model.calls] == [RouterDecision, Reply, Reply]
-    assert any("sent back to respond" in c for c in state["corrections"])
+    assert "Step: offer_ticket" in respond_prompt(model)
 
 
-def test_retry_messages_are_never_saved(model):
+def test_inferential_only_is_not_an_answer(model):
     sid = chat()
-    model.add(RouterDecision(intent="question", language="en", queries=["export"]),
-              Reply(say="Press Export.", step="answer"),
-              Reply(say="I don't have an answer for this. Would you like me to open a ticket?", step="offer_ticket"))
-    state = sessions.send(sid, "how do I export?")
-    texts = [m.text for m in state["messages"]]
-    assert texts[1:] == ["how do I export?", "I don't have an answer for this. Would you like me to open a ticket?"]
-    assert "Press Export." not in texts
-    assert not any("Note from the system" in t for t in texts)
+    model.add(RouterDecision(intent="question", language="en", queries=["How do I use the archive?"]),
+              Reply(say="I don't have an answer for this."))
+    assert sessions.send(sid, "archive?")["phase"] == "offer_ticket"
 
 
-def test_second_broken_reply_falls_back_to_the_standard_text(model):
+def test_failed_search_reads_as_no_answer_and_is_logged(model, monkeypatch, caplog):
     sid = chat()
-    model.add(RouterDecision(intent="question", language="ar", queries=["export"]),
-              Reply(say="Press Export.", step="answer"), Reply(say="Really, press Export.", step="answer"))
-    state = sessions.send(sid, "كيف أصدر تقريراً؟")
+    monkeypatch.setattr(graph, "kb_search", lambda q, p: Retrieval(query=q, verdict=Verdict.NOT_IN_KB,
+                                                                   error="retrieval incomplete: timeout"))
+    model.add(RouterDecision(intent="question", language="en", queries=["q"]), Reply(say="No answer."))
+    with caplog.at_level(logging.WARNING):
+        state = sessions.send(sid, "q?")
     assert state["phase"] == "offer_ticket"
-    assert state["messages"][-1].text == NO_ANSWER["ar"]
-    assert any("still broken after the retry" in c for c in state["corrections"])
+    assert any("search failed" in r.message and r.levelno == logging.WARNING for r in caplog.records)
 
 
 def test_at_most_four_searches(model, searches):
     sid = chat()
     model.add(RouterDecision(intent="question", language="en", queries=[f"q{i}" for i in range(6)]),
-              Reply(say="I don't have an answer for this. Would you like me to open a ticket?", step="offer_ticket"))
+              Reply(say="No answer."))
     sessions.send(sid, "six questions")
     assert searches == ["q0", "q1", "q2", "q3"]
 
@@ -114,54 +124,120 @@ def test_router_language_is_required():
         RouterDecision(intent="other")
 
 
-def test_inferential_only_is_not_an_answer(model):
-    sid = chat()
-    model.add(RouterDecision(intent="question", language="en", queries=["How do I use the archive?"]),
-              Reply(say="Open the Archive screen.", step="answer", sources=["STUB-02 Archive"]),
-              Reply(say="I don't have an answer for this. Would you like me to open a ticket?", step="offer_ticket"))
-    assert sessions.send(sid, "archive?")["phase"] == "offer_ticket"
-
-
-def test_always_ticket_is_never_searched_or_answered(model, searches):
+def test_always_ticket_is_never_searched(model, searches):
     sid = chat()
     model.add(RouterDecision(intent="question", language="en", queries=["password migration"], always_ticket=True),
-              Reply(say="Here is how.", step="answer"),
-              Reply(say="I don't have an answer for this. Would you like me to open a ticket?", step="offer_ticket"))
+              Reply(say="No answer."))
     state = sessions.send(sid, "migrate our data")
     assert searches == []
     assert state["phase"] == "offer_ticket"
 
 
-def test_ticket_flow_refuses_a_value_then_accepts_the_retry(model):
+def test_always_ticket_is_offered_before_a_draft_even_when_read_as_a_ticket_reply(model):
     sid = chat()
-    model.add(RouterDecision(intent="ticket_reply", language="en"),
-              Reply(say="Which screen?", step="collect", collected={"problem": "app crashes"}, missing=["screen"]))
-    state = sessions.send(sid, "yes open a ticket")
-    assert state["phase"] == "collect"
-    assert state["ticket_draft"].product == "Ole5"
+    model.add(ticket_reply(always_ticket=True, proceed=True), Reply(say="Shall I open a ticket?"))
+    state = sessions.send(sid, "I need help migrating our old data")
+    assert state["phase"] == "offer_ticket" and state["ticket_draft"] is None
+    model.add(ticket_reply(always_ticket=True, collected={"request": "data migration"}, missing=["volume"]),
+              Reply(say="How much data?"))
+    assert sessions.send(sid, "yes")["phase"] == "collect"
 
-    model.add(RouterDecision(intent="ticket_reply", language="en"),
-              Reply(say="Your ticket summary is ready. Press Submit to send it.", step="confirm",
-                    collected={"screen": "Inbox"}),
-              Classification(queue="Ole5 Helpdesk", type="Mobile App Issue", subtype="Application crash",
-                             reason="Issue - app crashes on Inbox", priority="Medium", title="App crash",
-                             summary="The app crashes on the Inbox screen.", confidence="high", queue_reason="tech"),
-              Classification(queue="Ole5 Technical", type="Mobile App Issue", subtype="Application crash",
-                             reason="Issue - app crashes on Inbox", priority="Medium", title="App crash",
-                             summary="The app crashes on the Inbox screen.", confidence="high", queue_reason="tech"))
+
+def test_urgent_question_offers_a_ticket_without_searching(model, searches):
+    sid = chat()
+    model.add(RouterDecision(intent="question", language="en", queries=["password"], urgent=True),
+              Reply(say="Shall I open an urgent ticket?"))
+    assert sessions.send(sid, "nobody can sign in, password reset fails")["phase"] == "offer_ticket"
+    assert searches == []
+
+
+def test_vague_message_is_asked_to_say_more(model):
+    sid = chat()
+    model.add(RouterDecision(intent="other", language="ar"), Reply(say="تفضل، ما سؤالك؟"))
+    assert sessions.send(sid, "عندي سؤال")["phase"] == "ask"
+
+
+def test_ticket_flow_collects_then_confirms_after_a_refused_value(model):
+    sid = chat()
+    state = collecting(model, sid)
+    assert state["phase"] == "collect"
+    assert state["ticket_draft"].product == "Ole5" and state["ticket_draft"].missing == ["screen"]
+
+    model.add(ticket_reply(collected={"screen": "Inbox"}),
+              GOOD.model_copy(update={"queue": "Ole5 Helpdesk"}), GOOD, Reply(say="Your summary is ready."))
     state = sessions.send(sid, "the Inbox screen")
     draft = state["ticket_draft"]
     assert state["phase"] == "confirm"
     assert (draft.queue, draft.type, draft.subtype) == ("Ole5 Technical", "Mobile App Issue", "Application crash")
     assert draft.collected == {"problem": "app crashes", "screen": "Inbox"}
-    assert draft.missing == []
+    assert draft.missing == [] and draft.classified
+
+
+def test_details_already_given_go_straight_to_confirm(model):
+    sid = chat()
+    model.add(ticket_reply(collected={"problem": "app crashes", "screen": "Inbox"}), GOOD, Reply(say="Ready."))
+    assert sessions.send(sid, "yes")["phase"] == "confirm"
+
+
+def test_detail_the_customer_does_not_know_is_not_asked_again(model):
+    sid = chat()
+    collecting(model, sid)
+    model.add(ticket_reply(missing=["screen"], unknown=["screen"]), GOOD, Reply(say="Ready."))
+    state = sessions.send(sid, "I don't know which screen")
+    assert state["phase"] == "confirm"
+    assert state["ticket_draft"].missing == [] and state["ticket_draft"].unknown == ["screen"]
+
+
+def test_proceed_confirms_with_what_was_given(model):
+    sid = chat()
+    collecting(model, sid)
+    model.add(ticket_reply(missing=["screen"], proceed=True), GOOD, Reply(say="Ready."))
+    state = sessions.send(sid, "just open it")
+    assert state["phase"] == "confirm" and state["ticket_draft"].missing == ["screen"]
+
+
+def test_cancel_drops_the_ticket(model):
+    sid = chat()
+    confirming(model, sid)
+    model.add(RouterDecision(intent="other", language="en", cancel_ticket=True), Reply(say="Okay."))
+    state = sessions.send(sid, "cancel it")
+    assert state["phase"] == "ask" and state["ticket_draft"] is None
+
+
+def test_answered_question_while_collecting_keeps_the_ticket(model):
+    sid = chat()
+    collecting(model, sid)
+    model.add(RouterDecision(intent="question", language="en", queries=["How do I reset my password?"]),
+              Reply(say="Choose Forgot password. Which screen crashes?"))
+    state = sessions.send(sid, "by the way, how do I reset my password?")
+    assert state["phase"] == "answer"
+    assert state["ticket_draft"].missing == ["screen"]
+    assert 'Still missing: ["screen"]' in respond_prompt(model)
+
+
+def test_unanswered_question_while_collecting_is_added_to_the_ticket(model):
+    sid = chat()
+    collecting(model, sid)
+    model.add(RouterDecision(intent="question", language="en", queries=["export"]), Reply(say="Added. Which screen?"))
+    state = sessions.send(sid, "how do I export?")
+    assert state["phase"] == "collect"
+    assert state["ticket_draft"].collected[graph.EXTRA_QUESTION] == "how do I export?"
+
+
+def test_question_at_confirm_keeps_the_summary_ready(model):
+    sid = chat()
+    confirming(model, sid)
+    model.add(RouterDecision(intent="question", language="en", queries=["How do I reset my password?"]),
+              Reply(say="Choose Forgot password."))
+    state = sessions.send(sid, "how do I reset my password?")
+    assert state["phase"] == "answer" and state["ticket_draft"].classified
 
 
 def test_value_still_wrong_after_retry_is_left_empty(model):
     sid = chat()
     bad = Classification(queue="Nope", type="Bug", subtype="Software malfunction", reason="Bug - x",
                          priority="Medium", title="t", summary="s", confidence="low", queue_reason="r")
-    model.add(RouterDecision(intent="ticket_reply", language="en"), Reply(say="Ready.", step="confirm"), bad, bad)
+    model.add(ticket_reply(collected={"problem": "x"}), bad, bad, Reply(say="Ready."))
     state = sessions.send(sid, "yes")
     assert state["ticket_draft"].queue is None
     assert any("queue: 'Nope'" in c for c in state["corrections"])
@@ -185,17 +261,23 @@ def test_rich_reason_comes_from_the_catalog_not_the_model():
 
 
 def test_model_failure_gives_a_safe_reply(model):
-    sid = chat()
-    state = sessions.send(sid, "hello?")
+    state = sessions.send(chat(), "hello?")
     assert state["phase"] == "ask"
     assert state["messages"][-1].text.startswith("عذراً")
     assert any("router failed" in c for c in state["corrections"])
 
 
+def test_respond_failure_never_leaves_an_empty_answer(model):
+    sid = chat()
+    model.add(RouterDecision(intent="question", language="en", queries=["How do I reset my password?"]))
+    state = sessions.send(sid, "password?")
+    assert state["phase"] == "ask" and state["sources"] == []
+
+
 def test_products_differ_in_the_router_prompt(model):
-    model.add(RouterDecision(intent="other", language="en"), Reply(say="ok", step="ask"))
+    model.add(RouterDecision(intent="other", language="en"), Reply(say="ok"))
     sessions.send(chat("rich@example.com"), "x")
-    model.add(RouterDecision(intent="other", language="en"), Reply(say="ok", step="ask"))
+    model.add(RouterDecision(intent="other", language="en"), Reply(say="ok"))
     sessions.send(chat("ole5@example.com"), "x")
     rich_prompt, ole5_prompt = model.calls[0][1], model.calls[2][1]
     assert "whitelisting an IP or a user" in rich_prompt and "data migration requests" in ole5_prompt

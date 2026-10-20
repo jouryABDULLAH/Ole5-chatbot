@@ -1,14 +1,10 @@
-"""The rules the model does not get to bend: no answer without a DIRECT passage, never-answered topics, and every ticket value from the lists."""
+"""The rules the model does not get to bend: every ticket value from the lists, and the safe reply when a model call fails."""
 
 import re
 
 from ole5_chat.agent.contracts import Classification
 from ole5_chat.values import Catalog
 
-NO_ANSWER = {
-    "en": "I don't have an answer for this. Would you like me to open a ticket?",
-    "ar": "ليس لدي إجابة على هذا. هل تريد أن أفتح لك تذكرة؟",
-}
 SORRY = {
     "en": "Sorry, something went wrong on our side. Please try again.",
     "ar": "عذراً، حدث خطأ من جهتنا. يرجى المحاولة مرة أخرى.",

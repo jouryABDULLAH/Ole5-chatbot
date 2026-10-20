@@ -45,7 +45,9 @@ class SessionView(BaseModel):
     messages: list[Line]
     sources: list[str]
     ticket_draft: TicketDraft | None = None
+    draft_ready: bool = False
     ticket_number: str | None = None
+    ticket_numbers: list[str] = []
 
 
 class TicketView(BaseModel):
@@ -63,11 +65,12 @@ def _line(message: BaseMessage) -> Line:
 
 
 def _view(session_id: str, state: ChatState) -> SessionView:
-    who = state["identity"]
+    who, draft = state["identity"], state.get("ticket_draft")
+    numbers = [t["ticket_number"] for t in state["created_tickets"]]
     return SessionView(session_id=session_id, product_name=products.load(who.product).name, language=who.language,
                        phase=state["phase"], messages=[_line(m) for m in state["messages"]],
-                       sources=state["sources"], ticket_draft=state.get("ticket_draft"),
-                       ticket_number=(state.get("created_ticket") or {}).get("ticket_number"))
+                       sources=state["sources"], ticket_draft=draft, draft_ready=bool(draft and draft.classified),
+                       ticket_number=numbers[-1] if numbers else None, ticket_numbers=numbers)
 
 
 

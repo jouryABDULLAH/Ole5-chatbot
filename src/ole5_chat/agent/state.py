@@ -24,6 +24,8 @@ class TicketDraft(BaseModel):
     summary: str | None = None
     collected: dict[str, str] = {}
     missing: list[str] = []
+    unknown: list[str] = []
+    classified: bool = False
     confidence: Literal["high", "medium", "low"] | None = None
     queue_reason: str | None = None
 
@@ -31,18 +33,16 @@ class TicketDraft(BaseModel):
 class ChatState(MessagesState):
     identity: Identity
     phase: Step
+    step: Step | None
     sources: list[str]
     decision: RouterDecision | None
     last_retrieval: dict | None
     reply: Reply | None
-    retry_note: str | None
-    retried: bool
     ticket_draft: TicketDraft | None
     corrections: list[str]
-    created_ticket: dict | None
+    created_tickets: list[dict]
 
 
 def initial_state(identity: Identity) -> ChatState:
-    return ChatState(messages=[], identity=identity, phase="greet", sources=[], decision=None, last_retrieval=None,
-                     reply=None, retry_note=None, retried=False, ticket_draft=None, corrections=[],
-                     created_ticket=None)
+    return ChatState(messages=[], identity=identity, phase="greet", step=None, sources=[], decision=None,
+                     last_retrieval=None, reply=None, ticket_draft=None, corrections=[], created_tickets=[])

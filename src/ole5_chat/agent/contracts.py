@@ -1,4 +1,4 @@
-"""What each LLM node must return. The model fills these; code checks them before anything reaches the customer or a ticket."""
+"""What each LLM node must return. The router reports facts about the message, code picks the step from them, respond writes the text for that step, and code checks it before anything reaches the customer or a ticket."""
 
 from typing import Literal
 
@@ -15,16 +15,18 @@ class RouterDecision(BaseModel):
     always_ticket: bool = False
     urgent: bool = False
     language: Literal["ar", "en"]
+    collected: dict[str, str] = {}
+    missing: list[str] = []
+    unknown: list[str] = []
+    proceed: bool = False
+    cancel_ticket: bool = False
 
 
 class Reply(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     say: str
-    step: Step
     sources: list[str] = []
-    collected: dict[str, str] = {}
-    missing: list[str] = []
 
 
 class Classification(BaseModel):

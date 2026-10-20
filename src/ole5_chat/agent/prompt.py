@@ -5,7 +5,7 @@ from functools import lru_cache
 
 from ole5_chat import products, values
 from ole5_chat.agent.contracts import Classification, Reply, RouterDecision
-from ole5_chat.agent.state import ChatState
+from ole5_chat.agent.state import ChatState, TicketDraft
 from ole5_chat.config import ROOT
 from ole5_chat.knowledge.contracts import Retrieval
 from ole5_chat.llm import schema_text
@@ -33,26 +33,33 @@ def _json(value) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
+def ticket_status(draft: TicketDraft | None) -> str:
+    if draft is None:
+        return "No ticket is being prepared."
+    ready = "yes, shown to the customer with a Submit button" if draft.classified else "no"
+    return (f"A ticket is being prepared.\nCollected: {_json(draft.collected)}\nStill missing: {_json(draft.missing)}"
+            f"\nThe customer does not know: {_json(draft.unknown)}\nSummary ready: {ready}")
+
+
 def router(state: ChatState) -> str:
     config = products.load(state["identity"].product)
+    last = next((m.text for m in reversed(state["messages"]) if m.type == "ai"), "none")
     return _fill("router", product_name=config.name, always_ticket=_list(config.always_ticket),
-                 urgent_when=_list(config.urgent_when), phase=state["phase"], schema=schema_text(RouterDecision))
+                 urgent_when=_list(config.urgent_when), ask_before_ticket=_json(config.ask_before_ticket),
+                 last_assistant=last, ticket=ticket_status(state.get("ticket_draft")),
+                 schema=schema_text(RouterDecision))
 
 
 def respond(state: ChatState) -> str:
     config = products.load(state["identity"].product)
-    draft = state.get("ticket_draft")
     retrieval = state.get("last_retrieval")
-    decision = state.get("decision")
     return _fill(
         "respond",
         product_name=config.name,
         tone=config.tone,
         ask_before_ticket=_json(config.ask_before_ticket),
-        phase=state["phase"],
-        decision=decision.model_dump_json() if decision else "none",
-        collected=_json(draft.collected if draft else {}),
-        missing=_json(draft.missing if draft else []),
+        step=state["step"],
+        ticket=ticket_status(state.get("ticket_draft")),
         evidence=Retrieval.from_json(retrieval).render() if retrieval else NOT_SEARCHED,
         schema=schema_text(Reply),
     )

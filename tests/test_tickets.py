@@ -13,7 +13,8 @@ from ole5_chat.tickets.client import TicketApiError
 DRAFT = dict(product="Ole5", queue="Ole5 Technical", type="Mobile App Issue", subtype="Application crash",
              reason="Issue - the app crashes on the Inbox screen", priority="Medium", title="App crashes on Inbox",
              summary="The mobile app crashes when the customer opens the Inbox screen.",
-             collected={"screen": "Inbox"}, missing=[], confidence="high", queue_reason="An app defect")
+             collected={"screen": "Inbox"}, missing=[], classified=True, confidence="high",
+             queue_reason="An app defect")
 
 
 def confirmed(email="ole5@example.com", **changes):
@@ -50,9 +51,10 @@ def test_submit_creates_the_ticket_as_the_spec_shows(api):
     assert update["DynamicField"] == [{"Name": "SubType", "Value": "Application crash"},
                                       {"Name": "Conclusions", "Value": DRAFT["reason"]}]
     assert update["Article"]["IsVisibleForCustomer"] == 0
-    assert update["Article"]["Body"].splitlines()[:5] == [
-        "Collected: screen: Inbox", "Missing: nothing", "Confidence: high", "Why this queue: An app defect",
-        "Urgent: no"]
+    assert update["Article"]["Body"].splitlines()[:6] == [
+        "Collected: screen: Inbox", "Missing: nothing", "Customer does not know: nothing", "Confidence: high",
+        "Why this queue: An app defect", "Urgent: no"]
+    assert view["ticket_draft"] is None and not view["draft_ready"] and view["ticket_numbers"] == [number]
 
     row = sheets.tickets()[-1]
     assert (row["ticket_number"], row["customer_email"], row["product"]) == (number, "ole5@example.com", "OLE5")
@@ -64,11 +66,26 @@ def test_second_submit_is_refused(api):
     client.post(f"/chat/sessions/{sid}/submit")
     again = client.post(f"/chat/sessions/{sid}/submit")
     assert again.status_code == 409
-    assert "already created" in again.json()["detail"]
+    assert again.json()["detail"] == "there is no ticket summary to submit"
     assert [c[0] for c in api.calls].count("TicketCreate") == 1
 
 
-def test_submit_outside_confirm_is_refused(api):
+def test_a_second_ticket_in_the_same_session(api):
+    client = TestClient(app)
+    sid = confirmed()
+    first = client.post(f"/chat/sessions/{sid}/submit").json()["ticket_number"]
+    sessions._graph.update_state(sessions._config(sid), {"ticket_draft": TicketDraft(**DRAFT)}, as_node="validate")
+    view = client.post(f"/chat/sessions/{sid}/submit").json()
+    assert view["ticket_numbers"] == [first, view["ticket_number"]] and view["ticket_number"] != first
+
+
+def test_unclassified_draft_is_refused(api):
+    response = TestClient(app).post(f"/chat/sessions/{confirmed(classified=False)}/submit")
+    assert response.status_code == 409
+    assert api.calls == []
+
+
+def test_submit_without_a_draft_is_refused(api):
     sid, _ = sessions.start("ole5@example.com")
     response = TestClient(app).post(f"/chat/sessions/{sid}/submit")
     assert response.status_code == 409

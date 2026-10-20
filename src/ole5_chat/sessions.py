@@ -1,4 +1,4 @@
-"""Conversations. One LangGraph thread per session id, kept by MemorySaver; the session is also what identifies the customer. Submit writes its result into the session with update_state."""
+"""Conversations. One LangGraph thread per session id, kept by MemorySaver; the session is also what identifies the customer. Submit writes its result into the session with update_state: the closing message, the ticket added to created_tickets, and the draft cleared so a second Submit is refused and a new problem starts a new ticket."""
 
 import threading
 import uuid
@@ -57,7 +57,8 @@ def submit(session_id: str) -> ChatState:
         state = get(session_id)
         ticket, closing, corrections = submit_ticket(state, ticket_api.ticket_client())
         _graph.update_state(_config(session_id), {
-            "messages": [AIMessage(content=closing)], "phase": "created", "sources": [],
-            "created_ticket": ticket, "corrections": state["corrections"] + corrections,
+            "messages": [AIMessage(content=closing)], "phase": "created", "step": None, "sources": [],
+            "ticket_draft": None, "created_tickets": [*state["created_tickets"], ticket],
+            "corrections": state["corrections"] + corrections,
         }, as_node="validate")
     return get(session_id)
