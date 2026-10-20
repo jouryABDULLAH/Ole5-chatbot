@@ -18,7 +18,6 @@ class RouterDecision(BaseModel):
     collected: dict[str, str] = {}
     missing: list[str] = []
     unknown: list[str] = []
-    proceed: bool = False
     cancel_ticket: bool = False
 
 

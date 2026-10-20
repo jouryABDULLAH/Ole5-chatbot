@@ -135,7 +135,7 @@ def test_always_ticket_is_never_searched(model, searches):
 
 def test_always_ticket_is_offered_before_a_draft_even_when_read_as_a_ticket_reply(model):
     sid = chat()
-    model.add(ticket_reply(always_ticket=True, proceed=True), Reply(say="Shall I open a ticket?"))
+    model.add(ticket_reply(always_ticket=True), Reply(say="Shall I open a ticket?"))
     state = sessions.send(sid, "I need help migrating our old data")
     assert state["phase"] == "offer_ticket" and state["ticket_draft"] is None
     model.add(ticket_reply(always_ticket=True, collected={"request": "data migration"}, missing=["volume"]),
@@ -188,14 +188,6 @@ def test_detail_the_customer_does_not_know_is_not_asked_again(model):
     assert state["ticket_draft"].missing == [] and state["ticket_draft"].unknown == ["screen"]
 
 
-def test_proceed_confirms_with_what_was_given(model):
-    sid = chat()
-    collecting(model, sid)
-    model.add(ticket_reply(missing=["screen"], proceed=True), GOOD, Reply(say="Ready."))
-    state = sessions.send(sid, "just open it")
-    assert state["phase"] == "confirm" and state["ticket_draft"].missing == ["screen"]
-
-
 def test_cancel_drops_the_ticket(model):
     sid = chat()
     confirming(model, sid)
@@ -215,13 +207,13 @@ def test_answered_question_while_collecting_keeps_the_ticket(model):
     assert 'Still missing: ["screen"]' in respond_prompt(model)
 
 
-def test_unanswered_question_while_collecting_is_added_to_the_ticket(model):
+def test_unanswered_question_while_collecting_is_deferred(model):
     sid = chat()
-    collecting(model, sid)
-    model.add(RouterDecision(intent="question", language="en", queries=["export"]), Reply(say="Added. Which screen?"))
+    before = collecting(model, sid)["ticket_draft"]
+    model.add(RouterDecision(intent="question", language="en", queries=["export"]),
+              Reply(say="I don't have an answer for that. Which screen?"))
     state = sessions.send(sid, "how do I export?")
-    assert state["phase"] == "collect"
-    assert state["ticket_draft"].collected[graph.EXTRA_QUESTION] == "how do I export?"
+    assert state["phase"] == "collect" and state["ticket_draft"] == before
 
 
 def test_question_at_confirm_keeps_the_summary_ready(model):
@@ -231,6 +223,7 @@ def test_question_at_confirm_keeps_the_summary_ready(model):
               Reply(say="Choose Forgot password."))
     state = sessions.send(sid, "how do I reset my password?")
     assert state["phase"] == "answer" and state["ticket_draft"].classified
+    assert "Summary ready: yes" in respond_prompt(model)
 
 
 def test_value_still_wrong_after_retry_is_left_empty(model):
@@ -330,3 +323,13 @@ def test_arabic_reply_with_english_screen_names_passes(model):
               Reply(say="اختر Forgot password في صفحة تسجيل الدخول.", sources=["STUB-01 Signing in"]))
     state = sessions.send(sid, "نسيت كلمة المرور")
     assert state["phase"] == "answer" and model.problems == []
+
+
+def test_change_request_at_confirm_is_refused_not_offered(model):
+    sid = chat()
+    confirming(model, sid)
+    model.add(RouterDecision(intent="question", language="en", queries=["change priority"]),
+              Reply(say="The summary cannot be changed here. Press Submit, or cancel."))
+    state = sessions.send(sid, "change the priority to High")
+    assert state["phase"] == "confirm" and state["ticket_draft"].classified
+    assert "Step: confirm" in respond_prompt(model)

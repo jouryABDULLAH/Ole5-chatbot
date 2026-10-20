@@ -16,7 +16,6 @@ from ole5_chat.knowledge.search import search as kb_search
 log = logging.getLogger(__name__)
 
 MAX_SEARCHES = 4
-EXTRA_QUESTION = "unanswered question"
 
 
 def _short(text: str, limit: int = 90) -> str:
@@ -42,16 +41,13 @@ def _with_details(draft: TicketDraft, decision: RouterDecision) -> TicketDraft:
 
 
 def _ticket_step(draft: TicketDraft, decision: RouterDecision) -> Step:
-    return "confirm" if decision.urgent or decision.proceed or not draft.missing else "collect"
+    return "confirm" if decision.urgent or not draft.missing else "collect"
 
 
-def _no_answer(draft: TicketDraft | None, decision: RouterDecision, question: str) -> tuple[Step, TicketDraft | None]:
+def _no_answer(draft: TicketDraft | None) -> Step:
     if draft is None:
-        return "offer_ticket", None
-    asked = draft.collected.get(EXTRA_QUESTION)
-    collected = {**draft.collected, EXTRA_QUESTION: f"{asked}; {question}" if asked else question}
-    draft = draft.model_copy(update={"collected": collected, "classified": False})
-    return ("confirm" if not draft.missing else "collect"), draft
+        return "offer_ticket"
+    return "confirm" if draft.classified else "collect"
 
 
 def route(state: ChatState) -> str:
@@ -66,8 +62,7 @@ def greet(state: ChatState) -> dict:
 
 
 def _decide(state: ChatState) -> dict:
-    question = state["messages"][-1].text
-    expected = language_of(question)
+    expected = language_of(state["messages"][-1].text)
 
     def language_check(d: RouterDecision) -> str | None:
         if expected and d.language != expected:
@@ -102,13 +97,13 @@ def _decide(state: ChatState) -> dict:
         draft = _with_details(draft or _new_draft(state), decision)
         step = _ticket_step(draft, decision)
     elif decision.always_ticket or not decision.queries or (decision.urgent and draft is None):
-        step, draft = _no_answer(draft, decision, question)
+        step = _no_answer(draft)
     else:
         step = None
 
-    log.info("router  intent=%s step=%s always_ticket=%s urgent=%s proceed=%s cancel=%s language=%s queries=%s "
+    log.info("router  intent=%s step=%s always_ticket=%s urgent=%s cancel=%s language=%s queries=%s "
              "missing=%s unknown=%s", decision.intent, step or "search", decision.always_ticket, decision.urgent,
-             decision.proceed, decision.cancel_ticket, decision.language, decision.queries,
+             decision.cancel_ticket, decision.language, decision.queries,
              draft.missing if draft else None, draft.unknown if draft else None)
     return {"decision": decision, "step": step, "ticket_draft": draft, "reply": None,
             "corrections": state["corrections"] + corrections}
@@ -118,12 +113,9 @@ def _after_search(state: ChatState) -> dict:
     retrieval = Retrieval.from_json(state["last_retrieval"])
     if retrieval.error:
         log.warning("router  search failed error=%s, treated as no answer", retrieval.error)
-    if retrieval.direct:
-        step, draft = "answer", state.get("ticket_draft")
-    else:
-        step, draft = _no_answer(state.get("ticket_draft"), state["decision"], state["messages"][-1].text)
+    step = "answer" if retrieval.direct else _no_answer(state.get("ticket_draft"))
     log.info("router  after search step=%s direct=%d", step, len(retrieval.direct))
-    return {"step": step, "ticket_draft": draft}
+    return {"step": step}
 
 
 def router(state: ChatState) -> dict:

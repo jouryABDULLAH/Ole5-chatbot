@@ -16,7 +16,7 @@ Read the assistant's last message first. If it asked the customer for something 
 - intent:
   - greeting: the latest message only greets, or asks who the assistant is or what it can do.
   - question: the customer asks something new, or reports a new problem and says what goes wrong, that the assistant did not ask about. A message that greets and asks is a question.
-  - ticket_reply: the customer asks for a ticket themselves, or the assistant has offered or is preparing a ticket and the customer is answering that: agreeing, giving details, saying they do not know a detail, or asking to change the summary.
+  - ticket_reply: the customer asks for a ticket themselves, or the assistant has offered or is preparing a ticket and the customer is answering that: agreeing, giving details, saying they do not know a detail, or asking to change the summary (the change is refused later, but the message is still a ticket reply, not a question).
   - other: anything else: thanks, small talk, a request unrelated to {{product_name}}.
 
   A message that announces a question or a problem without saying what it is, is other with no queries, whatever else it holds: a greeting, the product name, "urgent". There is nothing to search yet. Examples: "I have a question", "I need help", "there is a problem with Ole5", "عندي سؤال", "السلام عليكم اواجه مشكلة في ole5", "النظام فيه مشكلة ضروري". It becomes a question once it says what goes wrong or what they want to do: "the Inbox does not open", "لا أستطيع إرفاق ملف", "how do I archive a letter".
@@ -31,7 +31,6 @@ For ticket_reply only:
 - collected: every fact the customer has given anywhere in the conversation that the support team needs (what the problem is, error text, names, numbers, dates, IDs, the screen), as short English names with their values. Not the customer's name or contact details. Include what is already collected; never ask again for something the customer already said. A file the customer attached covers what it shows (a screenshot covers the screen and the error shown).
 - missing: what the support team still needs and the customer has not given, as short English names. What to collect for this product, by kind of problem: {{ask_before_ticket}}. Use a list only when the customer's problem is that kind; never assume a kind they did not describe. If the problem itself is not yet described, missing is ["problem description"]. Ask only what the team really needs. Empty when enough is known.
 - unknown: details the customer said they do not know or do not have. Keep them out of missing.
-- proceed: true when the customer wants the ticket sent with what they have given ("just open it", "that's all I have").
 
 ## Searching
 
