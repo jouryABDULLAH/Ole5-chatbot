@@ -26,7 +26,7 @@ Read the assistant's last message first. If it asked the customer for something 
 
 For ticket_reply only:
 
-- collected: every fact the customer has given anywhere in the conversation that the support team needs (what the problem is, error text, names, numbers, dates, IDs, the screen), as short English names with their values. Not the customer's name or contact details. Include what is already collected; never ask again for something the customer already said.
+- collected: every fact the customer has given anywhere in the conversation that the support team needs (what the problem is, error text, names, numbers, dates, IDs, the screen), as short English names with their values. Not the customer's name or contact details. Include what is already collected; never ask again for something the customer already said. A file the customer attached covers what it shows (a screenshot covers the screen and the error shown).
 - missing: what the support team still needs and the customer has not given, as short English names. What to collect for this product, by kind of problem: {{ask_before_ticket}}. Use a list only when the customer's problem is that kind; never assume a kind they did not describe. If the problem itself is not yet described, missing is ["problem description"]. Ask only what the team really needs. Empty when enough is known.
 - unknown: details the customer said they do not know or do not have. Keep them out of missing.
 - proceed: true when the customer wants the ticket sent with what they have given ("just open it", "that's all I have").

@@ -33,12 +33,14 @@ def _json(value) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
-def ticket_status(draft: TicketDraft | None) -> str:
+def ticket_status(draft: TicketDraft | None, files: list[dict] = ()) -> str:
+    names = ", ".join(f["file_name"] for f in files)
+    attached = f"\nFiles the customer attached for the ticket: {names}" if names else ""
     if draft is None:
-        return "No ticket is being prepared."
+        return "No ticket is being prepared." + attached
     ready = "yes, shown to the customer with a Submit button" if draft.classified else "no"
     return (f"A ticket is being prepared.\nCollected: {_json(draft.collected)}\nStill missing: {_json(draft.missing)}"
-            f"\nThe customer does not know: {_json(draft.unknown)}\nSummary ready: {ready}")
+            f"\nThe customer does not know: {_json(draft.unknown)}\nSummary ready: {ready}{attached}")
 
 
 def router(state: ChatState) -> str:
@@ -46,7 +48,7 @@ def router(state: ChatState) -> str:
     last = next((m.text for m in reversed(state["messages"]) if m.type == "ai"), "none")
     return _fill("router", product_name=config.name, always_ticket=_list(config.always_ticket),
                  urgent_when=_list(config.urgent_when), ask_before_ticket=_json(config.ask_before_ticket),
-                 last_assistant=last, ticket=ticket_status(state.get("ticket_draft")),
+                 last_assistant=last, ticket=ticket_status(state.get("ticket_draft"), state.get("attachments") or []),
                  schema=schema_text(RouterDecision))
 
 
@@ -59,7 +61,7 @@ def respond(state: ChatState) -> str:
         tone=config.tone,
         ask_before_ticket=_json(config.ask_before_ticket),
         step=state["step"],
-        ticket=ticket_status(state.get("ticket_draft")),
+        ticket=ticket_status(state.get("ticket_draft"), state.get("attachments") or []),
         evidence=Retrieval.from_json(retrieval).render() if retrieval else NOT_SEARCHED,
         schema=schema_text(Reply),
     )

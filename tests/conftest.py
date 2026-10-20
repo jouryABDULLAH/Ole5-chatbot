@@ -1,4 +1,4 @@
-"""Test setup: a temporary sheets folder with known customers, the real values.xlsx, fresh caches, and a scripted model instead of Groq."""
+"""Test setup: a temporary sheets folder and uploads folder with known customers, the real values.xlsx, fresh caches, and a scripted model instead of Groq."""
 
 import shutil
 
@@ -29,6 +29,8 @@ def sheets_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("KB_BACKEND", "stub")
     monkeypatch.setenv("TRACING", "false")
     monkeypatch.setenv("TICKET_API_URL", "")
+    monkeypatch.setenv("ATTACHMENTS_DIR", str(tmp_path / "uploads"))
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://chat.example.com")
     get_settings.cache_clear()
     sheets._rows.cache_clear()
     products.load.cache_clear()

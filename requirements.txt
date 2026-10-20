@@ -12,3 +12,4 @@ rich
 arize-phoenix
 arize-phoenix-otel
 openinference-instrumentation-langchain
+python-multipart

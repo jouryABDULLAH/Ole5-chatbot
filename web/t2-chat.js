@@ -12,6 +12,9 @@
       notSet: "Not set", failed: "The message was not sent. Try again.",
       unreachable: "The chat service cannot be reached. Check that it is running, then try again.",
       restart: "Start a new chat",
+      attach: "Attach a file", remove: "Remove", uploading: "Uploading",
+      tooBig: "The file is too large.", badType: "This file type cannot be attached.",
+      tooMany: "No more files can be attached to this ticket.",
     },
     ar: {
       open: "محادثة", close: "إغلاق المحادثة", title: "الدعم",
@@ -24,6 +27,9 @@
       notSet: "غير محدد", failed: "لم تُرسل الرسالة. حاول مرة أخرى.",
       unreachable: "تعذّر الوصول إلى خدمة المحادثة. تأكد من تشغيلها ثم حاول مرة أخرى.",
       restart: "بدء محادثة جديدة",
+      attach: "إرفاق ملف", remove: "إزالة", uploading: "جارٍ الرفع",
+      tooBig: "حجم الملف كبير جداً.", badType: "لا يمكن إرفاق هذا النوع من الملفات.",
+      tooMany: "لا يمكن إرفاق ملفات أخرى بهذه التذكرة.",
     },
   };
   const KEY = "t2-chat-session";
@@ -91,6 +97,19 @@
             color:#fff; cursor:pointer; flex:none; }
     .send:disabled { opacity:.45; cursor:default; }
     :host([dir=rtl]) .send svg { transform:scaleX(-1); }
+    .clip { width:42px; height:42px; display:grid; place-items:center; border:1px solid var(--line); border-radius:12px;
+            background:#fff; color:var(--muted); cursor:pointer; flex:none; }
+    .clip:hover:not(:disabled) { color:var(--ink); background:var(--soft); }
+    .clip:disabled { opacity:.45; cursor:default; }
+    .files { display:flex; flex-wrap:wrap; gap:6px; padding:10px 12px 0; border-top:1px solid var(--line); }
+    .files + .compose { border-top:0; }
+    .chip { display:inline-flex; align-items:center; gap:4px; max-width:100%; padding:4px 4px 4px 10px;
+            border:1px solid var(--line); border-radius:999px; background:#fff; font-size:13px; }
+    :host([dir=rtl]) .chip { padding:4px 10px 4px 4px; }
+    .chip span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:220px; }
+    .chip button { width:22px; height:22px; display:grid; place-items:center; border:0; border-radius:50%;
+                   background:none; color:var(--muted); cursor:pointer; }
+    .chip button:hover:not(:disabled) { background:var(--soft); color:var(--ink); }
     .restart { align-self:center; border:0; background:none; color:var(--accent); font-size:14px; cursor:pointer;
                text-decoration:underline; text-underline-offset:3px; }
     @media (prefers-reduced-motion: reduce) { .panel { animation:none; } .dots i { animation:none; opacity:.6; } }
@@ -101,6 +120,10 @@
   const ICON_CHAT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>';
   const ICON_CLOSE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
   const ICON_SEND = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>';
+
+  const ICON_CLIP = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.5l-7.8 7.8a5 5 0 01-7.1-7.1l8.5-8.5a3.3 3.3 0 014.7 4.7l-8.5 8.5a1.7 1.7 0 01-2.4-2.4L15 6.9"/></svg>';
+  const ICON_X = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  const ACCEPT = ".png,.jpg,.jpeg,.pdf,.docx,.xlsx,.txt,.log";
 
   const el = (tag, attrs = {}, ...children) => {
     const node = document.createElement(tag);
@@ -124,6 +147,16 @@
       res = await fetch(base + path, { method, headers: { "Content-Type": "application/json" },
                                 body: body ? JSON.stringify(body) : undefined });
     } catch { throw { kind: "unreachable" }; }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw { kind: "http", status: res.status, detail: data.detail };
+    return data;
+  }
+
+  async function upload(base, path, file) {
+    const form = new FormData();
+    form.append("file", file);
+    let res;
+    try { res = await fetch(base + path, { method: "POST", body: form }); } catch { throw { kind: "unreachable" }; }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw { kind: "http", status: res.status, detail: data.detail };
     return data;
@@ -155,11 +188,11 @@
     attributeChangedCallback() { if (this.isConnected) this.render(); }
 
     render() {
-      const typed = this.root.querySelector("textarea, input");
+      const typed = this.root.querySelector("textarea, input:not([type=file])");
       if (typed) this.draft = typed.value;
       this.setAttribute("dir", this.lang === "ar" ? "rtl" : "ltr");
       this.root.replaceChildren(el("style", {}, CSS), this.open ? this.panel() : this.launcher());
-      const field = this.root.querySelector("textarea, input");
+      const field = this.root.querySelector("textarea, input:not([type=file])");
       if (field && this.draft) field.value = this.draft;
     }
 
@@ -205,7 +238,7 @@
         log.append(bubble);
       });
       if (this.view.draft_ready && this.view.ticket_draft) log.append(this.card(this.view.ticket_draft));
-      if (this.busy) log.append(el("div", { class: "writing" }, el("span", { class: "dots", "aria-hidden": "true" },
+      if (this.busy && !this.uploading) log.append(el("div", { class: "writing" }, el("span", { class: "dots", "aria-hidden": "true" },
                                     el("i"), el("i"), el("i")), this.t.writing));
       if (this.error) log.append(el("p", { class: "error", role: "alert" }, this.error));
       log.append(el("button", { class: "restart", type: "button", onclick: () => this.restart() }, this.t.restart));
@@ -217,10 +250,21 @@
       box.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
       });
+      const picker = el("input", { type: "file", accept: ACCEPT, hidden: true,
+                                   onchange: () => { if (picker.files[0]) this.attach(picker.files[0]); } });
+      const clip = el("button", { class: "clip", type: "button", "aria-label": this.t.attach, title: this.t.attach,
+                                  html: ICON_CLIP, disabled: this.busy, onclick: () => picker.click() });
       const form = el("form", { class: "compose", onsubmit: (e) => { e.preventDefault(); this.send(box.value); } },
-                      box, sendBtn);
+                      picker, clip, box, sendBtn);
+      const attached = this.view.attachments || [];
+      const files = attached.length || this.uploading ? el("div", { class: "files" },
+        ...attached.map((f) => el("span", { class: "chip", dir: "auto" }, el("span", { title: f.file_name }, f.file_name),
+          el("button", { type: "button", "aria-label": `${this.t.remove} ${f.file_name}`, html: ICON_X,
+                         disabled: this.busy, onclick: () => this.detach(f.id) }))),
+        this.uploading ? el("span", { class: "chip" }, el("span", {}, `${this.t.uploading}: ${this.uploading}`)) : null)
+        : null;
       queueMicrotask(() => { log.scrollTop = log.scrollHeight; });
-      return [log, form];
+      return [log, files, form];
     }
 
     card(draft) {
@@ -238,7 +282,7 @@
 
     focusInput() {
       queueMicrotask(() => {
-        const target = this.root.querySelector("textarea, input");
+        const target = this.root.querySelector("textarea, input:not([type=file])");
         if (target) target.focus();
       });
     }
@@ -276,6 +320,30 @@
         this.error = this.explain(err);
       }
       this.busy = false; this.render(); this.focusInput();
+    }
+
+    async attach(file) {
+      if (this.busy) return;
+      this.busy = true; this.uploading = file.name; this.error = ""; this.render();
+      try {
+        const added = await upload(this.api, `/chat/sessions/${this.view.session_id}/attachments`, file);
+        this.view = { ...this.view, attachments: [...(this.view.attachments || []), added] };
+      } catch (err) {
+        if (err.status === 404) { this.restart(); return; }
+        this.error = err.status === 413 ? this.t.tooBig : err.status === 415 ? this.t.badType
+                   : err.status === 409 ? this.t.tooMany : this.explain(err);
+      }
+      this.busy = false; this.uploading = ""; this.render(); this.focusInput();
+    }
+
+    async detach(id) {
+      if (this.busy) return;
+      this.busy = true; this.error = ""; this.render();
+      try {
+        await fetch(`${this.api}/chat/sessions/${this.view.session_id}/attachments/${id}`, { method: "DELETE" });
+        this.view = { ...this.view, attachments: (this.view.attachments || []).filter((f) => f.id !== id) };
+      } catch (err) { this.error = this.explain({ kind: "unreachable" }); }
+      this.busy = false; this.render();
     }
 
     async submitTicket() {

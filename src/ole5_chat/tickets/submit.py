@@ -1,11 +1,11 @@
-"""The Submit flow: checks the ready draft again, creates the ticket with the summary and the conversation, classifies it with an internal note, records it in tickets.xlsx, and returns the closing message."""
+"""The Submit flow: checks the ready draft again, creates the ticket with the summary and the conversation, classifies it with an internal note that links the attached files, records it in tickets.xlsx and the files in attachments.xlsx, and returns the closing message."""
 
 import logging
 from datetime import datetime, timezone
 
 from langchain_core.messages import BaseMessage
 
-from ole5_chat import sheets, values
+from ole5_chat import attachments, sheets, values
 from ole5_chat.agent.contracts import Classification
 from ole5_chat.agent.state import ChatState
 from ole5_chat.agent.validate import check_ticket
@@ -28,7 +28,7 @@ def conversation_text(messages: list[BaseMessage]) -> str:
     return "\n".join(f"{'Customer' if m.type == 'human' else 'Assistant'}: {m.text}" for m in messages)
 
 
-def internal_note(draft, corrections: list[str]) -> str:
+def internal_note(draft, corrections: list[str], files: list[dict] = ()) -> str:
     collected = "; ".join(f"{k}: {v}" for k, v in draft.collected.items()) or "nothing"
     urgent = f"yes, {draft.urgent_reason}" if draft.urgent else "no"
     lines = [f"Collected: {collected}", f"Missing: {'; '.join(draft.missing) or 'nothing'}",
@@ -37,6 +37,8 @@ def internal_note(draft, corrections: list[str]) -> str:
              f"Urgent: {urgent}"]
     if corrections:
         lines.append("Corrections: " + "; ".join(corrections))
+    if files:
+        lines += ["Attachments:", *(f"{f['file_name']}: {attachments.link(f['id'])}" for f in files)]
     return "\n".join(lines)
 
 
@@ -70,7 +72,7 @@ def submit(state: ChatState, api: TicketApi) -> tuple[dict, str, list[str]]:
                    dynamic_fields=[{"Name": "SubType", "Value": draft.subtype},
                                    {"Name": "Conclusions", "Value": draft.reason}],
                    article={"Subject": "Chatbot: classification", "IsVisibleForCustomer": 0,
-                            "Body": internal_note(draft, state["corrections"])})
+                            "Body": internal_note(draft, state["corrections"], state["attachments"])})
     except TicketApiError as exc:
         log.exception("tickets  TicketUpdate failed for %s", created["TicketNumber"])
         corrections.append(f"TicketUpdate failed, the ticket is not classified: {exc}")
@@ -78,6 +80,9 @@ def submit(state: ChatState, api: TicketApi) -> tuple[dict, str, list[str]]:
     sheets.add_ticket({"ticket_id": created["TicketID"], "ticket_number": created["TicketNumber"],
                        "customer_email": who.email, "product": who.product, "title": draft.title,
                        "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds")})
+    for f in state["attachments"]:
+        sheets.add_attachment({"ticket_number": created["TicketNumber"], "file_name": f["file_name"],
+                               "link": attachments.link(f["id"]), "uploaded_at": f["uploaded_at"]})
     language = state["decision"].language if state.get("decision") else who.language
     log.info("tickets  created number=%s product=%s queue=%s", created["TicketNumber"], who.product, draft.queue)
     ticket = {"ticket_id": created["TicketID"], "ticket_number": created["TicketNumber"]}

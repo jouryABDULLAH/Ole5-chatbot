@@ -1,12 +1,15 @@
-"""HTTP API of the chat service: start a session with an email, send messages, read the conversation back, submit the ticket, list the customer's tickets."""
+"""HTTP API of the chat service: start a session with an email, send messages, attach files, read the conversation back, submit the ticket, serve the attached files, list the customer's tickets."""
 
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response, UploadFile
+from fastapi.responses import FileResponse
 from langchain_core.messages import BaseMessage
 from pydantic import BaseModel, ConfigDict, Field
 
-from ole5_chat import products, sessions, sheets
+from ole5_chat import attachments, products, sessions, sheets
+from ole5_chat.attachments import AttachmentRefused
+from ole5_chat.config import get_settings
 from ole5_chat.agent.state import ChatState, Step, TicketDraft
 from ole5_chat.identity import NotRegistered
 from ole5_chat.tickets import client as ticket_api
@@ -35,6 +38,14 @@ class Line(BaseModel):
     text: str
 
 
+class AttachmentView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    file_name: str
+    size: int
+
+
 class SessionView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -48,6 +59,7 @@ class SessionView(BaseModel):
     draft_ready: bool = False
     ticket_number: str | None = None
     ticket_numbers: list[str] = []
+    attachments: list[AttachmentView] = []
 
 
 class TicketView(BaseModel):
@@ -64,13 +76,18 @@ def _line(message: BaseMessage) -> Line:
     return Line(author="customer" if message.type == "human" else "bot", text=message.text)
 
 
+def _attachment(f: dict) -> AttachmentView:
+    return AttachmentView(id=f["id"], file_name=f["file_name"], size=f["size"])
+
+
 def _view(session_id: str, state: ChatState) -> SessionView:
     who, draft = state["identity"], state.get("ticket_draft")
     numbers = [t["ticket_number"] for t in state["created_tickets"]]
     return SessionView(session_id=session_id, product_name=products.load(who.product).name, language=who.language,
                        phase=state["phase"], messages=[_line(m) for m in state["messages"]],
                        sources=state["sources"], ticket_draft=draft, draft_ready=bool(draft and draft.classified),
-                       ticket_number=numbers[-1] if numbers else None, ticket_numbers=numbers)
+                       ticket_number=numbers[-1] if numbers else None, ticket_numbers=numbers,
+                       attachments=[_attachment(f) for f in state.get("attachments") or []])
 
 
 
@@ -109,6 +126,37 @@ def submit(session_id: str) -> SessionView:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except TicketApiError as exc:
         raise HTTPException(status_code=502, detail="The ticket could not be created. Try again.") from exc
+
+
+@app.post("/chat/sessions/{session_id}/attachments")
+async def upload_attachment(session_id: str, file: UploadFile) -> AttachmentView:
+    limit = int(get_settings().attachment_max_mb * 1024 * 1024)
+    data = await file.read(limit + 1)
+    try:
+        return _attachment(sessions.attach(session_id, file.filename or "file", data))
+    except sessions.SessionNotFound as exc:
+        raise HTTPException(status_code=404, detail="Session not found") from exc
+    except AttachmentRefused as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
+
+
+@app.delete("/chat/sessions/{session_id}/attachments/{att_id}", status_code=204)
+def delete_attachment(session_id: str, att_id: str) -> Response:
+    try:
+        removed = sessions.detach(session_id, att_id)
+    except sessions.SessionNotFound as exc:
+        raise HTTPException(status_code=404, detail="Session not found") from exc
+    if not removed:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    return Response(status_code=204)
+
+
+@app.get("/chat/attachments/{att_id}")
+def read_attachment(att_id: str) -> FileResponse:
+    path = attachments.find(att_id)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    return FileResponse(path, filename=path.name.split("-", 1)[1])
 
 
 @app.get("/chat/tickets")

@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     sheets_dir: Path = ROOT / "sheets"
     products_dir: Path = ROOT / "products"
 
+    attachments_dir: Path = ROOT / "uploads"
+    public_base_url: str = "http://localhost:8000"
+    attachment_max_mb: float = 10.0
+    attachment_max_files: int = 5
+
     tracing: bool = False
     phoenix_project_name: str = "ole5-chat"
     phoenix_collector_endpoint: str = "http://localhost:6006"

@@ -7,6 +7,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 
+from ole5_chat import attachments
 from ole5_chat.agent.graph import build
 from ole5_chat.agent.contracts import Reply, RouterDecision
 from ole5_chat.agent.state import ChatState, TicketDraft, initial_state
@@ -52,13 +53,32 @@ def send(session_id: str, text: str) -> ChatState:
 _submit_lock = threading.Lock()
 
 
+def attach(session_id: str, file_name: str, data: bytes) -> dict:
+    with _submit_lock:
+        state = get(session_id)
+        added = attachments.save(session_id, file_name, data, len(state["attachments"]))
+        _graph.update_state(_config(session_id), {"attachments": [*state["attachments"], added]}, as_node="validate")
+    return added
+
+
+def detach(session_id: str, att_id: str) -> bool:
+    with _submit_lock:
+        state = get(session_id)
+        kept = [f for f in state["attachments"] if f["id"] != att_id]
+        if len(kept) == len(state["attachments"]):
+            return False
+        attachments.delete(att_id)
+        _graph.update_state(_config(session_id), {"attachments": kept}, as_node="validate")
+    return True
+
+
 def submit(session_id: str) -> ChatState:
     with _submit_lock:
         state = get(session_id)
         ticket, closing, corrections = submit_ticket(state, ticket_api.ticket_client())
         _graph.update_state(_config(session_id), {
             "messages": [AIMessage(content=closing)], "phase": "created", "step": None, "sources": [],
-            "ticket_draft": None, "created_tickets": [*state["created_tickets"], ticket],
+            "ticket_draft": None, "created_tickets": [*state["created_tickets"], ticket], "attachments": [],
             "corrections": state["corrections"] + corrections,
         }, as_node="validate")
     return get(session_id)
