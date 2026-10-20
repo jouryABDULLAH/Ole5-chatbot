@@ -46,7 +46,7 @@ def main() -> None:
     tenants = sorted(set(s.kb_tenants.values()))
     print(f"\n2. Loading RAGent2 models (the first run downloads the reranker, several GB) for {tenants}")
     started = time.perf_counter()
-    retriever.warm(tenants)
+    # retriever.warm(tenants)
     print(f"   loaded in {time.perf_counter() - started:.1f}s")
 
     for name in tenants:

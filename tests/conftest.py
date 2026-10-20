@@ -1,11 +1,13 @@
 """Test setup: a temporary sheets folder and uploads folder with known customers, the real values.xlsx, fresh caches, and a scripted model instead of Groq."""
 
+import re
 import shutil
 
 import pytest
 from openpyxl import Workbook
 
 from ole5_chat import llm, products, sheets
+from ole5_chat.agent.validate import Language
 from ole5_chat.tickets import client as ticket_api
 from ole5_chat.config import ROOT, get_settings
 
@@ -40,21 +42,32 @@ def sheets_dir(tmp_path, monkeypatch):
 
 
 class ScriptedModel:
-    """Returns queued objects per schema, in order, and records every call."""
+    """Returns queued objects per schema, in order, and records every call. Runs the caller's check like llm.structured does: a refused object is replaced by the next queued one, or GuardrailFailed when none is left. Language calls, when not scripted, are answered from the letters in the text."""
 
     def __init__(self):
         self.queue: dict[type, list] = {}
         self.calls: list[tuple[type, str]] = []
+        self.problems: list[str] = []
 
     def add(self, *objects):
         for obj in objects:
             self.queue.setdefault(type(obj), []).append(obj)
 
-    def __call__(self, system, messages, schema, node=None):
+    def __call__(self, system, messages, schema, node=None, check=None):
         self.calls.append((schema, system))
+        if schema is Language and not self.queue.get(schema):
+            text = messages[-1].text
+            return Language(language="ar" if re.search(r"[\u0600-\u06FF]", text) else "en" if re.search(r"[A-Za-z]", text) else "none")
         if not self.queue.get(schema):
             raise llm.ModelFailed(f"nothing scripted for {schema.__name__}")
-        return self.queue[schema].pop(0)
+        result = self.queue[schema].pop(0)
+        problem = check(result) if check else None
+        if problem is not None:
+            self.problems.append(problem)
+            if self.queue.get(schema):
+                return self(system, messages, schema, node, check)
+            raise llm.GuardrailFailed(problem, result)
+        return result
 
 
 @pytest.fixture(autouse=True)

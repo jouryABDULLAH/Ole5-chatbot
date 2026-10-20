@@ -1,4 +1,4 @@
-"""The conversation graph, one invoke per customer message. The first run sends the fixed chat.yaml greeting. Every later message goes to the router, the only node that routes: its model call reports facts about the message, code picks the step from them, and search and classify hand back to it. Then respond writes the text for that step and validate checks it."""
+"""The conversation graph, one invoke per customer message. The first run sends the fixed chat.yaml greeting. Every later message goes to the router, the only node that routes: its model call reports facts about the message, code picks the step from them, and search and classify hand back to it. Then respond writes the text for that step and validate checks it. Two guardrails run inside their nodes: the router's language must match the customer's message, and respond's reply must be in that language; each is sent back to the model with the reason, twice at most."""
 
 import logging
 
@@ -9,7 +9,7 @@ from ole5_chat import llm, products, values
 from ole5_chat.agent import prompt
 from ole5_chat.agent.contracts import Classification, Reply, RouterDecision, Step
 from ole5_chat.agent.state import ChatState, TicketDraft
-from ole5_chat.agent.validate import SORRY, check_ticket
+from ole5_chat.agent.validate import NAMES, SORRY, check_ticket, language_of, language_problem
 from ole5_chat.knowledge.contracts import Retrieval, merge
 from ole5_chat.knowledge.search import search as kb_search
 
@@ -66,15 +66,29 @@ def greet(state: ChatState) -> dict:
 
 
 def _decide(state: ChatState) -> dict:
+    question = state["messages"][-1].text
+    expected = language_of(question)
+
+    def language_check(d: RouterDecision) -> str | None:
+        if expected and d.language != expected:
+            return f"The customer's message is in {NAMES[expected]}, so language must be \"{expected}\"."
+        return None
+
     try:
-        decision = llm.structured(prompt.router(state), state["messages"], RouterDecision, node="router")
+        decision = llm.structured(prompt.router(state), state["messages"], RouterDecision, node="router",
+                                  check=language_check)
         corrections = []
+    except llm.GuardrailFailed as exc:
+        decision, corrections = exc.result, []
     except llm.ModelFailed as exc:
-        decision = RouterDecision(intent="other", language=state["identity"].language)
+        decision = RouterDecision(intent="other", language=expected or state["identity"].language)
         corrections = [f"router failed: {exc}"]
+    if expected and decision.language != expected:
+        log.warning("router  language overridden model=%s detected=%s", decision.language, expected)
+        corrections.append(f"router language {decision.language!r} overridden with {expected!r}")
+        decision = decision.model_copy(update={"language": expected})
 
     draft = state.get("ticket_draft")
-    question = state["messages"][-1].text
     step: Step | None
     if decision.cancel_ticket:
         step, draft = "ask", None
@@ -167,12 +181,15 @@ def classify(state: ChatState) -> dict:
 
 
 def respond(state: ChatState) -> dict:
-    step = state["step"]
+    step, language = state["step"], state["decision"].language
     try:
-        reply = llm.structured(prompt.respond(state), state["messages"], Reply, node="respond")
+        reply = llm.structured(prompt.respond(state), state["messages"], Reply, node="respond",
+                               check=lambda r: language_problem(r.say, language))
         corrections = []
+    except llm.GuardrailFailed as exc:
+        reply, corrections = exc.result, [f"respond sent in the wrong language: {exc}"]
     except llm.ModelFailed as exc:
-        reply = Reply(say=SORRY[state["decision"].language])
+        reply = Reply(say=SORRY[language])
         corrections = [f"respond failed: {exc}"]
         if step == "answer":
             step = "ask"

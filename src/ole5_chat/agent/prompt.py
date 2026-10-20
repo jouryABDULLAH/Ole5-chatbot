@@ -6,6 +6,7 @@ from functools import lru_cache
 from ole5_chat import products, values
 from ole5_chat.agent.contracts import Classification, Reply, RouterDecision
 from ole5_chat.agent.state import ChatState, TicketDraft
+from ole5_chat.agent.validate import NAMES, Language
 from ole5_chat.config import ROOT
 from ole5_chat.knowledge.contracts import Retrieval
 from ole5_chat.llm import schema_text
@@ -52,6 +53,10 @@ def router(state: ChatState) -> str:
                  schema=schema_text(RouterDecision))
 
 
+def language() -> str:
+    return _fill("language", schema=schema_text(Language))
+
+
 def respond(state: ChatState) -> str:
     config = products.load(state["identity"].product)
     retrieval = state.get("last_retrieval")
@@ -59,6 +64,7 @@ def respond(state: ChatState) -> str:
         "respond",
         product_name=config.name,
         tone=config.tone,
+        language=NAMES[state["decision"].language],
         ask_before_ticket=_json(config.ask_before_ticket),
         step=state["step"],
         ticket=ticket_status(state.get("ticket_draft"), state.get("attachments") or []),

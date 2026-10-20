@@ -1,9 +1,9 @@
-"""The model, behind one small wrapper. Groq today; the model name is a setting. Every call returns a validated pydantic object."""
+"""The model, behind one small wrapper. Groq today; the model name is a setting. Every call returns a validated pydantic object; an invalid reply, or one a caller's check refuses, is sent back to the model with the reason, up to RETRIES times."""
 
 import json
 import logging
 import time
-from typing import TypeVar
+from typing import Callable, TypeVar
 
 from groq import BadRequestError
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
@@ -15,11 +15,19 @@ from ole5_chat.config import get_settings
 
 T = TypeVar("T", bound=BaseModel)
 log = logging.getLogger(__name__)
-ATTEMPTS = 3
+RETRIES = 2
 
 
 class ModelFailed(RuntimeError):
     """The model did not return a valid object after every attempt."""
+
+
+class GuardrailFailed(ModelFailed):
+    """The model returned valid objects, but every one failed the check. result is the last one."""
+
+    def __init__(self, problem: str, result):
+        super().__init__(problem)
+        self.result = result
 
 
 def _client(temperature: float):
@@ -38,27 +46,36 @@ def _clean(text: str) -> str:
     return text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
 
 
-def structured(system: str, messages: list[BaseMessage], schema: type[T], node: str = "llm") -> T:
+def structured(system: str, messages: list[BaseMessage], schema: type[T], node: str = "llm",
+               check: Callable[[T], str | None] | None = None) -> T:
     convo: list[BaseMessage] = [SystemMessage(content=system), *messages]
-    error = "no attempt made"
-    for attempt in range(ATTEMPTS):
+    error, last = "no attempt made", None
+    for attempt in range(1, RETRIES + 2):
         started = time.perf_counter()
         try:
-            reply = _client(0 if attempt == 0 else 0.3).invoke(convo)
+            reply = _client(0 if attempt == 1 else 0.3).invoke(convo)
         except BadRequestError as exc:
             error = str(exc)[:400]
-            log.warning("%s  llm schema=%s attempt=%d rejected by Groq: %s", node, schema.__name__, attempt + 1, error)
+            log.warning("%s  llm schema=%s attempt=%d rejected by Groq: %s", node, schema.__name__, attempt, error)
             continue
         ms = int((time.perf_counter() - started) * 1000)
         if (reasoning := reply.additional_kwargs.get("reasoning_content")) and (span := get_current_span()):
             span.set_attribute("llm.reasoning", reasoning)
         try:
             result = schema.model_validate_json(_clean(reply.text))
-            log.info("%s  llm schema=%s attempt=%d ms=%d", node, schema.__name__, attempt + 1, ms)
-            return result
         except ValidationError as exc:
             error = str(exc)[:400]
-            log.warning("%s  llm schema=%s attempt=%d ms=%d invalid: %s", node, schema.__name__, attempt + 1, ms, error)
+            log.warning("%s  llm schema=%s attempt=%d ms=%d invalid: %s", node, schema.__name__, attempt, ms, error)
             convo += [AIMessage(content=reply.text),
                       HumanMessage(content=f"That was not valid: {error}. Reply with JSON only, matching the schema.")]
+            continue
+        problem = check(result) if check else None
+        if problem is None:
+            log.info("%s  llm schema=%s attempt=%d ms=%d", node, schema.__name__, attempt, ms)
+            return result
+        error, last = problem, result
+        log.warning("%s  llm schema=%s attempt=%d ms=%d guardrail: %s", node, schema.__name__, attempt, ms, problem)
+        convo += [AIMessage(content=reply.text), HumanMessage(content=f"Note from the system, not the customer: {problem}")]
+    if last is not None:
+        raise GuardrailFailed(error, last)
     raise ModelFailed(error)

@@ -7,7 +7,7 @@ import pytest
 from ole5_chat import sessions
 from ole5_chat.agent import graph
 from ole5_chat.agent.contracts import Classification, Reply, RouterDecision
-from ole5_chat.agent.validate import check_ticket
+from ole5_chat.agent.validate import Language, check_ticket
 from ole5_chat.knowledge.contracts import Retrieval, Verdict
 from ole5_chat.values import catalog
 
@@ -66,7 +66,7 @@ def test_hi_is_greeted_without_a_search(model, searches):
     assert state["phase"] == "greet"
     assert state["messages"][-1].text == "أهلاً بك، كيف أساعدك؟"
     assert searches == []
-    assert [c[0] for c in model.calls] == [RouterDecision, Reply]
+    assert [c[0] for c in model.calls if c[0] is not Language] == [RouterDecision, Reply]
     assert "Step: greet" in respond_prompt(model)
 
 
@@ -261,7 +261,7 @@ def test_rich_reason_comes_from_the_catalog_not_the_model():
 
 
 def test_model_failure_gives_a_safe_reply(model):
-    state = sessions.send(chat(), "hello?")
+    state = sessions.send(chat(), "هلا؟")
     assert state["phase"] == "ask"
     assert state["messages"][-1].text.startswith("عذراً")
     assert any("router failed" in c for c in state["corrections"])
@@ -279,7 +279,7 @@ def test_products_differ_in_the_router_prompt(model):
     sessions.send(chat("rich@example.com"), "x")
     model.add(RouterDecision(intent="other", language="en"), Reply(say="ok"))
     sessions.send(chat("ole5@example.com"), "x")
-    rich_prompt, ole5_prompt = model.calls[0][1], model.calls[2][1]
+    rich_prompt, ole5_prompt = [c[1] for c in model.calls if c[0] is RouterDecision]
     assert "whitelisting an IP or a user" in rich_prompt and "data migration requests" in ole5_prompt
 
 
@@ -289,3 +289,44 @@ def test_offer_ticket_gets_no_passages(model):
               Reply(say="I don't have an answer for this."))
     sessions.send(sid, "archive?")
     assert "STUB-02 Archive" not in respond_prompt(model) and "No search was run" in respond_prompt(model)
+
+
+def test_router_language_is_corrected_then_overridden(model):
+    sid = chat()
+    model.add(RouterDecision(intent="other", language="en"), RouterDecision(intent="other", language="ar"),
+              Reply(say="تفضل."))
+    state = sessions.send(sid, "عندي سؤال")
+    assert state["decision"].language == "ar" and len(model.problems) == 1
+    assert "Respond in Arabic" in respond_prompt(model)
+
+    model.add(RouterDecision(intent="other", language="en"), RouterDecision(intent="other", language="en"),
+              RouterDecision(intent="other", language="en"), Reply(say="تفضل."))
+    state = sessions.send(sid, "سؤال آخر")
+    assert state["decision"].language == "ar"
+    assert any("overridden" in c for c in state["corrections"])
+
+
+def test_reply_in_the_wrong_language_is_rewritten(model):
+    sid = chat()
+    model.add(RouterDecision(intent="other", language="ar"), Reply(say="Go ahead, what is your question?"),
+              Reply(say="تفضل، ما سؤالك؟"))
+    state = sessions.send(sid, "عندي سؤال")
+    assert state["messages"][-1].text == "تفضل، ما سؤالك؟"
+    assert "Write the same reply in Arabic" in model.problems[-1]
+    assert not any("Note from the system" in m.text for m in state["messages"])
+
+
+def test_reply_still_wrong_after_two_retries_is_sent_with_a_correction(model):
+    sid = chat()
+    model.add(RouterDecision(intent="other", language="ar"), *(Reply(say="Go ahead.") for _ in range(3)))
+    state = sessions.send(sid, "عندي سؤال")
+    assert state["messages"][-1].text == "Go ahead."
+    assert any("wrong language" in c for c in state["corrections"])
+
+
+def test_arabic_reply_with_english_screen_names_passes(model):
+    sid = chat()
+    model.add(RouterDecision(intent="question", language="ar", queries=["How do I reset my password?"]),
+              Reply(say="اختر Forgot password في صفحة تسجيل الدخول.", sources=["STUB-01 Signing in"]))
+    state = sessions.send(sid, "نسيت كلمة المرور")
+    assert state["phase"] == "answer" and model.problems == []

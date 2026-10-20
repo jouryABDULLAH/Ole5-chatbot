@@ -1,6 +1,10 @@
-"""The rules the model does not get to bend: every ticket value from the lists, and the safe reply when a model call fails."""
+"""The rules the model does not get to bend: every ticket value from the lists, the language of a text (a small model call used as a guardrail on the router and on respond), and the safe reply when a model call fails."""
 
 import re
+from typing import Literal
+
+from langchain_core.messages import HumanMessage
+from pydantic import BaseModel, ConfigDict
 
 from ole5_chat.agent.contracts import Classification
 from ole5_chat.values import Catalog
@@ -10,6 +14,33 @@ SORRY = {
     "ar": "عذراً، حدث خطأ من جهتنا. يرجى المحاولة مرة أخرى.",
 }
 REASON_MAX = 500
+NAMES = {"ar": "Arabic", "en": "English"}
+
+
+class Language(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    language: Literal["ar", "en", "none"]
+
+
+def language_of(text: str) -> str | None:
+    """The language a text is written in, judged by the model: "ar", "en", or None when it has no words or the call failed."""
+    from ole5_chat import llm
+    from ole5_chat.agent import prompt
+    try:
+        found = llm.structured(prompt.language(), [HumanMessage(content=text)], Language, node="language").language
+    except llm.ModelFailed:
+        return None
+    return None if found == "none" else found
+
+
+def language_problem(text: str, language: str) -> str | None:
+    """None when the text is in the language; else what to tell the model."""
+    found = language_of(text)
+    if found is None or found == language:
+        return None
+    return (f"The reply is in {NAMES[found]}. The customer wrote in {NAMES[language]}. "
+            f"Write the same reply in {NAMES[language]}.")
 
 
 def match(options: list[str], value: str | None) -> str | None:
