@@ -5,6 +5,8 @@ import time
 from functools import lru_cache
 from typing import Any
 
+from openinference.instrumentation import suppress_tracing
+
 from ole5_chat.config import get_settings
 from ole5_chat.knowledge.contracts import Evidence, Retrieval, Verdict
 from ole5_chat.knowledge.qdrant_login import SessionLogin
@@ -27,6 +29,13 @@ def qdrant_client() -> Any:
     return QdrantClient(url=s.qdrant_url, api_key=qdrant_key or None, **extra)
 
 
+class NoRerank:
+    """Stands in for ragent2's cross-encoder. Ragent.retriever reads Ragent.reranker, which would download and load BAAI/bge-reranker-v2-m3 even when find(use_reranker=False); passing this keeps the model out entirely."""
+
+    def score(self, query: str, candidates: Any) -> list:
+        return list(candidates)
+
+
 @lru_cache(maxsize=1)
 def ragent() -> Any:
     s = get_settings()
@@ -38,7 +47,7 @@ def ragent() -> Any:
     except ImportError as exc:
         raise KnowledgeUnavailable("ragent2 is not installed in this environment") from exc
     qdrant_key = s.qdrant_api_key.get_secret_value() if s.qdrant_api_key else ""
-    return Ragent(client=qdrant_client(), settings=RagSettings(
+    return Ragent(client=qdrant_client(), reranker=NoRerank(), settings=RagSettings(
         groq_api_key=s.groq_api_key.get_secret_value(),
         groq_api_base=s.groq_api_base,
         answer_model=s.groq_model,
@@ -62,7 +71,7 @@ def tenant(name: str) -> Any:
 
 def warm(tenants: list[str]) -> None:
     rag = ragent()
-    for part in ("client", "embedder", "reranker", "retriever", "find_model"):
+    for part in ("client", "embedder", "retriever", "find_model"):
         getattr(rag, part)
     for name in tenants:
         tenant(name)
@@ -90,7 +99,8 @@ def _verdict(evidence: list[Evidence]) -> Verdict:
 def retrieve(question: str, tenant_name: str) -> Retrieval:
     started = time.perf_counter()
     try:
-        result = tenant(tenant_name).find(question)
+        with suppress_tracing():
+            result = tenant(tenant_name).find(question, use_reranker=False)
     except Exception as exc:
         elapsed = int((time.perf_counter() - started) * 1000)
         log.exception("kb  tenant=%s failed after ms=%d", tenant_name, elapsed)
