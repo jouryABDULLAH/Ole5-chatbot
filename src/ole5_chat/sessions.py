@@ -25,6 +25,10 @@ class SessionNotFound(KeyError):
     """No conversation with this session id."""
 
 
+class AttachmentNotFound(KeyError):
+    """A message named an attachment this session does not have."""
+
+
 def _config(session_id: str) -> dict:
     return {"configurable": {"thread_id": session_id}}
 
@@ -47,8 +51,16 @@ def current_identity(session_id: str) -> Identity:
     return get(session_id)["identity"]
 
 
-def send(session_id: str, text: str) -> ChatState:
-    get(session_id)
+ATTACHED = "[attached: {}]"
+
+
+def send(session_id: str, text: str, attachment_ids: list[str] = ()) -> ChatState:
+    state = get(session_id)
+    names = [f["file_name"] for f in state["attachments"] if f["id"] in attachment_ids]
+    if len(names) != len(set(attachment_ids)):
+        raise AttachmentNotFound()
+    if names:
+        text = f"{text}\n{ATTACHED.format(', '.join(names))}".strip()
     with using_session(session_id):
         return _graph.invoke({"messages": [HumanMessage(content=text)]}, _config(session_id))
 

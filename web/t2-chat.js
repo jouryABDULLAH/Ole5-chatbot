@@ -104,6 +104,9 @@
             background:#fff; color:var(--muted); cursor:pointer; flex:none; }
     .clip:hover:not(:disabled) { color:var(--ink); background:var(--soft); }
     .clip:disabled { opacity:.45; cursor:default; }
+    .me .sent { display:flex; align-items:center; gap:6px; margin-top:6px; padding-top:6px; border-top:1px solid rgba(14,90,76,.18);
+                color:var(--accent); font-size:13px; }
+    .me .sent svg { width:14px; height:14px; flex:none; }
     .files { display:flex; flex-wrap:wrap; gap:6px; padding:10px 12px 0; border-top:1px solid var(--line); }
     .files + .compose { border-top:0; }
     .chip { display:inline-flex; align-items:center; gap:4px; max-width:100%; padding:4px 4px 4px 10px;
@@ -127,6 +130,7 @@
   const ICON_CLIP = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.5l-7.8 7.8a5 5 0 01-7.1-7.1l8.5-8.5a3.3 3.3 0 014.7 4.7l-8.5 8.5a1.7 1.7 0 01-2.4-2.4L15 6.9"/></svg>';
   const ICON_X = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
   const ACCEPT = ".png,.jpg,.jpeg,.pdf,.docx,.xlsx,.txt,.log";
+  const MAX_MB = 10;
 
   const el = (tag, attrs = {}, ...children) => {
     const node = document.createElement(tag);
@@ -173,6 +177,7 @@
       this.open = false;
       this.busy = false;
       this.error = "";
+      this.pending = [];
     }
 
     get api() { return (this.getAttribute("api") || "").replace(/\/$/, ""); }
@@ -231,7 +236,7 @@
       const log = el("div", { class: "log", "aria-live": "polite" });
       const lines = this.view.messages;
       lines.forEach((m, i) => {
-        if (m.author === "customer") { log.append(el("div", { class: "me", dir: "auto" }, m.text)); return; }
+        if (m.author === "customer") { log.append(this.customerBubble(m.text)); return; }
         const bubble = el("div", { class: "bot", dir: "auto" }, m.text);
         const last = i === lines.length - 1;
         if (last && this.view.sources.length) {
@@ -244,7 +249,7 @@
         log.append(bubble);
       });
       if (this.view.draft_ready && this.view.ticket_draft) log.append(this.card(this.view.ticket_draft));
-      if (this.busy && !this.uploading) log.append(el("div", { class: "writing" }, el("span", { class: "dots", "aria-hidden": "true" },
+      if (this.busy) log.append(el("div", { class: "writing" }, el("span", { class: "dots", "aria-hidden": "true" },
                                     el("i"), el("i"), el("i")), this.t.writing));
       if (this.error) log.append(el("p", { class: "error", role: "alert" }, this.error));
       log.append(el("button", { class: "restart", type: "button", onclick: () => this.restart() }, this.t.restart));
@@ -257,17 +262,15 @@
         if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
       });
       const picker = el("input", { type: "file", accept: ACCEPT, hidden: true,
-                                   onchange: () => { if (picker.files[0]) this.attach(picker.files[0]); } });
+                                   onchange: () => { if (picker.files[0]) this.stage(picker.files[0]); } });
       const clip = el("button", { class: "clip", type: "button", "aria-label": this.t.attach, title: this.t.attach,
                                   html: ICON_CLIP, disabled: this.busy, onclick: () => picker.click() });
       const form = el("form", { class: "compose", onsubmit: (e) => { e.preventDefault(); this.send(box.value); } },
                       picker, clip, box, sendBtn);
-      const attached = this.view.attachments || [];
-      const files = attached.length || this.uploading ? el("div", { class: "files" },
-        ...attached.map((f) => el("span", { class: "chip", dir: "auto" }, el("span", { title: f.file_name }, f.file_name),
-          el("button", { type: "button", "aria-label": `${this.t.remove} ${f.file_name}`, html: ICON_X,
-                         disabled: this.busy, onclick: () => this.detach(f.id) }))),
-        this.uploading ? el("span", { class: "chip" }, el("span", {}, `${this.t.uploading}: ${this.uploading}`)) : null)
+      const files = this.pending.length ? el("div", { class: "files" },
+        ...this.pending.map((f, i) => el("span", { class: "chip", dir: "auto" }, el("span", { title: f.name }, f.name),
+          el("button", { type: "button", "aria-label": `${this.t.remove} ${f.name}`, html: ICON_X,
+                         disabled: this.busy, onclick: () => { this.pending.splice(i, 1); this.render(); } }))))
         : null;
       queueMicrotask(() => { log.scrollTop = log.scrollHeight; });
       return [log, files, form];
@@ -313,46 +316,47 @@
       this.busy = false; this.render(); this.focusInput();
     }
 
+    customerBubble(text) {
+      const m = text.match(/^([\s\S]*?)\n?\[attached: (.+)\]$/);
+      const bubble = el("div", { class: "me", dir: "auto" }, m ? m[1] : text);
+      if (m) bubble.append(el("div", { class: "sent", html: ICON_CLIP }, el("span", {}, m[2])));
+      return bubble;
+    }
+
+    stage(file) {
+      this.error = "";
+      const ext = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
+      if (!ACCEPT.split(",").includes(ext)) this.error = this.t.badType;
+      else if (file.size > MAX_MB * 1024 * 1024) this.error = this.t.tooBig;
+      else this.pending.push(file);
+      this.render(); this.focusInput();
+    }
+
     async send(text) {
       text = text.trim();
-      if (!text || this.busy) return;
+      if ((!text && !this.pending.length) || this.busy) return;
       const before = this.view;
-      this.view = { ...before, messages: [...before.messages, { author: "customer", text }], sources: [] };
+      const shown = this.pending.length ? `${text}\n[attached: ${this.pending.map((f) => f.name).join(", ")}]` : text;
+      this.view = { ...before, messages: [...before.messages, { author: "customer", text: shown }], sources: [] };
       this.root.querySelector("textarea").value = "";
       this.busy = true; this.error = ""; this.render();
       try {
-        this.view = await call(this.api, "POST", `/chat/sessions/${before.session_id}/messages`, { text });
+        const ids = [];
+        for (const file of this.pending) {
+          const added = await upload(this.api, `/chat/sessions/${before.session_id}/attachments`, file);
+          ids.push(added.id);
+        }
+        this.view = await call(this.api, "POST", `/chat/sessions/${before.session_id}/messages`,
+                               { text, attachment_ids: ids });
+        this.pending = [];
       } catch (err) {
         if (err.status === 404) { this.restart(); return; }
         this.view = before;
         this.draft = text;
-        this.error = this.explain(err);
-      }
-      this.busy = false; this.render(); this.focusInput();
-    }
-
-    async attach(file) {
-      if (this.busy) return;
-      this.busy = true; this.uploading = file.name; this.error = ""; this.render();
-      try {
-        const added = await upload(this.api, `/chat/sessions/${this.view.session_id}/attachments`, file);
-        this.view = { ...this.view, attachments: [...(this.view.attachments || []), added] };
-      } catch (err) {
-        if (err.status === 404) { this.restart(); return; }
         this.error = err.status === 413 ? this.t.tooBig : err.status === 415 ? this.t.badType
                    : err.status === 409 ? this.t.tooMany : this.explain(err);
       }
-      this.busy = false; this.uploading = ""; this.render(); this.focusInput();
-    }
-
-    async detach(id) {
-      if (this.busy) return;
-      this.busy = true; this.error = ""; this.render();
-      try {
-        await fetch(`${this.api}/chat/sessions/${this.view.session_id}/attachments/${id}`, { method: "DELETE" });
-        this.view = { ...this.view, attachments: (this.view.attachments || []).filter((f) => f.id !== id) };
-      } catch (err) { this.error = this.explain({ kind: "unreachable" }); }
-      this.busy = false; this.render();
+      this.busy = false; this.render(); this.focusInput();
     }
 
     async submitTicket() {

@@ -333,3 +333,40 @@ def test_change_request_at_confirm_is_refused_not_offered(model):
     state = sessions.send(sid, "change the priority to High")
     assert state["phase"] == "confirm" and state["ticket_draft"].classified
     assert "Step: confirm" in respond_prompt(model)
+
+
+def test_respond_is_told_what_the_message_was(model):
+    sid = chat()
+    collecting(model, sid)
+    model.add(ticket_reply(missing=["screen"], unknown=["screen"]), GOOD, Reply(say="Ready."))
+    sessions.send(sid, "I don't know")
+    assert "The customer's message: a reply about the ticket" in respond_prompt(model)
+    model.add(RouterDecision(intent="question", language="en", queries=["export"]), Reply(say="No answer; still ready."))
+    sessions.send(sid, "how do I export?")
+    assert "The customer's message: a question the knowledge base could not answer" in respond_prompt(model)
+
+
+def test_answer_without_a_source_from_the_model_shows_none(model):
+    sid = chat()
+    model.add(RouterDecision(intent="question", language="en", queries=["How do I reset my password?"]),
+              Reply(say="I don't have an answer for this. Would you like a ticket?"))
+    state = sessions.send(sid, "password?")
+    assert state["phase"] == "answer" and state["sources"] == []
+
+
+def test_respond_is_told_the_ticket_is_urgent(model):
+    sid = chat()
+    model.add(ticket_reply(urgent=True, collected={"problem": "nobody can sign in"}, missing=["since when"]), GOOD,
+              Reply(say="This is urgent, so the ticket is ready now. Press Submit."))
+    state = sessions.send(sid, "yes")
+    assert state["phase"] == "confirm"
+    assert "Urgent: yes" in respond_prompt(model) and "Step: confirm" in respond_prompt(model)
+
+
+def test_urgent_offer_tells_respond_it_is_urgent(model):
+    sid = chat()
+    model.add(RouterDecision(intent="question", language="ar", queries=["system down"], urgent=True),
+              Reply(say="هذه مشكلة عاجلة. هل تريد فتح تذكرة عاجلة الآن؟"))
+    state = sessions.send(sid, "النظام كله ما يفتح")
+    assert state["phase"] == "offer_ticket"
+    assert "Urgent: yes" in respond_prompt(model) and "Step: offer_ticket" in respond_prompt(model)

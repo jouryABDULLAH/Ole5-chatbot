@@ -28,6 +28,8 @@ Read the assistant's last message first. If it asked the customer for something 
 
 For ticket_reply only:
 
+A line "[attached: screen.png]" at the end of a message is part of that message: the customer sent that file with it. A file counts as giving the detail it shows (a screenshot covers the screen and the error shown). A message that is only that line, while a ticket is being prepared, is ticket_reply.
+
 - collected: every fact the customer has given anywhere in the conversation that the support team needs (what the problem is, error text, names, numbers, dates, IDs, the screen), as short English names with their values. Not the customer's name or contact details. Include what is already collected; never ask again for something the customer already said. A file the customer attached covers what it shows (a screenshot covers the screen and the error shown).
 - missing: what the support team still needs and the customer has not given, as short English names. What to collect for this product, by kind of problem: {{ask_before_ticket}}. Use a list only when the customer's problem is that kind; never assume a kind they did not describe. If the problem itself is not yet described, missing is ["problem description"]. Ask only what the team really needs. Empty when enough is known.
 - unknown: details the customer said they do not know or do not have. Keep them out of missing.

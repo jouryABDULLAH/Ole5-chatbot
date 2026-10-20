@@ -34,14 +34,17 @@ def _json(value) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
-def ticket_status(draft: TicketDraft | None, files: list[dict] = ()) -> str:
+def ticket_status(draft: TicketDraft | None, files: list[dict] = (), urgent: bool = False) -> str:
     names = ", ".join(f["file_name"] for f in files)
     attached = f"\nFiles the customer attached for the ticket: {names}" if names else ""
     if draft is None:
-        return "No ticket is being prepared." + attached
+        urgency = "\nUrgent: yes: this message describes an urgent problem" if urgent else ""
+        return "No ticket is being prepared." + urgency + attached
     ready = "yes, shown to the customer with a Submit button" if draft.classified else "no"
-    return (f"A ticket is being prepared.\nCollected: {_json(draft.collected)}\nStill missing: {_json(draft.missing)}"
-            f"\nThe customer does not know: {_json(draft.unknown)}\nSummary ready: {ready}{attached}")
+    urgency = "yes: the usual questions are skipped and the ticket is prepared right away" if urgent else "no"
+    return (f"A ticket is being prepared.\nUrgent: {urgency}\nCollected: {_json(draft.collected)}"
+            f"\nStill missing: {_json(draft.missing)}\nThe customer does not know: {_json(draft.unknown)}"
+            f"\nSummary ready: {ready}{attached}")
 
 
 def router(state: ChatState) -> str:
@@ -57,6 +60,22 @@ def language() -> str:
     return _fill("language", schema=schema_text(Language))
 
 
+def _urgent(state: ChatState) -> bool:
+    draft, decision = state.get("ticket_draft"), state.get("decision")
+    return bool((draft and draft.urgent) or (decision and decision.urgent))
+
+
+def _message_kind(state: ChatState) -> str:
+    intent, step = state["decision"].intent, state["step"]
+    if intent == "ticket_reply":
+        return "a reply about the ticket (details, I don't know, yes, a change request)"
+    if intent == "question" and step == "answer":
+        return "a question the passages below answer"
+    if intent == "question":
+        return "a question the knowledge base could not answer"
+    return "a greeting, thanks, or something else"
+
+
 def respond(state: ChatState) -> str:
     config = products.load(state["identity"].product)
     retrieval = state.get("last_retrieval")
@@ -67,7 +86,9 @@ def respond(state: ChatState) -> str:
         language=NAMES[state["decision"].language],
         ask_before_ticket=_json(config.ask_before_ticket),
         step=state["step"],
-        ticket=ticket_status(state.get("ticket_draft"), state.get("attachments") or []),
+        message_kind=_message_kind(state),
+        ticket=ticket_status(state.get("ticket_draft"), state.get("attachments") or [],
+                             urgent=_urgent(state)),
         evidence=Retrieval.from_json(retrieval).render() if retrieval and state["step"] == "answer" else NOT_SEARCHED,
         schema=schema_text(Reply),
     )

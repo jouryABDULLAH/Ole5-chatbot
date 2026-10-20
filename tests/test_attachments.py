@@ -81,3 +81,17 @@ def test_submit_links_the_files_in_the_note_and_the_sheet():
     row = sheets._read("attachments")[-1]
     assert (row["ticket_number"], row["file_name"], row["link"]) == (view["ticket_number"], "screen.png", link)
     assert view["attachments"] == []
+
+
+def test_message_carries_its_attachments(model):
+    from ole5_chat.agent.contracts import Reply, RouterDecision
+    sid = session()
+    att = send_file(sid, "screen.png").json()
+    model.add(RouterDecision(intent="other", language="en"), Reply(say="Got it."))
+    view = client.post(f"/chat/sessions/{sid}/messages", json={"text": "here it is", "attachment_ids": [att["id"]]}).json()
+    assert view["messages"][-2]["text"] == "here it is\n[attached: screen.png]"
+    model.add(RouterDecision(intent="other", language="en"), Reply(say="Got it."))
+    view = client.post(f"/chat/sessions/{sid}/messages", json={"text": "", "attachment_ids": [att["id"]]}).json()
+    assert view["messages"][-2]["text"] == "[attached: screen.png]"
+    assert client.post(f"/chat/sessions/{sid}/messages", json={"text": "", "attachment_ids": []}).status_code == 422
+    assert client.post(f"/chat/sessions/{sid}/messages", json={"text": "x", "attachment_ids": ["nope"]}).status_code == 404

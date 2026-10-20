@@ -28,7 +28,8 @@ class StartSession(BaseModel):
 class NewMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    text: str = Field(min_length=1, max_length=4000)
+    text: str = Field(max_length=4000)
+    attachment_ids: list[str] = []
 
 
 class Line(BaseModel):
@@ -112,10 +113,14 @@ def read_session(session_id: str) -> SessionView:
 
 @app.post("/chat/sessions/{session_id}/messages")
 def send_message(session_id: str, body: NewMessage) -> SessionView:
+    if not body.text.strip() and not body.attachment_ids:
+        raise HTTPException(status_code=422, detail="The message is empty")
     try:
-        return _view(session_id, sessions.send(session_id, body.text))
+        return _view(session_id, sessions.send(session_id, body.text.strip(), body.attachment_ids))
     except sessions.SessionNotFound as exc:
         raise HTTPException(status_code=404, detail="Session not found") from exc
+    except sessions.AttachmentNotFound as exc:
+        raise HTTPException(status_code=404, detail="Attachment not found") from exc
 
 
 @app.post("/chat/sessions/{session_id}/submit")

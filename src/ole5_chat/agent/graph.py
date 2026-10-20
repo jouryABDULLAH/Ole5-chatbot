@@ -194,7 +194,7 @@ def validate(state: ChatState) -> dict:
     sources: list[str] = []
     if step == "answer":
         direct = _direct_documents(state)
-        sources = [s for s in reply.sources if s in direct] or direct
+        sources = [s for s in reply.sources if s in direct] or (direct if reply.sources else [])
         dropped = [s for s in reply.sources if s not in direct]
         if dropped:
             log.info("validate  dropped sources not in a DIRECT passage: %s", dropped)
