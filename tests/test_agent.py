@@ -400,3 +400,31 @@ def test_classify_failure_keeps_the_draft_unclassified(model):
     assert state["phase"] == "ask" and not draft.classified and draft.collected["screen"] == "Inbox"
     assert "could not be built" in respond_prompt(model)
     assert any("classify failed" in c for c in state["corrections"])
+
+
+def test_greeting_detection():
+    from ole5_chat.agent.prompt import greeting_in
+    assert greeting_in("السلام عليكم متى تردون علي") == "السلام عليكم"
+    assert greeting_in("Hello, how do I reset my password?") == "Hello"
+    assert greeting_in("good morning!") == "good morning"
+    assert greeting_in("كيف أستعيد كلمة المرور؟") is None
+    assert greeting_in("hithere") is None
+
+
+def test_outline_carries_the_greeting_and_the_reminder(model):
+    sid = chat()
+    collecting(model, sid)
+    model.add(RouterDecision(intent="question", language="ar", queries=["How do I reset my password?"]),
+              Reply(say="وعليكم السلام. اختر Forgot password. ما الشاشة؟", sources=["STUB-01 Signing in"]))
+    sessions.send(sid, "السلام عليكم، كيف أستعيد كلمة المرور؟")
+    p = respond_prompt(model)
+    assert '1. Return the customer\'s greeting ("السلام عليكم")' in p
+    assert "asking again for: screen" in p
+
+
+def test_outline_for_an_urgent_offer(model):
+    sid = chat()
+    model.add(RouterDecision(intent="question", language="ar", queries=["system down"], urgent=True),
+              Reply(say="المشكلة عاجلة، هل أفتح تذكرة عاجلة الآن؟"))
+    sessions.send(sid, "النظام كله ما يفتح")
+    assert "The problem is urgent" in respond_prompt(model) and "Return the customer" not in respond_prompt(model)

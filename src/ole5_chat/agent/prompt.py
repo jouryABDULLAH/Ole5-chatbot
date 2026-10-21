@@ -1,6 +1,7 @@
 """Builds each LLM node's system prompt from prompts/chat/*.md and the conversation's own data: chat.yaml, the value lists and the search results."""
 
 import json
+import re
 from functools import lru_cache
 
 from ole5_chat import products, values
@@ -71,6 +72,69 @@ def _persona(config: products.ProductConfig, language: str) -> str:
     return "\n".join(lines)
 
 
+GREETING = re.compile(
+    r"^\W*(السلام عليكم|سلام عليكم|وعليكم السلام|مرحبا|مرحباً|أهلا|أهلاً|اهلا|هلا|يا هلا|صباح الخير|مساء الخير|"
+    r"hello|hi|hey|good (?:morning|afternoon|evening)|greetings)\b", re.IGNORECASE)
+NO_ANSWER_KIND = "a question the knowledge base could not answer"
+
+
+def greeting_in(text: str) -> str | None:
+    """The greeting a message opens with, or None."""
+    m = GREETING.match(text.strip())
+    return m.group(1) if m else None
+
+
+def _outline(state: ChatState) -> str:
+    """The lines this reply must contain, in order, decided from the state. respond words them in the persona's voice."""
+    step, draft = state["step"], state.get("ticket_draft")
+    kind, urgent = _message_kind(state), _urgent(state)
+    lines: list[str] = []
+    greeting = greeting_in(state["messages"][-1].text)
+    if greeting and step != "greet":
+        lines.append(f'Return the customer\'s greeting ("{greeting}") first, in its own form.')
+    if state.get("note"):
+        lines.append(state["note"])
+    if step == "greet":
+        lines.append("Greet them back, or say who you are and what you can do, and invite their question. No product facts.")
+    elif step == "answer":
+        lines.append("Answer from the passages below only, and cite the documents you used. If they do not answer what "
+                     "was asked, say you have no answer, offer a ticket, and cite nothing.")
+    elif step == "offer_ticket":
+        if urgent:
+            lines.append("The problem is urgent: say so and ask whether to open an urgent ticket right away. "
+                         "Do not say you have no answer.")
+        else:
+            lines.append("Let them know this is not something you can answer here, and ask whether they want a "
+                         "ticket opened. State nothing about the product.")
+    elif step == "collect":
+        if kind == NO_ANSWER_KIND:
+            lines.append("Say in one line you have no answer for that question and that you will finish the ticket first.")
+        if draft is None or not draft.collected:
+            lines.append("Ask them to describe the problem, nothing else.")
+        else:
+            lines.append(f"Ask for one or two of: {', '.join(draft.missing) or 'nothing'}. Do not ask for "
+                         f"{', '.join(draft.collected) or 'nothing'} (already given) or "
+                         f"{', '.join(draft.unknown) or 'nothing'} (they do not know).")
+    elif step == "confirm":
+        if urgent:
+            lines.append("Tell them that because the problem is urgent the ticket was prepared right away, "
+                         "without the usual questions.")
+        if kind == NO_ANSWER_KIND:
+            lines.append("Say in one line you have no answer for that question.")
+        lines.append("Say the ticket summary is ready and they can press Submit. Ask for nothing. If they asked to "
+                     "change it, say it cannot be changed here: they can press Submit, or cancel and start again.")
+    elif step == "ask":
+        lines.append("Reply briefly, state no product facts, and offer help with the product. If they declined or "
+                     "cancelled a ticket, say they can contact support at any time. If they said they have a "
+                     "question or a problem without saying what it is, invite them to say it.")
+    if step == "answer" and draft is not None:
+        if draft.classified:
+            lines.append("End with one line: the ticket summary from before is still ready, press Submit.")
+        elif draft.missing:
+            lines.append(f"End with one line asking again for: {', '.join(draft.missing)}.")
+    return "\n".join(f"{i}. {line}" for i, line in enumerate(lines, 1))
+
+
 def _urgent(state: ChatState) -> bool:
     draft, decision = state.get("ticket_draft"), state.get("decision")
     return bool((draft and draft.urgent) or (decision and decision.urgent))
@@ -98,7 +162,7 @@ def respond(state: ChatState) -> str:
         ask_before_ticket=_json(config.ask_before_ticket),
         step=state["step"],
         message_kind=_message_kind(state),
-        note=state.get("note") or "none",
+        outline=_outline(state),
         ticket=ticket_status(state.get("ticket_draft"), state.get("attachments") or [],
                              urgent=_urgent(state)),
         evidence=Retrieval.from_json(retrieval).render() if retrieval and state["step"] == "answer" else NOT_SEARCHED,
