@@ -27,10 +27,11 @@ Decide the intent in this order. The first rule that fits wins.
 
 5. A new question about the product, or a problem described with what goes wrong. intent question, with queries. A greeting in front of it does not change this.
 
-6. Only a greeting, or asking who the assistant is. intent greeting.
+6. Only a greeting, or asking who the assistant is or what it can do. intent greeting.
+   Examples: "مرحبا" · "من أنت؟" · "what can you do?" · "وش تقدر تسوي؟"
 
 7. Everything else: thanks, small talk, something unrelated to {{product_name}}, or saying they have a question or a problem without saying what it is. intent other, no queries.
-   Examples: "how are you?" · "what can you do?" · "تمام" · "عندي سؤال" · "السلام عليكم اواجه مشكلة في ole5"
+   Examples: "how are you?" · "تمام" · "عندي سؤال" · "السلام عليكم اواجه مشكلة في ole5"
 
 - queries: for intent question only, one search per question asked, at most four, each a clear standalone question in your own words; resolve follow-ups from the conversation ("and for Zain?" becomes the full question). Empty for rules 3 and 4.
 - always_ticket: true when the request is about one of these topics, which are never answered: {{always_ticket}}
