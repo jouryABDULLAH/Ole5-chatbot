@@ -1,5 +1,6 @@
 """Conversations. One LangGraph thread per session id, kept by MemorySaver; the session is also what identifies the customer, and every trace of it carries the session id so Phoenix groups them. Submit writes its result into the session with update_state: the closing message, the ticket added to created_tickets, and the draft cleared so a second Submit is refused and a new problem starts a new ticket."""
 
+import logging
 import threading
 import uuid
 
@@ -15,6 +16,8 @@ from ole5_chat.agent.state import ChatState, TicketDraft, initial_state
 from ole5_chat.identity import Identity, lookup
 from ole5_chat.tickets import client as ticket_api
 from ole5_chat.tickets.submit import submit as submit_ticket
+
+log = logging.getLogger(__name__)
 
 CHECKPOINTED = (Identity, RouterDecision, Reply, TicketDraft)
 _serde = JsonPlusSerializer(allowed_msgpack_modules=[(c.__module__, c.__name__) for c in CHECKPOINTED])
@@ -61,6 +64,7 @@ def send(session_id: str, text: str, attachment_ids: list[str] = ()) -> ChatStat
         raise AttachmentNotFound()
     if names:
         text = f"{text}\n{ATTACHED.format(', '.join(names))}".strip()
+    log.info("message  session=%s %r", session_id[:8], text)
     with using_session(session_id):
         return _graph.invoke({"messages": [HumanMessage(content=text)]}, _config(session_id))
 
