@@ -60,6 +60,17 @@ def language() -> str:
     return _fill("language", schema=schema_text(Language))
 
 
+def _persona(config: products.ProductConfig, language: str) -> str:
+    p = config.persona
+    who = f"{p.name}, " if p.name else ""
+    lines = [f"You are {who}{p.identity}. You introduced yourself at the start of this chat with: "
+             f"\"{p.introduction.get(language) or p.introduction['en']}\"", "", "Greetings:"]
+    lines += [f"- {g}" for g in p.greetings]
+    lines += ["", "Questions and problems:"] + [f"- {q}" for q in p.questions]
+    lines += ["", "Voice:"] + [f"- {v}" for v in p.voice]
+    return "\n".join(lines)
+
+
 def _urgent(state: ChatState) -> bool:
     draft, decision = state.get("ticket_draft"), state.get("decision")
     return bool((draft and draft.urgent) or (decision and decision.urgent))
@@ -82,7 +93,7 @@ def respond(state: ChatState) -> str:
     return _fill(
         "respond",
         product_name=config.name,
-        tone=config.tone,
+        persona=_persona(config, state["decision"].language),
         language=NAMES[state["decision"].language],
         ask_before_ticket=_json(config.ask_before_ticket),
         step=state["step"],

@@ -1,4 +1,4 @@
-"""Per-product chat settings from products/<code>/chat.yaml. Adding a product means adding a folder."""
+"""Per-product chat settings from products/<code>/chat.yaml: the persona (who the assistant is, how it introduces itself, greets, answers and sounds), the never-answered and urgent topics, and what to collect per kind of problem. Adding a product means adding a folder."""
 
 from functools import lru_cache
 
@@ -8,20 +8,30 @@ from pydantic import BaseModel, ConfigDict
 from ole5_chat.config import get_settings
 
 
+class Persona(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = ""
+    identity: str
+    introduction: dict[str, str]
+    greetings: list[str] = []
+    questions: list[str] = []
+    voice: list[str] = []
+
+
 class ProductConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     code: str
     name: str
-    greeting: dict[str, str]
-    tone: str
+    persona: Persona
     always_ticket: list[str] = []
     urgent_when: list[str] = []
     ask_before_ticket: dict[str, list[str]] = {}
     team_scopes: str | None = None
 
     def greet(self, language: str) -> str:
-        return self.greeting.get(language) or self.greeting["en"]
+        return self.persona.introduction.get(language) or self.persona.introduction["en"]
 
 
 @lru_cache(maxsize=16)

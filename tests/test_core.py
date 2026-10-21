@@ -57,7 +57,7 @@ def test_products_differ_only_by_chat_yaml():
     ole5, rich = products.load("OLE5"), products.load("rich")
     assert ole5.greet("ar") != rich.greet("ar")
     assert ole5.always_ticket != rich.always_ticket
-    assert ole5.greet("fr") == ole5.greeting["en"]
+    assert ole5.greet("fr") == ole5.persona.introduction["en"]
 
 
 def test_ticket_row_is_appended():

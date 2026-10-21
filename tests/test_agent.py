@@ -55,7 +55,7 @@ def confirming(model, sid):
 
 def test_first_message_is_the_fixed_greeting_without_a_model_call(model):
     state = sessions.get(chat())
-    assert state["messages"][0].text == "أهلاً، كيف يمكنني مساعدتك في Ole5؟"
+    assert state["messages"][0].text.startswith("أهلاً بك، أنا مساعد دعم Ole5")
     assert model.calls == []
 
 
