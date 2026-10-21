@@ -29,11 +29,12 @@ class Settings(BaseSettings):
     kb_tenants: dict[str, str] = {"OLE5": "ole5"}
     embedding_service_url: str = "https://ds.t2.sa/text_embed"
     kb_candidate_pool: int = 30
-    kb_top_k: int = 10
+    kb_top_k: int = 15
     kb_max_rounds: int = 3
     kb_tool_repair_attempts: int = 2
     kb_embed_timeout: float = 60.0
     kb_find_timeout: float = 120.0
+    kb_find_retries: int = 1
 
     sheets_dir: Path = ROOT / "sheets"
     products_dir: Path = ROOT / "products"

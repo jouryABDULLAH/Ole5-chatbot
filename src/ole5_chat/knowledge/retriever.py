@@ -96,11 +96,32 @@ def _verdict(evidence: list[Evidence]) -> Verdict:
     return Verdict.PARTIAL if evidence else Verdict.NOT_IN_KB
 
 
+TRANSIENT = ("tool_use_failed", "Failed to parse tool call arguments")
+
+
+def _short(text: str, limit: int = 160) -> str:
+    text = " ".join(text.split())
+    return text if len(text) <= limit else text[:limit - 1] + "…"
+
+
+def _find(name: str, question: str):
+    """One find() call, repeated when Groq rejected the search agent's tool call: the model sometimes puts several queries as a list in one call, which Groq refuses before ragent2 can repair it, and the next attempt is usually well-formed."""
+    retries = get_settings().kb_find_retries
+    for attempt in range(retries + 1):
+        try:
+            with suppress_tracing():
+                return tenant(name).find(question, use_reranker=False)
+        except Exception as exc:
+            if attempt == retries or not any(mark in str(exc) for mark in TRANSIENT):
+                raise
+            log.warning("kb  tenant=%s attempt=%d rejected tool call, trying again: %s", name, attempt + 1,
+                        _short(str(exc)))
+
+
 def retrieve(question: str, tenant_name: str) -> Retrieval:
     started = time.perf_counter()
     try:
-        with suppress_tracing():
-            result = tenant(tenant_name).find(question, use_reranker=False)
+        result = _find(tenant_name, question)
     except Exception as exc:
         elapsed = int((time.perf_counter() - started) * 1000)
         log.exception("kb  tenant=%s failed after ms=%d", tenant_name, elapsed)

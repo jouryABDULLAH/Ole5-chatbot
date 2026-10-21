@@ -24,10 +24,14 @@ def fake_find(monkeypatch):
     holder = {}
 
     class Tenant:
-        def find(self, question):
-            if isinstance(holder["value"], Exception):
-                raise holder["value"]
-            return holder["value"]
+        def find(self, question, **kwargs):
+            holder["calls"] = holder.get("calls", 0) + 1
+            value = holder["value"]
+            if isinstance(value, list):
+                value = value.pop(0)
+            if isinstance(value, Exception):
+                raise value
+            return value
 
     monkeypatch.setattr(retriever, "tenant", lambda name: Tenant())
     return holder
@@ -76,3 +80,23 @@ def test_backend_switch(monkeypatch, fake_find):
     get_settings.cache_clear()
     assert search.search("password", "OLE5").documents == ["KB-REAL"]
     assert search.search("password", "RICH").documents == ["STUB-01 Signing in"]
+
+
+def test_rejected_tool_call_is_retried_once(fake_find):
+    rejected = RuntimeError("Error code: 400 - {'code': 'tool_use_failed', 'message': 'Failed to parse tool call arguments as JSON'}")
+    fake_find["value"] = [rejected, result(chunk("direct"))]
+    retrieval = retriever.retrieve("q", "ole5")
+    assert retrieval.verdict == Verdict.ANSWERABLE and fake_find["calls"] == 2
+
+
+def test_rejected_tool_call_twice_fails(fake_find):
+    rejected = RuntimeError("tool_use_failed")
+    fake_find["value"] = [rejected, RuntimeError("tool_use_failed")]
+    retrieval = retriever.retrieve("q", "ole5")
+    assert retrieval.error and fake_find["calls"] == 2
+
+
+def test_other_errors_are_not_retried(fake_find):
+    fake_find["value"] = [RuntimeError("timeout"), result(chunk("direct"))]
+    retrieval = retriever.retrieve("q", "ole5")
+    assert retrieval.error and fake_find["calls"] == 1
