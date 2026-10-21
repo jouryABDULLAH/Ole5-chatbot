@@ -38,6 +38,7 @@ class ChatState(MessagesState):
     decision: RouterDecision | None
     last_retrieval: dict | None
     reply: Reply | None
+    note: str | None
     ticket_draft: TicketDraft | None
     corrections: list[str]
     created_tickets: list[dict]
@@ -46,5 +47,5 @@ class ChatState(MessagesState):
 
 def initial_state(identity: Identity) -> ChatState:
     return ChatState(messages=[], identity=identity, phase="greet", step=None, sources=[], decision=None,
-                     last_retrieval=None, reply=None, ticket_draft=None, corrections=[], created_tickets=[],
+                     last_retrieval=None, reply=None, note=None, ticket_draft=None, corrections=[], created_tickets=[],
                      attachments=[])

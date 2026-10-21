@@ -98,6 +98,7 @@ def respond(state: ChatState) -> str:
         ask_before_ticket=_json(config.ask_before_ticket),
         step=state["step"],
         message_kind=_message_kind(state),
+        note=state.get("note") or "none",
         ticket=ticket_status(state.get("ticket_draft"), state.get("attachments") or [],
                              urgent=_urgent(state)),
         evidence=Retrieval.from_json(retrieval).render() if retrieval and state["step"] == "answer" else NOT_SEARCHED,

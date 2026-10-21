@@ -380,3 +380,23 @@ def test_urgent_offer_tells_respond_it_is_urgent(model):
     state = sessions.send(sid, "النظام كله ما يفتح")
     assert state["phase"] == "offer_ticket"
     assert "Urgent: yes" in respond_prompt(model) and "Step: offer_ticket" in respond_prompt(model)
+
+
+def test_router_failure_sends_the_apology_and_changes_nothing(model):
+    sid = chat()
+    before = collecting(model, sid)["ticket_draft"]
+    state = sessions.send(sid, "هلا؟")
+    assert state["messages"][-1].text.startswith("عذراً")
+    assert state["ticket_draft"] == before and state["phase"] == "ask"
+    assert not any(c[0] is Reply for c in model.calls[-1:])
+
+
+def test_classify_failure_keeps_the_draft_unclassified(model):
+    sid = chat()
+    collecting(model, sid)
+    model.add(ticket_reply(collected={"screen": "Inbox"}), Reply(say="I couldn't build the summary; send that again."))
+    state = sessions.send(sid, "the Inbox screen")
+    draft = state["ticket_draft"]
+    assert state["phase"] == "ask" and not draft.classified and draft.collected["screen"] == "Inbox"
+    assert "could not be built" in respond_prompt(model)
+    assert any("classify failed" in c for c in state["corrections"])

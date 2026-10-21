@@ -76,8 +76,10 @@ def _decide(state: ChatState) -> dict:
     except llm.GuardrailFailed as exc:
         decision, corrections = exc.result, []
     except llm.ModelFailed as exc:
-        decision = RouterDecision(intent="other", language=expected or state["identity"].language)
-        corrections = [f"router failed: {exc}"]
+        language = expected or state["identity"].language
+        log.warning("router  model failed, fixed apology sent, state unchanged: %s", _short(str(exc)))
+        return {"decision": RouterDecision(intent="other", language=language), "step": "ask",
+                "reply": Reply(say=SORRY[language]), "corrections": state["corrections"] + [f"router failed: {exc}"]}
     if expected and decision.language != expected:
         log.warning("router  language overridden model=%s detected=%s", decision.language, expected)
         corrections.append(f"router language {decision.language!r} overridden with {expected!r}")
@@ -101,11 +103,11 @@ def _decide(state: ChatState) -> dict:
     else:
         step = None
 
-    log.info("router  intent=%s step=%s always_ticket=%s urgent=%s cancel=%s language=%s queries=%s "
-             "missing=%s unknown=%s", decision.intent, step or "search", decision.always_ticket, decision.urgent,
+    log.info("router  phase=%s intent=%s step=%s always_ticket=%s urgent=%s cancel=%s language=%s queries=%s "
+             "missing=%s unknown=%s", state["phase"], decision.intent, step or "search", decision.always_ticket, decision.urgent,
              decision.cancel_ticket, decision.language, decision.queries,
              draft.missing if draft else None, draft.unknown if draft else None)
-    return {"decision": decision, "step": step, "ticket_draft": draft, "reply": None,
+    return {"decision": decision, "step": step, "ticket_draft": draft, "reply": None, "note": None,
             "corrections": state["corrections"] + corrections}
 
 
@@ -123,6 +125,9 @@ def router(state: ChatState) -> dict:
         return _decide(state)
     if state["step"] is None:
         return _after_search(state)
+    if not state["ticket_draft"].classified:
+        log.info("router  after classify: summary not built, step=ask")
+        return {"step": "ask"}
     log.info("router  after classify step=%s", state["step"])
     return {}
 
@@ -154,8 +159,10 @@ def classify(state: ChatState) -> dict:
         try:
             result = llm.structured(prompt.classify(state), messages, Classification, node="classify")
         except llm.ModelFailed as exc:
-            problems = [f"classify failed: {exc}"]
-            break
+            log.warning("classify  model failed, summary not built: %s", _short(str(exc)))
+            return {"note": "The ticket summary could not be built this time. Say so in one line, keep what the "
+                            "customer gave, and ask them to send their last message again.",
+                    "corrections": state["corrections"] + [f"classify failed: {exc}"]}
         fields, problems = check_ticket(result, catalog)
         log.info("classify  attempt=%d queue=%s type=%s subtype=%s priority=%s urgent=%s confidence=%s problems=%s",
                  attempt, result.queue, result.type, result.subtype, result.priority, result.urgent,
@@ -174,6 +181,9 @@ def classify(state: ChatState) -> dict:
 
 def respond(state: ChatState) -> dict:
     step, language = state["step"], state["decision"].language
+    if state.get("reply") is not None:
+        log.info("respond  step=%s preset=%r", step, _short(state["reply"].say))
+        return {"step": step}
     try:
         reply = llm.structured(prompt.respond(state), state["messages"], Reply, node="respond",
                                check=lambda r: language_problem(r.say, language))
@@ -202,9 +212,9 @@ def validate(state: ChatState) -> dict:
         dropped = [s for s in reply.sources if s not in direct]
         if dropped:
             log.info("validate  dropped sources not in a DIRECT passage: %s", dropped)
-    log.info("validate  step=%s sources=%s", step, sources)
+    log.info("validate  phase %s -> %s sources=%s", state["phase"], step, sources)
     return {"messages": [AIMessage(content=reply.say)], "phase": step, "step": None, "sources": sources,
-            "last_retrieval": None}
+            "last_retrieval": None, "note": None}
 
 
 def build(checkpointer):
