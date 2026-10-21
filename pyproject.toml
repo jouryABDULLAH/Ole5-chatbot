@@ -30,3 +30,6 @@ graders = ["hallucination", "evals.graders:phase_matches", "evals.graders:langua
 
 [tool.evalkit.suites.conversations]
 graders = ["correctness", "evals.graders:phase_matches", "evals.graders:language_matches", "evals.graders:sources_match", "evals.graders:draft_matches"]
+
+[tool.evalkit.suites.answerable_small]
+graders = ["correctness", "evals.graders:phase_matches", "evals.graders:language_matches", "evals.graders:sources_match", "evals.graders:draft_matches"]
