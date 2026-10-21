@@ -200,7 +200,7 @@ def test_answered_question_while_collecting_keeps_the_ticket(model):
     sid = chat()
     collecting(model, sid)
     model.add(RouterDecision(intent="question", language="en", queries=["How do I reset my password?"]),
-              Reply(say="Choose Forgot password. Which screen crashes?"))
+              Reply(say="Choose Forgot password. Which screen crashes?", sources=["STUB-01 Signing in"]))
     state = sessions.send(sid, "by the way, how do I reset my password?")
     assert state["phase"] == "answer"
     assert state["ticket_draft"].missing == ["screen"]
@@ -220,7 +220,7 @@ def test_question_at_confirm_keeps_the_summary_ready(model):
     sid = chat()
     confirming(model, sid)
     model.add(RouterDecision(intent="question", language="en", queries=["How do I reset my password?"]),
-              Reply(say="Choose Forgot password."))
+              Reply(say="Choose Forgot password.", sources=["STUB-01 Signing in"]))
     state = sessions.send(sid, "how do I reset my password?")
     assert state["phase"] == "answer" and state["ticket_draft"].classified
     assert "Summary ready: yes" in respond_prompt(model)
@@ -346,12 +346,22 @@ def test_respond_is_told_what_the_message_was(model):
     assert "The customer's message: a question the knowledge base could not answer" in respond_prompt(model)
 
 
-def test_answer_without_a_source_from_the_model_shows_none(model):
+def test_answer_without_a_source_becomes_a_ticket_offer(model):
     sid = chat()
     model.add(RouterDecision(intent="question", language="en", queries=["How do I reset my password?"]),
               Reply(say="I don't have an answer for this. Would you like a ticket?"))
     state = sessions.send(sid, "password?")
-    assert state["phase"] == "answer" and state["sources"] == []
+    assert state["phase"] == "offer_ticket" and state["sources"] == []
+    assert any("answer without a source" in c for c in state["corrections"])
+
+
+def test_answer_without_a_source_during_a_ticket_stays_in_collect(model):
+    sid = chat()
+    collecting(model, sid)
+    model.add(RouterDecision(intent="question", language="en", queries=["How do I reset my password?"]),
+              Reply(say="I don't have an answer for that; let's finish the ticket. Which screen?"))
+    state = sessions.send(sid, "password?")
+    assert state["phase"] == "collect" and state["ticket_draft"].missing == ["screen"]
 
 
 def test_respond_is_told_the_ticket_is_urgent(model):

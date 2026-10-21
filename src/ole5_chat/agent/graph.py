@@ -185,6 +185,10 @@ def respond(state: ChatState) -> dict:
         corrections = [f"respond failed: {exc}"]
         if step == "answer":
             step = "ask"
+    if step == "answer" and not reply.sources:
+        step = "offer_ticket" if state.get("ticket_draft") is None else _no_answer(state["ticket_draft"])
+        corrections.append(f"answer without a source: step changed to {step}")
+        log.info("respond  no source cited at answer, step changed to %s", step)
     log.info("respond  step=%s say=%r sources=%s", step, _short(reply.say), reply.sources)
     return {"reply": reply, "step": step, "corrections": state["corrections"] + corrections}
 
