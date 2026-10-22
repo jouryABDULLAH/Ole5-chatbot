@@ -44,10 +44,8 @@ def _ticket_step(draft: TicketDraft, decision: RouterDecision) -> Step:
     return "confirm" if decision.urgent or not draft.missing else "collect"
 
 
-def _no_answer(draft: TicketDraft | None) -> Step:
-    if draft is None:
-        return "offer_ticket"
-    return "confirm" if draft.classified else "collect"
+def _no_answer() -> Step:
+    return "offer_ticket"
 
 
 def route(state: ChatState) -> str:
@@ -98,8 +96,8 @@ def _decide(state: ChatState) -> dict:
     elif decision.intent == "ticket_reply":
         draft = _with_details(draft or _new_draft(state), decision)
         step = _ticket_step(draft, decision)
-    elif decision.always_ticket or not decision.queries or (decision.urgent and draft is None):
-        step = _no_answer(draft)
+    elif not decision.queries or (decision.urgent and draft is None):
+        step = _no_answer()
     else:
         step = None
 
@@ -115,7 +113,7 @@ def _after_search(state: ChatState) -> dict:
     retrieval = Retrieval.from_json(state["last_retrieval"])
     if retrieval.error:
         log.warning("router  search failed error=%s, treated as no answer", retrieval.error)
-    step = "answer" if retrieval.direct else _no_answer(state.get("ticket_draft"))
+    step = "answer" if retrieval.direct else _no_answer()
     log.info("router  after search step=%s direct=%d", step, len(retrieval.direct))
     return {"step": step}
 
@@ -196,7 +194,7 @@ def respond(state: ChatState) -> dict:
         if step == "answer":
             step = "ask"
     if step == "answer" and not reply.sources:
-        step = "offer_ticket" if state.get("ticket_draft") is None else _no_answer(state["ticket_draft"])
+        step = _no_answer()
         corrections.append(f"answer without a source: step changed to {step}")
         log.info("respond  no source cited at answer, step changed to %s", step)
     log.info("respond  step=%s say=%r sources=%s", step, _short(reply.say), reply.sources)

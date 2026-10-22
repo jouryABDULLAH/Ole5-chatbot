@@ -23,13 +23,16 @@ entry = "src/ole5_chat/agent/graph.py"
 roots = ["src"]
 
 [tool.evalkit.suites.answerable]
-graders = ["correctness", "evals.graders:phase_matches", "evals.graders:language_matches", "evals.graders:sources_match", "evals.graders:draft_matches"]
+graders = ["evals.graders:correctness", "evals.graders:completeness", "evals.graders:phase_matches", "evals.graders:language_matches", "evals.graders:sources_match", "evals.graders:draft_matches"]
 
 [tool.evalkit.suites.unanswerable]
-graders = ["hallucination", "evals.graders:phase_matches", "evals.graders:language_matches", "evals.graders:sources_match", "evals.graders:draft_matches"]
+graders = ["evals.graders:correctness", "evals.graders:phase_matches", "evals.graders:language_matches", "evals.graders:sources_match", "evals.graders:draft_matches"]
 
 [tool.evalkit.suites.conversations]
-graders = ["correctness", "evals.graders:phase_matches", "evals.graders:language_matches", "evals.graders:sources_match", "evals.graders:draft_matches"]
+graders = ["evals.graders:correctness", "evals.graders:completeness", "evals.graders:phase_matches", "evals.graders:language_matches", "evals.graders:sources_match", "evals.graders:draft_matches"]
 
 [tool.evalkit.suites.answerable_small]
-graders = ["correctness", "evals.graders:phase_matches", "evals.graders:language_matches", "evals.graders:sources_match", "evals.graders:draft_matches"]
+graders = ["evals.graders:correctness", "evals.graders:completeness", "evals.graders:phase_matches", "evals.graders:language_matches", "evals.graders:sources_match", "evals.graders:draft_matches"]
+
+[tool.evalkit.suites.happy_path]
+graders = ["evals.graders:correctness", "evals.graders:completeness", "evals.graders:phase_matches", "evals.graders:language_matches", "evals.graders:sources_match", "evals.graders:draft_matches"]

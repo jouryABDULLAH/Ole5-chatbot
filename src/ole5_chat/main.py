@@ -5,6 +5,7 @@ import os
 import threading
 
 from fastapi.staticfiles import StaticFiles
+from opentelemetry.sdk.trace.sampling import Decision, ParentBased, Sampler, SamplingResult
 from rich.console import Console
 from rich.highlighter import ReprHighlighter
 from rich.logging import RichHandler
@@ -32,6 +33,18 @@ for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
+class SessionsOnly(Sampler):
+    """Keeps a root span only when it starts inside using_session(). RAGent2 grades passages in plain worker threads, which inherit neither the session nor suppress_tracing, so their model calls would otherwise start traces of their own."""
+
+    def should_sample(self, parent_context, trace_id, name, kind=None, attributes=None, links=None, trace_state=None):
+        if attributes and attributes.get("session.id"):
+            return SamplingResult(Decision.RECORD_AND_SAMPLE, attributes, trace_state)
+        return SamplingResult(Decision.DROP, None, trace_state)
+
+    def get_description(self) -> str:
+        return "SessionsOnly"
+
+
 def start_tracing() -> None:
     s = get_settings()
     if not s.tracing:
@@ -40,7 +53,7 @@ def start_tracing() -> None:
     if s.phoenix_api_key and s.phoenix_api_key.get_secret_value():
         os.environ.setdefault("PHOENIX_API_KEY", s.phoenix_api_key.get_secret_value())
     from phoenix.otel import register
-    register(project_name=s.phoenix_project_name, auto_instrument=True)
+    register(project_name=s.phoenix_project_name, auto_instrument=True, sampler=ParentBased(root=SessionsOnly()))
     logging.getLogger(__name__).info("tracing  project=%s endpoint=%s", s.phoenix_project_name,
                                      os.environ["PHOENIX_COLLECTOR_ENDPOINT"])
 

@@ -9,6 +9,7 @@ from groq import BadRequestError
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 from openinference.instrumentation.langchain import get_current_span
+from opentelemetry import trace as trace_api
 from pydantic import BaseModel, ValidationError
 
 from ole5_chat.config import get_settings
@@ -46,21 +47,30 @@ def _clean(text: str) -> str:
     return text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
 
 
+def _attempt_span(name: str):
+    """A span under the current graph node for one model attempt. Phoenix's LangChain tracer ends the LLM span before any other callback runs, so the reasoning cannot go on that span and is recorded here instead."""
+    parent = get_current_span() if get_settings().tracing else None
+    return trace_api.get_tracer(__name__).start_as_current_span(
+        name, context=trace_api.set_span_in_context(parent) if parent else None,
+        attributes={"openinference.span.kind": "CHAIN"})
+
+
 def structured(system: str, messages: list[BaseMessage], schema: type[T], node: str = "llm",
                check: Callable[[T], str | None] | None = None) -> T:
     convo: list[BaseMessage] = [SystemMessage(content=system), *messages]
     error, last = "no attempt made", None
     for attempt in range(1, RETRIES + 2):
         started = time.perf_counter()
-        try:
-            reply = _client(0 if attempt == 1 else 0.3).invoke(convo)
-        except BadRequestError as exc:
-            error = str(exc)[:400]
-            log.warning("%s  llm schema=%s attempt=%d rejected by Groq: %s", node, schema.__name__, attempt, error)
-            continue
+        with _attempt_span(schema.__name__) as span:
+            try:
+                reply = _client(0 if attempt == 1 else 0.3).invoke(convo, config={"run_name": node})
+            except BadRequestError as exc:
+                error = str(exc)[:400]
+                log.warning("%s  llm schema=%s attempt=%d rejected by Groq: %s", node, schema.__name__, attempt, error)
+                continue
+            if reasoning := reply.additional_kwargs.get("reasoning_content"):
+                span.set_attribute("output.value", reasoning)
         ms = int((time.perf_counter() - started) * 1000)
-        if (reasoning := reply.additional_kwargs.get("reasoning_content")) and (span := get_current_span()):
-            span.set_attribute("llm.reasoning", reasoning)
         try:
             result = schema.model_validate_json(_clean(reply.text))
         except ValidationError as exc:

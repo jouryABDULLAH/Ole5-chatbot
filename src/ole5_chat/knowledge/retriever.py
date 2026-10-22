@@ -26,7 +26,7 @@ def qdrant_client() -> Any:
     s = get_settings()
     qdrant_key = s.qdrant_api_key.get_secret_value() if s.qdrant_api_key else ""
     extra = {"auth": SessionLogin(s.qdrant_session_cookie)} if s.qdrant_login_email else {}
-    return QdrantClient(url=s.qdrant_url, api_key=qdrant_key or None, **extra)
+    return QdrantClient(url=s.qdrant_url, api_key=qdrant_key or None, timeout=int(s.qdrant_timeout), **extra)
 
 
 class NoRerank:
@@ -96,7 +96,7 @@ def _verdict(evidence: list[Evidence]) -> Verdict:
     return Verdict.PARTIAL if evidence else Verdict.NOT_IN_KB
 
 
-TRANSIENT = ("tool_use_failed", "Failed to parse tool call arguments")
+TRANSIENT = ("tool_use_failed", "Failed to parse tool call arguments", "ReadTimeout", "Read timed out")
 
 
 def _short(text: str, limit: int = 160) -> str:
@@ -105,7 +105,7 @@ def _short(text: str, limit: int = 160) -> str:
 
 
 def _find(name: str, question: str):
-    """One find() call, repeated when Groq rejected the search agent's tool call: the model sometimes puts several queries as a list in one call, which Groq refuses before ragent2 can repair it, and the next attempt is usually well-formed."""
+    """One find() call, repeated once on two transient failures: Groq rejecting the search agent's tool call (the model sometimes puts several queries as a list in one call), and the embedding gateway timing out."""
     retries = get_settings().kb_find_retries
     for attempt in range(retries + 1):
         try:

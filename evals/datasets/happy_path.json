@@ -1,0 +1,98 @@
+{
+  "cases": [
+    {
+      "id": "answer-then-thanks-ar",
+      "input": {
+        "turns": [
+          "السلام عليكم",
+          "كم مدة صلاحية جلسة رابط الدخول الآمن؟",
+          "شكراً"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "phase": "greet",
+            "draft": null
+          },
+          {
+            "phase": "answer",
+            "sources": [
+              "نظام OLE5 — حلول المشكلات الشائعة"
+            ],
+            "answer": "جلسة رابط الدخول الآمن تنتهي صلاحيتها بعد 8 ساعات، وبعدها يلزم إغلاق المتصفح وفتح الرابط الآمن من جديد وتسجيل الدخول.",
+            "draft": null
+          },
+          {
+            "phase": "ask",
+            "draft": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "ticket-full-ar",
+      "input": {
+        "turns": [
+          "تطبيق التواقيع يطلع لي شاشة سوداء على الآيباد",
+          "نعم",
+          "ما عندي معلومات ثانية، افتحها بهذا"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "phase": "offer_ticket",
+            "sources": [],
+            "draft": null
+          },
+          {
+            "phase": "collect",
+            "draft": {
+              "ready": false
+            }
+          },
+          {
+            "phase": "confirm",
+            "draft": {
+              "ready": true,
+              "missing_empty": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "ticket-full-en",
+      "input": {
+        "turns": [
+          "Hi, the barcode label prints in the wrong place on the letter",
+          "yes please",
+          "That's all I have, I don't know anything else"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "phase": "offer_ticket",
+            "sources": [],
+            "draft": null
+          },
+          {
+            "phase": "collect",
+            "draft": {
+              "ready": false
+            }
+          },
+          {
+            "phase": "confirm",
+            "draft": {
+              "ready": true,
+              "missing_empty": true
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

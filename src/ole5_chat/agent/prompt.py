@@ -75,7 +75,6 @@ def _persona(config: products.ProductConfig, language: str) -> str:
 GREETING = re.compile(
     r"^\W*(السلام عليكم|سلام عليكم|وعليكم السلام|مرحبا|مرحباً|أهلا|أهلاً|اهلا|هلا|يا هلا|صباح الخير|مساء الخير|"
     r"hello|hi|hey|good (?:morning|afternoon|evening)|greetings)\b", re.IGNORECASE)
-NO_ANSWER_KIND = "a question the knowledge base could not answer"
 
 
 def greeting_in(text: str) -> str | None:
@@ -87,11 +86,11 @@ def greeting_in(text: str) -> str | None:
 def _outline(state: ChatState) -> str:
     """The lines this reply must contain, in order, decided from the state. respond words them in the persona's voice."""
     step, draft = state["step"], state.get("ticket_draft")
-    kind, urgent = _message_kind(state), _urgent(state)
+    urgent = _urgent(state)
     lines: list[str] = []
     greeting = greeting_in(state["messages"][-1].text)
     if greeting and step != "greet":
-        lines.append(f'Return the customer\'s greeting ("{greeting}") first, in its own form.')
+        lines.append(f'Reply to the customer\'s greeting ("{greeting}") first, in its own form.')
     if state.get("note"):
         lines.append(state["note"])
     if step == "greet":
@@ -107,8 +106,6 @@ def _outline(state: ChatState) -> str:
             lines.append("Let them know this is not something you can answer here, and ask whether they want a "
                          "ticket opened. State nothing about the product.")
     elif step == "collect":
-        if kind == NO_ANSWER_KIND:
-            lines.append("Say in one line you have no answer for that question and that you will finish the ticket first.")
         if draft is None or not draft.collected:
             lines.append("Ask them to describe the problem, nothing else.")
         else:
@@ -119,19 +116,12 @@ def _outline(state: ChatState) -> str:
         if urgent:
             lines.append("Tell them that because the problem is urgent the ticket was prepared right away, "
                          "without the usual questions.")
-        if kind == NO_ANSWER_KIND:
-            lines.append("Say in one line you have no answer for that question.")
-        lines.append("Say the ticket summary is ready and they can press Submit. Ask for nothing. If they asked to "
-                     "change it, say it cannot be changed here: they can press Submit, or cancel and start again.")
+        lines.append("Say the ticket summary is ready and they can press Submit. Ask for nothing.")
     elif step == "ask":
-        lines.append("Reply briefly, state no product facts, and offer help with the product. If they declined or "
-                     "cancelled a ticket, say they can contact support at any time. If they said they have a "
-                     "question or a problem without saying what it is, invite them to say it.")
-    if step == "answer" and draft is not None:
-        if draft.classified:
-            lines.append("End with one line: the ticket summary from before is still ready, press Submit.")
-        elif draft.missing:
-            lines.append(f"End with one line asking again for: {', '.join(draft.missing)}.")
+        lines.append("Reply briefly, state no product facts, and offer help with the product. If they ask about this "
+                     "conversation itself (what they asked earlier, what you said), answer from the messages above. "
+                     "If they declined or cancelled a ticket, say they can contact support at any time. If they said "
+                     "they have a question or a problem without saying what it is, invite them to say it.")
     return "\n".join(f"{i}. {line}" for i, line in enumerate(lines, 1))
 
 

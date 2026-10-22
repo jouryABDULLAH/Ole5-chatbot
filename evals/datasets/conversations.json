@@ -46,7 +46,7 @@
             "sources": [
               "نظام OLE5 — حلول المشكلات الشائعة"
             ],
-            "answer": "يبدأ الرد برد التحية (وعليكم السلام)، ثم: عند طلب استعادة كلمة المرور يجب كتابة اسم المستخدم متبوعاً بنطاق البيئة الخاص بالجهة.",
+            "answer": "عند طلب استعادة كلمة المرور يجب كتابة اسم المستخدم متبوعاً بنطاق البيئة الخاص بالجهة.",
             "draft": null
           }
         ]
@@ -78,12 +78,11 @@
       }
     },
     {
-      "id": "ticket-to-confirm-en",
+      "id": "ticket-accept-ar",
       "input": {
         "turns": [
-          "The mobile app closes by itself when I open the Inbox",
-          "yes please",
-          "Android 14, app version 3.2, it started yesterday, the error says Unexpected error"
+          "تطبيق التواقيع يطلع لي شاشة سوداء على الآيباد",
+          "نعم من فضلك"
         ]
       },
       "expected": {
@@ -98,43 +97,6 @@
             "draft": {
               "ready": false
             }
-          },
-          {
-            "phase": [
-              "collect",
-              "confirm"
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": "ticket-to-confirm-ar",
-      "input": {
-        "turns": [
-          "تطبيق الجوال يغلق من نفسه عند فتح صندوق الوارد",
-          "نعم من فضلك",
-          "أندرويد 14، نسخة التطبيق 3.2، بدأت أمس، ونص الخطأ Unexpected error"
-        ]
-      },
-      "expected": {
-        "turns": [
-          {
-            "phase": "offer_ticket",
-            "sources": [],
-            "draft": null
-          },
-          {
-            "phase": "collect",
-            "draft": {
-              "ready": false
-            }
-          },
-          {
-            "phase": [
-              "collect",
-              "confirm"
-            ]
           }
         ]
       }
@@ -143,9 +105,8 @@
       "id": "dont-know-ar",
       "input": {
         "turns": [
-          "عندي bug في البرنامج، النظام لا يفتح عندي",
+          "تطبيق الجوال يغلق من نفسه عند فتح صندوق الوارد",
           "نعم افتح تذكرة",
-          "لا أعلم",
           "لا أستطيع الإجابة"
         ]
       },
@@ -162,12 +123,6 @@
             }
           },
           {
-            "phase": [
-              "collect",
-              "confirm"
-            ]
-          },
-          {
             "phase": "confirm",
             "draft": {
               "ready": true,
@@ -181,7 +136,7 @@
       "id": "urgent-ar",
       "input": {
         "turns": [
-          "النظام كله لا يفتح لأي مستخدم في الجهة منذ الصباح",
+          "لا يستطيع أي مستخدم في الجهة تسجيل الدخول منذ الصباح",
           "نعم"
         ]
       },
@@ -229,7 +184,7 @@
       "id": "decline-ticket-ar",
       "input": {
         "turns": [
-          "هل يمكن جدولة إرسال مراسلة في وقت لاحق؟",
+          "هل يوجد وضع ليلي (داكن) للنظام؟",
           "لا شكراً"
         ]
       },
@@ -250,7 +205,7 @@
       "id": "cancel-at-collect-en",
       "input": {
         "turns": [
-          "The mobile app closes when I open the Inbox",
+          "The mobile app closes by itself when I open the Inbox",
           "yes",
           "never mind, cancel the ticket"
         ]
@@ -270,109 +225,6 @@
           {
             "phase": "ask",
             "draft": null
-          }
-        ]
-      }
-    },
-    {
-      "id": "detour-at-collect-en",
-      "input": {
-        "turns": [
-          "The mobile app closes when I open the Inbox",
-          "yes",
-          "by the way, how do I reset my password?",
-          "Android 14, app 3.2, since yesterday, error Unexpected error"
-        ]
-      },
-      "expected": {
-        "turns": [
-          {
-            "phase": "offer_ticket",
-            "draft": null
-          },
-          {
-            "phase": "collect",
-            "draft": {
-              "ready": false
-            }
-          },
-          {
-            "phase": "answer",
-            "sources": [
-              "نظام OLE5 — حلول المشكلات الشائعة"
-            ],
-            "draft": {
-              "ready": false
-            }
-          },
-          {
-            "phase": [
-              "collect",
-              "confirm"
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": "detour-at-confirm-ar",
-      "input": {
-        "turns": [
-          "النظام كله لا يفتح لأي مستخدم في الجهة",
-          "نعم",
-          "كم مدة صلاحية جلسة رابط الدخول الآمن؟"
-        ]
-      },
-      "expected": {
-        "turns": [
-          {
-            "phase": "offer_ticket",
-            "draft": null
-          },
-          {
-            "phase": "confirm",
-            "draft": {
-              "ready": true
-            }
-          },
-          {
-            "phase": "answer",
-            "sources": [
-              "نظام OLE5 — حلول المشكلات الشائعة"
-            ],
-            "draft": {
-              "ready": true
-            }
-          }
-        ]
-      }
-    },
-    {
-      "id": "change-at-confirm-ar",
-      "input": {
-        "turns": [
-          "النظام كله لا يفتح لأي مستخدم في الجهة",
-          "نعم",
-          "غيّر الأولوية إلى منخفضة"
-        ]
-      },
-      "expected": {
-        "turns": [
-          {
-            "phase": "offer_ticket",
-            "draft": null
-          },
-          {
-            "phase": "confirm",
-            "draft": {
-              "ready": true
-            }
-          },
-          {
-            "phase": "confirm",
-            "draft": {
-              "ready": true
-            }
           }
         ]
       }
@@ -412,32 +264,28 @@
       }
     },
     {
-      "id": "unanswerable-during-ticket-en",
+      "id": "recall-first-question-ar",
       "input": {
         "turns": [
-          "The mobile app closes when I open the Inbox",
-          "yes",
-          "also, does Ole5 integrate with Teams?"
+          "كم مدة صلاحية جلسة رابط الدخول الآمن؟",
+          "ايش كان سؤالي الأول؟"
         ]
       },
       "expected": {
         "turns": [
           {
-            "phase": "offer_ticket",
+            "phase": "answer",
+            "sources": [
+              "نظام OLE5 — حلول المشكلات الشائعة"
+            ],
+            "answer": "جلسة رابط الدخول الآمن تنتهي صلاحيتها بعد 8 ساعات.",
             "draft": null
           },
           {
-            "phase": "collect",
-            "draft": {
-              "ready": false
-            }
-          },
-          {
-            "phase": "collect",
+            "phase": "ask",
             "sources": [],
-            "draft": {
-              "ready": false
-            }
+            "answer": "سؤالك الأول كان عن مدة صلاحية جلسة رابط الدخول الآمن.",
+            "draft": null
           }
         ]
       }

@@ -21,7 +21,6 @@ persona:
 always_ticket:
   - data migration requests
 urgent_when:
-  - the system is down or unreachable for all users
   - no user in the organization can sign in
 ask_before_ticket:
   bug: [screen or page, steps to reproduce, screenshot, error text, when it started]

@@ -32,8 +32,9 @@ class Settings(BaseSettings):
     kb_top_k: int = 15
     kb_max_rounds: int = 3
     kb_tool_repair_attempts: int = 2
-    kb_embed_timeout: float = 60.0
-    kb_find_timeout: float = 120.0
+    kb_embed_timeout: float = 120.0
+    qdrant_timeout: float = 60.0
+    kb_find_timeout: float = 260.0
     kb_find_retries: int = 1
 
     sheets_dir: Path = ROOT / "sheets"

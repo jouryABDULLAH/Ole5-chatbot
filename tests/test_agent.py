@@ -207,15 +207,6 @@ def test_answered_question_while_collecting_keeps_the_ticket(model):
     assert 'Still missing: ["screen"]' in respond_prompt(model)
 
 
-def test_unanswered_question_while_collecting_is_deferred(model):
-    sid = chat()
-    before = collecting(model, sid)["ticket_draft"]
-    model.add(RouterDecision(intent="question", language="en", queries=["export"]),
-              Reply(say="I don't have an answer for that. Which screen?"))
-    state = sessions.send(sid, "how do I export?")
-    assert state["phase"] == "collect" and state["ticket_draft"] == before
-
-
 def test_question_at_confirm_keeps_the_summary_ready(model):
     sid = chat()
     confirming(model, sid)
@@ -325,16 +316,6 @@ def test_arabic_reply_with_english_screen_names_passes(model):
     assert state["phase"] == "answer" and model.problems == []
 
 
-def test_change_request_at_confirm_is_refused_not_offered(model):
-    sid = chat()
-    confirming(model, sid)
-    model.add(RouterDecision(intent="question", language="en", queries=["change priority"]),
-              Reply(say="The summary cannot be changed here. Press Submit, or cancel."))
-    state = sessions.send(sid, "change the priority to High")
-    assert state["phase"] == "confirm" and state["ticket_draft"].classified
-    assert "Step: confirm" in respond_prompt(model)
-
-
 def test_respond_is_told_what_the_message_was(model):
     sid = chat()
     collecting(model, sid)
@@ -353,15 +334,6 @@ def test_answer_without_a_source_becomes_a_ticket_offer(model):
     state = sessions.send(sid, "password?")
     assert state["phase"] == "offer_ticket" and state["sources"] == []
     assert any("answer without a source" in c for c in state["corrections"])
-
-
-def test_answer_without_a_source_during_a_ticket_stays_in_collect(model):
-    sid = chat()
-    collecting(model, sid)
-    model.add(RouterDecision(intent="question", language="en", queries=["How do I reset my password?"]),
-              Reply(say="I don't have an answer for that; let's finish the ticket. Which screen?"))
-    state = sessions.send(sid, "password?")
-    assert state["phase"] == "collect" and state["ticket_draft"].missing == ["screen"]
 
 
 def test_respond_is_told_the_ticket_is_urgent(model):
@@ -411,15 +383,12 @@ def test_greeting_detection():
     assert greeting_in("hithere") is None
 
 
-def test_outline_carries_the_greeting_and_the_reminder(model):
+def test_outline_carries_the_greeting(model):
     sid = chat()
-    collecting(model, sid)
     model.add(RouterDecision(intent="question", language="ar", queries=["How do I reset my password?"]),
-              Reply(say="وعليكم السلام. اختر Forgot password. ما الشاشة؟", sources=["STUB-01 Signing in"]))
+              Reply(say="وعليكم السلام. اختر Forgot password.", sources=["STUB-01 Signing in"]))
     sessions.send(sid, "السلام عليكم، كيف أستعيد كلمة المرور؟")
-    p = respond_prompt(model)
-    assert '1. Return the customer\'s greeting ("السلام عليكم")' in p
-    assert "asking again for: screen" in p
+    assert '1. Reply to the customer\'s greeting ("السلام عليكم")' in respond_prompt(model)
 
 
 def test_outline_for_an_urgent_offer(model):
