@@ -374,6 +374,18 @@ def test_classify_failure_keeps_the_draft_unclassified(model):
     assert any("classify failed" in c for c in state["corrections"])
 
 
+def test_values_refused_twice_keep_the_draft_unclassified(model):
+    sid = chat()
+    collecting(model, sid)
+    bad = GOOD.model_copy(update={"queue": "Ole5 Helpdesk"})
+    model.add(ticket_reply(collected={"screen": "Inbox"}), bad, bad, Reply(say="I couldn't build the summary; send that again."))
+    state = sessions.send(sid, "the Inbox screen")
+    draft = state["ticket_draft"]
+    assert state["phase"] == "ask" and not draft.classified and draft.collected["screen"] == "Inbox"
+    assert "could not be built" in respond_prompt(model)
+    assert any("classify refused" in c for c in state["corrections"])
+
+
 def test_greeting_detection():
     from ole5_chat.agent.prompt import greeting_in
     assert greeting_in("السلام عليكم متى تردون علي") == "السلام عليكم"

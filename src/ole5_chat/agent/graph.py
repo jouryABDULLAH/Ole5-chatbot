@@ -170,11 +170,15 @@ def classify(state: ChatState) -> dict:
         messages = [*messages, AIMessage(content=result.model_dump_json()),
                     HumanMessage(content="These values were refused: " + "; ".join(problems)
                                  + ". Choose each from its list exactly as written.")]
+    if problems:
+        log.warning("classify  values still refused, summary not built: %s", "; ".join(problems))
+        return {"note": "The ticket summary could not be built this time. Say so in one line, keep what the "
+                        "customer gave, and ask them to send their last message again.",
+                "corrections": state["corrections"] + [f"classify refused: {'; '.join(problems)}"]}
     draft = state["ticket_draft"].model_copy(update={**fields, "classified": True})
-    log.info("classify  checked queue=%s type=%s subtype=%s priority=%s urgent=%s reason=%r refused=%s",
-             draft.queue, draft.type, draft.subtype, draft.priority, draft.urgent, _short(draft.reason or ""),
-             problems)
-    return {"ticket_draft": draft, "corrections": state["corrections"] + problems}
+    log.info("classify  checked queue=%s type=%s subtype=%s priority=%s urgent=%s reason=%r",
+             draft.queue, draft.type, draft.subtype, draft.priority, draft.urgent, _short(draft.reason or ""))
+    return {"ticket_draft": draft}
 
 
 def respond(state: ChatState) -> dict:
