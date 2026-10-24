@@ -1,4 +1,9 @@
-"""The respond node that searches for itself: the support agent's tool loop with one tool, search_knowledge_base, then two gates. Gate 1 nudges a reply written without a search, as the support agent does, and asks the grounding call whether it asserts facts. Gate 2 (the grounding call) compares the reply with the DIRECT passages and names the documents it draws on; those are the sources, never the respond model's own list. Then the language guardrails."""
+"""The respond node that searches for itself: the support agent's tool loop with one tool, 
+search_knowledge_base, then two gates. 
+Gate 1 nudges a reply written without a search, as the support agent does, and asks the grounding call whether it asserts facts. 
+Gate 2 (the grounding call) compares the reply with the DIRECT passages and names the documents it draws on; 
+those are the sources, never the respond model's own list. 
+Then the language guardrails."""
 
 import logging
 import re
