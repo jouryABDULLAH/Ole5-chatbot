@@ -35,6 +35,7 @@ class Grounding(BaseModel):
     used: list[str]
     answered: bool
     offered: bool
+    unsupported: list[str]
 
 
 def _invoke(convo: list[BaseMessage], tool, tool_choice: str | None = None) -> AIMessage:
@@ -113,15 +114,24 @@ def _gates(convo, tool, sink, customer, text, corrections) -> tuple[str, list[st
             corrections.append("grounding call failed")
             return text, direct
         used = [d for d in direct if any(d in u for u in grounding.used)]
-        log.info("respond_agent  grounding attempt=%d answered=%s offered=%s used=%s", attempt, grounding.answered,
-                 grounding.offered, used)
-        if grounding.answered and used:
+        log.info("respond_agent  grounding attempt=%d answered=%s offered=%s used=%s unsupported=%s", attempt,
+                 grounding.answered, grounding.offered, used, grounding.unsupported)
+        if grounding.answered and used and not grounding.unsupported:
             if grounding.offered:
                 corrections.append("reply offered a ticket")
             return text, used
+        if grounding.unsupported:
+            if attempt == 2:
+                corrections.append("reply kept unsupported facts")
+                return _no_answer(convo, tool), []
+            convo.append(HumanMessage(content=NOTE + "Remove these from your reply; no passage states them: "
+                                      + "; ".join(grounding.unsupported) + ". Keep only what the passages say."))
+            corrections.append("gate 2 retried: unsupported")
+            text = _loop(convo, tool, corrections)
+            continue
         if attempt == 1:
             convo.append(HumanMessage(content=NOTE + "a passage answers this directly; answer from it."))
-            corrections.append("gate 2 retried")
+            corrections.append("gate 2 retried: declined")
             text = _loop(convo, tool, corrections)
     corrections.append("respond declined a DIRECT passage")
     return _no_answer(convo, tool), []

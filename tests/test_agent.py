@@ -464,7 +464,7 @@ def searching(question, call_id="c1"):
 
 def test_respond_agent_keeps_a_partial_answer_that_offers_a_ticket(model, respond_node):
     from ole5_chat.agent.respond_agent import Grounding
-    model.add(Grounding(used=["Guide"], answered=True, offered=True))
+    model.add(Grounding(used=["Guide"], answered=True, offered=True, unsupported=[]))
     hit = Retrieval(query="drafts", verdict=Verdict.PARTIAL, evidence=[passage("Guide")])
     out, _ = respond_node("How do I save a draft, and how long is it kept?",
                           [searching("How to save a draft?"),
@@ -509,7 +509,7 @@ def rejected():
 
 def test_respond_agent_cites_the_document_the_grounding_names(model, respond_node):
     from ole5_chat.agent.respond_agent import Grounding
-    model.add(Grounding(used=["Guide"], answered=True, offered=False))
+    model.add(Grounding(used=["Guide"], answered=True, offered=False, unsupported=[]))
     out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?"),
                                                      AIMessage(content="Press Save as draft.")], [hit("Guide", "Manual")])
     assert out["reply"].say == "Press Save as draft." and out["reply"].sources == ["Guide"]
@@ -526,7 +526,7 @@ def test_respond_agent_without_a_direct_passage_skips_grounding(model, respond_n
 
 def test_respond_agent_keeps_a_greeting_written_without_a_search(model, respond_node):
     from ole5_chat.agent.respond_agent import NUDGE, Grounding
-    model.add(Grounding(used=[], answered=False, offered=False))
+    model.add(Grounding(used=[], answered=False, offered=False, unsupported=[]))
     out, fake = respond_node("مرحبا", [AIMessage(content="أهلاً بك، كيف أقدر أساعدك؟"),
                                        AIMessage(content="أهلاً بك، كيف أقدر أساعدك؟")])
     assert sent(fake)[-1].content == NUDGE
@@ -536,7 +536,7 @@ def test_respond_agent_keeps_a_greeting_written_without_a_search(model, respond_
 
 def test_respond_agent_searches_when_nudged(model, respond_node):
     from ole5_chat.agent.respond_agent import NUDGE, Grounding
-    model.add(Grounding(used=["Guide"], answered=True, offered=False))
+    model.add(Grounding(used=["Guide"], answered=True, offered=False, unsupported=[]))
     out, fake = respond_node("How do I save a draft?", [AIMessage(content="Press Save."),
                                                         searching("How to save a draft?"),
                                                         AIMessage(content="Press Save as draft.")], [hit("Guide")])
@@ -547,7 +547,7 @@ def test_respond_agent_searches_when_nudged(model, respond_node):
 
 def test_respond_agent_replaces_an_answer_written_without_a_search(model, respond_node):
     from ole5_chat.agent.respond_agent import Grounding
-    model.add(Grounding(used=[], answered=True, offered=False))
+    model.add(Grounding(used=[], answered=True, offered=False, unsupported=[]))
     out, fake = respond_node("How long are drafts kept?", [AIMessage(content="Drafts are kept 30 days."),
                                                            AIMessage(content="Drafts are kept 30 days."),
                                                            AIMessage(content="I have no answer for that. Open a ticket?")])
@@ -558,7 +558,7 @@ def test_respond_agent_replaces_an_answer_written_without_a_search(model, respon
 
 def test_respond_agent_declining_a_direct_passage_twice_gives_the_no_answer(model, respond_node):
     from ole5_chat.agent.respond_agent import Grounding
-    model.add(Grounding(used=[], answered=False, offered=True), Grounding(used=[], answered=False, offered=True))
+    model.add(Grounding(used=[], answered=False, offered=True, unsupported=[]), Grounding(used=[], answered=False, offered=True, unsupported=[]))
     out, fake = respond_node("How do I save a draft?", [searching("How to save a draft?"),
                                                         AIMessage(content="Open a ticket?"),
                                                         AIMessage(content="Open a ticket?"),
@@ -567,7 +567,7 @@ def test_respond_agent_declining_a_direct_passage_twice_gives_the_no_answer(mode
     assert "a passage answers this directly" in sent(fake, 2)[-1].content
     assert len(grounding(model)) == 2
     assert out["reply"].say.startswith("I have no answer") and out["reply"].sources == []
-    assert out["corrections"] == ["gate 2 retried", "respond declined a DIRECT passage"]
+    assert out["corrections"] == ["gate 2 retried: declined", "respond declined a DIRECT passage"]
 
 
 def test_respond_agent_cites_every_direct_document_when_grounding_fails(model, respond_node):
@@ -579,7 +579,7 @@ def test_respond_agent_cites_every_direct_document_when_grounding_fails(model, r
 
 def test_respond_agent_rewrites_a_reply_in_the_wrong_language(model, respond_node):
     from ole5_chat.agent.respond_agent import Grounding
-    model.add(*[Grounding(used=["Guide"], answered=True, offered=False)] * 2)
+    model.add(*[Grounding(used=["Guide"], answered=True, offered=False, unsupported=[])] * 2)
     out, fake = respond_node("كيف أحفظ مسودة؟", [searching("How to save a draft?"),
                                                AIMessage(content="Press Save as draft."),
                                                AIMessage(content="اضغط حفظ كمسودة.")], [hit("Guide")])
@@ -589,7 +589,7 @@ def test_respond_agent_rewrites_a_reply_in_the_wrong_language(model, respond_nod
 
 def test_respond_agent_sends_the_last_reply_after_two_language_retries(model, respond_node):
     from ole5_chat.agent.respond_agent import Grounding
-    model.add(*[Grounding(used=["Guide"], answered=True, offered=False)] * 3)
+    model.add(*[Grounding(used=["Guide"], answered=True, offered=False, unsupported=[])] * 3)
     out, fake = respond_node("كيف أحفظ مسودة؟", [searching("How to save a draft?"),
                                                *[AIMessage(content="Press Save as draft.")] * 3], [hit("Guide")])
     assert len(fake.calls) == 4
@@ -600,7 +600,7 @@ def test_respond_agent_sends_the_last_reply_after_two_language_retries(model, re
 
 def test_respond_agent_rewrites_a_reply_with_chinese_characters(model, respond_node):
     from ole5_chat.agent.respond_agent import Grounding
-    model.add(*[Grounding(used=["Guide"], answered=True, offered=False)] * 2)
+    model.add(*[Grounding(used=["Guide"], answered=True, offered=False, unsupported=[])] * 2)
     out, fake = respond_node("كيف أحفظ مسودة؟", [searching("How to save a draft?"),
                                                AIMessage(content="اضغط 保存 كمسودة."),
                                                AIMessage(content="اضغط حفظ كمسودة.")], [hit("Guide")])
@@ -621,7 +621,7 @@ def test_respond_agent_shows_a_failed_search_to_the_model(model, respond_node):
 
 def test_respond_agent_retries_a_rejected_call_warmer(model, respond_node):
     from ole5_chat.agent.respond_agent import Grounding
-    model.add(Grounding(used=["Guide"], answered=True, offered=False))
+    model.add(Grounding(used=["Guide"], answered=True, offered=False, unsupported=[]))
     out, fake = respond_node("How do I save a draft?", [rejected(), searching("How to save a draft?"),
                                                         AIMessage(content="Press Save as draft.")], [hit("Guide")])
     assert [t for t, _ in fake.calls] == [0, 0.3, 0]
@@ -642,7 +642,7 @@ def test_respond_agent_stops_searching_at_the_cap(model, respond_node, monkeypat
 
 def test_respond_agent_finds_the_title_inside_what_the_grounding_returns(model, respond_node):
     from ole5_chat.agent.respond_agent import Grounding
-    model.add(Grounding(used=["[Guide] Saving drafts"], answered=True, offered=False))
+    model.add(Grounding(used=["[Guide] Saving drafts"], answered=True, offered=False, unsupported=[]))
     out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?"),
                                                      AIMessage(content="Press Save as draft.")], [hit("Guide", "Manual")])
     assert out["reply"].say == "Press Save as draft." and out["reply"].sources == ["Guide"]
@@ -656,7 +656,7 @@ def test_respond_agent_sees_direct_passages_whole_and_inferential_cut(model, res
     from ole5_chat.knowledge.tool import PASSAGE_CHARS
     direct, inferential = passage("Guide"), passage("Manual", relation="INFERENTIAL")
     direct.text, inferential.text = "d" * 2000, "i" * 2000
-    model.add(Grounding(used=["Guide"], answered=True, offered=False))
+    model.add(Grounding(used=["Guide"], answered=True, offered=False, unsupported=[]))
     _, fake = respond_node("How do I save a draft?", [searching("How to save a draft?"),
                                                       AIMessage(content="Press Save as draft.")],
                            [Retrieval(query="q", verdict=Verdict.ANSWERABLE, evidence=[direct, inferential])])
@@ -664,3 +664,29 @@ def test_respond_agent_sees_direct_passages_whole_and_inferential_cut(model, res
     texts = {e["document"]: e["text"] for e in tool_reply["evidence"]}
     assert texts["Guide"] == "d" * 2000
     assert texts["Manual"] == "i" * PASSAGE_CHARS
+
+
+def test_respond_agent_removes_unsupported_facts_on_retry(model, respond_node):
+    from ole5_chat.agent.respond_agent import Grounding
+    model.add(Grounding(used=["Guide"], answered=True, offered=False, unsupported=["Tenant ID"]),
+              Grounding(used=["Guide"], answered=True, offered=False, unsupported=[]))
+    out, fake = respond_node("How do I set up SSO?", [searching("How to set up SSO?"),
+                                                      AIMessage(content="Fill the form with your Tenant ID."),
+                                                      AIMessage(content="Fill the requirements form and send it to support.")],
+                             [hit("Guide")])
+    assert "Tenant ID" in sent(fake)[-1].content
+    assert out["reply"].say == "Fill the requirements form and send it to support."
+    assert out["reply"].sources == ["Guide"] and out["corrections"] == ["gate 2 retried: unsupported"]
+
+
+def test_respond_agent_unsupported_facts_twice_give_the_no_answer(model, respond_node):
+    from ole5_chat.agent.respond_agent import Grounding
+    model.add(*[Grounding(used=["Guide"], answered=True, offered=False, unsupported=["Tenant ID"])] * 2)
+    out, fake = respond_node("How do I set up SSO?", [searching("How to set up SSO?"),
+                                                      AIMessage(content="Fill the form with your Tenant ID."),
+                                                      AIMessage(content="Enter your Tenant ID in the form."),
+                                                      AIMessage(content="I have no answer for that. Open a ticket?")],
+                             [hit("Guide")])
+    assert "You have no answer for this" in sent(fake)[-1].content
+    assert out["reply"].say.startswith("I have no answer") and out["reply"].sources == []
+    assert out["corrections"] == ["gate 2 retried: unsupported", "reply kept unsupported facts"]
