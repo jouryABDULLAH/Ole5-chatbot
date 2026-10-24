@@ -476,12 +476,164 @@ def test_respond_agent_keeps_a_partial_answer_that_offers_a_ticket(model, respon
 
 
 def test_respond_agent_sends_the_apology_when_the_model_fails(respond_node):
-    from groq import BadRequestError
-    import httpx
-    rejected = BadRequestError("bad tool call", response=httpx.Response(400, request=httpx.Request("POST", "https://x")),
-                               body=None)
-    out, fake = respond_node("كيف أحفظ مسودة؟", [rejected, rejected])
+    out, fake = respond_node("كيف أحفظ مسودة؟", [rejected(), rejected()])
     assert out["reply"].say.startswith("عذراً") and out["reply"].sources == []
     assert out["last_retrieval"] is None
     assert any(c.startswith("respond failed:") for c in out["corrections"])
     assert [t for t, _ in fake.calls] == [0, 0.3]
+
+
+def hit(*documents):
+    return Retrieval(query="q", verdict=Verdict.ANSWERABLE, evidence=[passage(d) for d in documents])
+
+
+def miss():
+    return Retrieval(query="q", verdict=Verdict.NOT_IN_KB, evidence=[passage("Other", relation="INFERENTIAL")])
+
+
+def grounding(model):
+    return [c for c in model.calls if c[0].__name__ == "Grounding"]
+
+
+def sent(fake, n=-1):
+    """The messages of the nth tool-model call."""
+    return fake.calls[n][1]
+
+
+def rejected():
+    from groq import BadRequestError
+    import httpx
+    return BadRequestError("bad tool call", response=httpx.Response(400, request=httpx.Request("POST", "https://x")),
+                           body=None)
+
+
+def test_respond_agent_cites_the_document_the_grounding_names(model, respond_node):
+    from ole5_chat.agent.respond_agent import Grounding
+    model.add(Grounding(used=["Guide"], answered=True, offered=False))
+    out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?"),
+                                                     AIMessage(content="Press Save as draft.")], [hit("Guide", "Manual")])
+    assert out["reply"].say == "Press Save as draft." and out["reply"].sources == ["Guide"]
+    assert out["last_retrieval"] is not None and out["corrections"] == []
+
+
+def test_respond_agent_without_a_direct_passage_skips_grounding(model, respond_node):
+    out, _ = respond_node("Does it run on Linux?", [searching("Does Ole5 run on Linux?"),
+                                                    AIMessage(content="I have no answer for that. Open a ticket?")],
+                          [miss()])
+    assert out["reply"].say.startswith("I have no answer") and out["reply"].sources == []
+    assert grounding(model) == []
+
+
+def test_respond_agent_keeps_a_greeting_written_without_a_search(model, respond_node):
+    from ole5_chat.agent.respond_agent import NUDGE, Grounding
+    model.add(Grounding(used=[], answered=False, offered=False))
+    out, fake = respond_node("مرحبا", [AIMessage(content="أهلاً بك، كيف أقدر أساعدك؟"),
+                                       AIMessage(content="أهلاً بك، كيف أقدر أساعدك؟")])
+    assert sent(fake)[-1].content == NUDGE
+    assert out["reply"].say == "أهلاً بك، كيف أقدر أساعدك؟" and out["reply"].sources == []
+    assert "replied without searching" in out["corrections"] and out["last_retrieval"] is None
+
+
+def test_respond_agent_searches_when_nudged(model, respond_node):
+    from ole5_chat.agent.respond_agent import NUDGE, Grounding
+    model.add(Grounding(used=["Guide"], answered=True, offered=False))
+    out, fake = respond_node("How do I save a draft?", [AIMessage(content="Press Save."),
+                                                        searching("How to save a draft?"),
+                                                        AIMessage(content="Press Save as draft.")], [hit("Guide")])
+    assert sent(fake, 1)[-1].content == NUDGE
+    assert out["reply"].say == "Press Save as draft." and out["reply"].sources == ["Guide"]
+    assert out["corrections"] == []
+
+
+def test_respond_agent_replaces_an_answer_written_without_a_search(model, respond_node):
+    from ole5_chat.agent.respond_agent import Grounding
+    model.add(Grounding(used=[], answered=True, offered=False))
+    out, fake = respond_node("How long are drafts kept?", [AIMessage(content="Drafts are kept 30 days."),
+                                                           AIMessage(content="Drafts are kept 30 days."),
+                                                           AIMessage(content="I have no answer for that. Open a ticket?")])
+    assert "You have no answer for this" in sent(fake)[-1].content
+    assert out["reply"].say.startswith("I have no answer") and out["reply"].sources == []
+    assert "answer without searching" in out["corrections"]
+
+
+def test_respond_agent_declining_a_direct_passage_twice_gives_the_no_answer(model, respond_node):
+    from ole5_chat.agent.respond_agent import Grounding
+    model.add(Grounding(used=[], answered=False, offered=True), Grounding(used=[], answered=False, offered=True))
+    out, fake = respond_node("How do I save a draft?", [searching("How to save a draft?"),
+                                                        AIMessage(content="Open a ticket?"),
+                                                        AIMessage(content="Open a ticket?"),
+                                                        AIMessage(content="I have no answer for that. Open a ticket?")],
+                             [hit("Guide")])
+    assert "a passage answers this directly" in sent(fake, 2)[-1].content
+    assert len(grounding(model)) == 2
+    assert out["reply"].say.startswith("I have no answer") and out["reply"].sources == []
+    assert "respond declined a DIRECT passage" in out["corrections"]
+
+
+def test_respond_agent_cites_every_direct_document_when_grounding_fails(model, respond_node):
+    out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?"),
+                                                     AIMessage(content="Press Save as draft.")], [hit("Guide", "Manual")])
+    assert out["reply"].say == "Press Save as draft." and out["reply"].sources == ["Guide", "Manual"]
+    assert "grounding call failed" in out["corrections"]
+
+
+def test_respond_agent_rewrites_a_reply_in_the_wrong_language(model, respond_node):
+    from ole5_chat.agent.respond_agent import Grounding
+    model.add(*[Grounding(used=["Guide"], answered=True, offered=False)] * 2)
+    out, fake = respond_node("كيف أحفظ مسودة؟", [searching("How to save a draft?"),
+                                               AIMessage(content="Press Save as draft."),
+                                               AIMessage(content="اضغط حفظ كمسودة.")], [hit("Guide")])
+    assert "The customer wrote in Arabic" in sent(fake)[-1].content
+    assert out["reply"].say == "اضغط حفظ كمسودة." and out["corrections"] == []
+
+
+def test_respond_agent_sends_the_last_reply_after_two_language_retries(model, respond_node):
+    from ole5_chat.agent.respond_agent import Grounding
+    model.add(*[Grounding(used=["Guide"], answered=True, offered=False)] * 3)
+    out, fake = respond_node("كيف أحفظ مسودة؟", [searching("How to save a draft?"),
+                                               *[AIMessage(content="Press Save as draft.")] * 3], [hit("Guide")])
+    assert len(fake.calls) == 4
+    assert out["reply"].say == "Press Save as draft."
+    assert any(c.startswith("language:") for c in out["corrections"])
+
+
+def test_respond_agent_rewrites_a_reply_with_chinese_characters(model, respond_node):
+    from ole5_chat.agent.respond_agent import Grounding
+    model.add(*[Grounding(used=["Guide"], answered=True, offered=False)] * 2)
+    out, fake = respond_node("كيف أحفظ مسودة؟", [searching("How to save a draft?"),
+                                               AIMessage(content="اضغط 保存 كمسودة."),
+                                               AIMessage(content="اضغط حفظ كمسودة.")], [hit("Guide")])
+    assert "Chinese characters" in sent(fake)[-1].content
+    assert out["reply"].say == "اضغط حفظ كمسودة."
+
+
+def test_respond_agent_shows_a_failed_search_to_the_model(model, respond_node):
+    from langchain_core.messages import ToolMessage
+    failed = Retrieval(query="q", verdict=Verdict.NOT_IN_KB, error="ReadTimeout")
+    out, fake = respond_node("How do I save a draft?", [searching("How to save a draft?"),
+                                                        AIMessage(content="I could not check that now. Open a ticket?")],
+                             [failed])
+    tool_reply = [m for m in sent(fake) if isinstance(m, ToolMessage)][0]
+    assert '"status": "search_failed"' in tool_reply.content and "does NOT" in tool_reply.content
+    assert out["reply"].sources == []
+
+
+def test_respond_agent_retries_a_rejected_call_warmer(model, respond_node):
+    from ole5_chat.agent.respond_agent import Grounding
+    model.add(Grounding(used=["Guide"], answered=True, offered=False))
+    out, fake = respond_node("How do I save a draft?", [rejected(), searching("How to save a draft?"),
+                                                        AIMessage(content="Press Save as draft.")], [hit("Guide")])
+    assert [t for t, _ in fake.calls] == [0, 0.3, 0]
+    assert out["reply"].say == "Press Save as draft." and out["corrections"] == []
+
+
+def test_respond_agent_stops_searching_at_the_cap(model, respond_node, monkeypatch):
+    from ole5_chat.config import get_settings
+    monkeypatch.setenv("KB_MAX_SEARCHES", "1")
+    get_settings.cache_clear()
+    out, fake = respond_node("How do I save a draft?", [searching("a", "c1"), searching("b", "c2"),
+                                                        AIMessage(content="I have no answer for that. Open a ticket?")],
+                             [miss(), miss()])
+    assert len(fake.calls) == 3
+    assert "no more searches" in sent(fake)[-1].content
+    assert out["reply"].say.startswith("I have no answer")
