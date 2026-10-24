@@ -10,12 +10,11 @@ from ole5_chat.agent import prompt
 from ole5_chat.agent.contracts import Classification, Reply, RouterDecision, Step
 from ole5_chat.agent.state import ChatState, TicketDraft
 from ole5_chat.agent.validate import NAMES, SORRY, check_ticket, language_of, language_problem
+from ole5_chat.config import get_settings
 from ole5_chat.knowledge.contracts import Retrieval, merge
 from ole5_chat.knowledge.search import search as kb_search
 
 log = logging.getLogger(__name__)
-
-MAX_SEARCHES = 4
 
 
 def _short(text: str, limit: int = 90) -> str:
@@ -139,11 +138,11 @@ def after_router(state: ChatState) -> str:
 
 
 def search(state: ChatState) -> dict:
-    queries = state["decision"].queries
-    if len(queries) > MAX_SEARCHES:
-        log.warning("search  %d queries, only the first %d run", len(queries), MAX_SEARCHES)
+    queries, max_searches = state["decision"].queries, get_settings().kb_max_searches
+    if len(queries) > max_searches:
+        log.warning("search  %d queries, only the first %d run", len(queries), max_searches)
     product = state["identity"].product
-    result = merge([kb_search(q, product) for q in queries[:MAX_SEARCHES]])
+    result = merge([kb_search(q, product) for q in queries[:max_searches]])
     log.info("search  verdict=%s passages=%d direct=%d documents=%s error=%s",
              result.verdict.value, len(result.evidence), len(result.direct), result.documents, result.error)
     return {"last_retrieval": result.as_json()}
