@@ -7,7 +7,6 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from ole5_chat import sessions
 from ole5_chat.agent import graph
-from ole5_chat.agent import prompt as prompt_module
 from ole5_chat.agent.contracts import Classification, Reply, RouterDecision
 from ole5_chat.agent.validate import Language, check_ticket
 from ole5_chat.knowledge.contracts import Evidence, Retrieval, Verdict
@@ -448,8 +447,6 @@ def respond_node(monkeypatch):
         monkeypatch.setattr(tool, "search", lambda question, product: found.pop(0))
         fake = ToolModel(*replies)
         monkeypatch.setattr(llm, "tool_client", fake)
-        # respond_v2 arrives in point 7; until then the system prompt is a placeholder
-        monkeypatch.setattr(prompt_module, "respond_v2", lambda state: "system", raising=False)
         state = sessions.get(chat())
         state = {**state, "messages": [*state["messages"], HumanMessage(content=message)]}
         return respond_agent.respond_agent(state), fake

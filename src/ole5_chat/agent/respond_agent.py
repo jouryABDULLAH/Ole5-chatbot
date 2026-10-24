@@ -122,9 +122,9 @@ def respond_agent(state: ChatState) -> dict:
     sink: list[Retrieval] = []
     tool = make_search_tool(identity.product, sink)
     corrections: list[str] = []
-    convo: list[BaseMessage] = [SystemMessage(content=prompt.respond_v2(state)), *state["messages"]]
-    text = _loop(convo, tool)
     language = language_of(customer) or identity.language
+    convo: list[BaseMessage] = [SystemMessage(content=prompt.respond_v2(state, language)), *state["messages"]]
+    text = _loop(convo, tool)
     for attempt in range(LANGUAGE_RETRIES + 1):
         text, sources = _gates(convo, tool, sink, customer, text, corrections)
         problem = language_problem(text, language) or (

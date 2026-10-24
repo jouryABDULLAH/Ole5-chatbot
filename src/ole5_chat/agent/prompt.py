@@ -8,7 +8,7 @@ from ole5_chat import products, values
 from ole5_chat.agent.contracts import Classification, Reply, RouterDecision
 from ole5_chat.agent.state import ChatState, TicketDraft
 from ole5_chat.agent.validate import NAMES, Language
-from ole5_chat.config import ROOT
+from ole5_chat.config import ROOT, get_settings
 from ole5_chat.knowledge.contracts import Retrieval
 from ole5_chat.llm import schema_text
 
@@ -160,6 +160,16 @@ def respond(state: ChatState) -> str:
         evidence=Retrieval.from_json(retrieval).render() if retrieval and state["step"] == "answer" else NOT_SEARCHED,
         schema=schema_text(Reply),
     )
+
+
+RESPOND_TASK = ("Answer the customer from what the search returns. If no passage answers the question, say you have "
+                "no answer for this and ask whether they would like a ticket opened.")
+
+
+def respond_v2(state: ChatState, language: str) -> str:
+    config = products.load(state["identity"].product)
+    return _fill("respond_v2", persona=_persona(config, language), max_searches=str(get_settings().kb_max_searches),
+                 language=NAMES[language], task=RESPOND_TASK, note=state.get("note") or "")
 
 
 def ground() -> str:
