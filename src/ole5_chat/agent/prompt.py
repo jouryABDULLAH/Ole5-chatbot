@@ -118,10 +118,12 @@ def _outline(state: ChatState) -> str:
                          "without the usual questions.")
         lines.append("Say the ticket summary is ready and they can press Submit. Ask for nothing.")
     elif step == "ask":
-        lines.append("Reply briefly, state no product facts, and offer help with the product. If they ask about this "
-                     "conversation itself (what they asked earlier, what you said), answer from the messages above. "
-                     "If they declined or cancelled a ticket, say they can contact support at any time. If they said "
-                     "they have a question or a problem without saying what it is, invite them to say it.")
+        lines.append("Reply to what they said. You may state only two kinds of things: what this conversation "
+                     "contains (their earlier messages, your earlier replies) and that you can help with the product "
+                     "or open a ticket. If they ask about something the conversation does not contain, say so. If "
+                     "they did not understand, say your last reply again more simply. If they declined or cancelled "
+                     "a ticket, say they can contact support at any time. Never add how the product works, guess "
+                     "what they meant, or promise anything.")
     return "\n".join(f"{i}. {line}" for i, line in enumerate(lines, 1))
 
 

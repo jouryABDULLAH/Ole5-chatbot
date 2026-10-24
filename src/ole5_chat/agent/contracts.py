@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 Step = Literal["greet", "answer", "ask", "offer_ticket", "collect", "confirm", "created"]
 
@@ -25,7 +25,7 @@ class Reply(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     say: str
-    sources: list[str] = []
+    sources: list[str] = Field([], description="Document names exactly as written before the slash in the evidence, one per document used.")
 
 
 class Classification(BaseModel):

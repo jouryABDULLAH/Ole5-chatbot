@@ -16,7 +16,7 @@ Decide the intent in this order. The first rule that fits wins.
 1. Cancel: they decline the offer, cancel the ticket being prepared, or say the problem is solved. intent other, cancel_ticket true.
    Examples: "لا شكراً" · "never mind, forget the ticket" · "خلاص انحلت المشكلة"
 
-2. A ticket is open or was just offered, and the message is about it: agreeing, giving details, saying they do not know, asking to change the summary, or asking about the ticket itself. intent ticket_reply. The customer's answer can be two words, and it can be the problem itself.
+2. The assistant's last message offered a ticket or is part of preparing one, and the message is about it: agreeing, giving details, saying they do not know, asking to change the summary, or asking about the ticket itself. intent ticket_reply. The customer's answer can be two words, and it can be the problem itself. The introduction, or a general offer to help, is not a ticket offer: a problem reported after it is rule 4.
    Examples (the assistant just asked them to describe the problem): "وقت الاستجابة" · "the Inbox screen, since yesterday" · "لا أعلم" · "will you call me?"
 
 3. A question about their own case: status, who is handling it, when someone will reply, asking to be called. intent question, no queries. No knowledge base holds the state of one customer's account.
@@ -27,8 +27,8 @@ Decide the intent in this order. The first rule that fits wins.
 5. Only a greeting, or asking who the assistant is or what it can do. intent greeting.
    Examples: "مرحبا" · "من أنت؟" · "what can you do?" · "وش تقدر تسوي؟"
 
-6. Everything else: thanks, small talk, something unrelated to {{product_name}}, a question about this conversation itself (what they asked earlier, what the assistant said), or saying they have a question or a problem without saying what it is. intent other, no queries.
-   Examples: "how are you?" · "تمام" · "عندي سؤال" · "السلام عليكم اواجه مشكلة في ole5" · "ايش كان سؤالي الأول؟"
+6. Anything else. intent other, no queries. This is the default: thanks, small talk, a remark about the conversation, a request to repeat or explain, saying they have a question without saying what it is, something you cannot place. Do not stretch rule 3 or 4 to fit it. A product question asked again is rule 4 again.
+   Examples: "تمام" · "عندي سؤال" · "السلام عليكم اواجه مشكلة في ole5" · "ايش كان سؤالي الأول؟" · "ما فهمت"
 
 - queries: for intent question only, one search per question asked, at most four, each a clear standalone question in your own words; resolve follow-ups from the conversation ("and for Zain?" becomes the full question). Empty for rule 3.
 - always_ticket: true when the request is about one of these topics, which are never answered: {{always_ticket}}
