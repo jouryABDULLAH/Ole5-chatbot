@@ -11,8 +11,10 @@ from ole5_chat.knowledge.search import search
 
 log = logging.getLogger(__name__)
 
-# How much of a passage to hand back to the model. Enough to write a reply from,
-# short enough that four searches do not fill the context.
+# How much of an INFERENTIAL passage to hand back to the model: enough to judge
+# it by, short enough that four searches do not fill the context. DIRECT passages
+# go whole: the reply is written from them and the grounding check reads them in
+# full, so the model must see every word the check counts as grounded.
 PASSAGE_CHARS = 1200
 
 
@@ -53,7 +55,7 @@ def make_search_tool(product: str, sink: list[Retrieval]):
                         "section": e.section,
                         "relation": e.relation,
                         "why": e.reason,
-                        "text": e.text[:PASSAGE_CHARS],
+                        "text": e.text if e.relation == "DIRECT" else e.text[:PASSAGE_CHARS],
                     }
                     for e in result.evidence
                 ],

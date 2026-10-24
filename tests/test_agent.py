@@ -647,3 +647,20 @@ def test_respond_agent_finds_the_title_inside_what_the_grounding_returns(model, 
                                                      AIMessage(content="Press Save as draft.")], [hit("Guide", "Manual")])
     assert out["reply"].say == "Press Save as draft." and out["reply"].sources == ["Guide"]
     assert out["corrections"] == []
+
+
+def test_respond_agent_sees_direct_passages_whole_and_inferential_cut(model, respond_node):
+    import json
+    from langchain_core.messages import ToolMessage
+    from ole5_chat.agent.respond_agent import Grounding
+    from ole5_chat.knowledge.tool import PASSAGE_CHARS
+    direct, inferential = passage("Guide"), passage("Manual", relation="INFERENTIAL")
+    direct.text, inferential.text = "d" * 2000, "i" * 2000
+    model.add(Grounding(used=["Guide"], answered=True, offered=False))
+    _, fake = respond_node("How do I save a draft?", [searching("How to save a draft?"),
+                                                      AIMessage(content="Press Save as draft.")],
+                           [Retrieval(query="q", verdict=Verdict.ANSWERABLE, evidence=[direct, inferential])])
+    tool_reply = json.loads([m for m in sent(fake) if isinstance(m, ToolMessage)][0].content)
+    texts = {e["document"]: e["text"] for e in tool_reply["evidence"]}
+    assert texts["Guide"] == "d" * 2000
+    assert texts["Manual"] == "i" * PASSAGE_CHARS
