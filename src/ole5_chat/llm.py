@@ -31,12 +31,16 @@ class GuardrailFailed(ModelFailed):
         self.result = result
 
 
-def _client(temperature: float):
+def tool_client(temperature: float) -> ChatGroq:
+    """The model without JSON mode, for a node that binds tools."""
     s = get_settings()
     if not s.groq_api_key:
         raise ModelFailed("GROQ_API_KEY is not set")
-    return ChatGroq(model=s.groq_model, api_key=s.groq_api_key.get_secret_value(),
-                    temperature=temperature).bind(response_format={"type": "json_object"})
+    return ChatGroq(model=s.groq_model, api_key=s.groq_api_key.get_secret_value(), temperature=temperature)
+
+
+def _client(temperature: float):
+    return tool_client(temperature).bind(response_format={"type": "json_object"})
 
 
 def schema_text(schema: type[BaseModel]) -> str:
