@@ -48,7 +48,7 @@ def _invoke(convo: list[BaseMessage], tool, tool_choice: str | None = None) -> A
     raise llm.ModelFailed(error)
 
 
-def _loop(convo: list[BaseMessage], tool) -> str:
+def _loop(convo: list[BaseMessage], tool, corrections: list[str]) -> str:
     """Model calls until one has no tool call, at most kb_max_searches + 1, then one final call with searching off. Appends every message to convo; returns the last reply's text."""
     for _ in range(get_settings().kb_max_searches + 1):
         reply = _invoke(convo, tool)
@@ -58,9 +58,13 @@ def _loop(convo: list[BaseMessage], tool) -> str:
         for call in reply.tool_calls:
             content = tool.invoke(call["args"]) if call["name"] == tool.name else f"No tool named {call['name']}."
             convo.append(ToolMessage(content=content, tool_call_id=call["id"]))
+    
     log.warning("respond_agent  search cap reached, one final call")
+    corrections.append("search cap reached")
+    
     convo.append(HumanMessage(content=NOTE + "no more searches; answer from what you have."))
     reply = _invoke(convo, tool, tool_choice="none")
+    
     convo.append(reply)
     return reply.text
 
@@ -83,7 +87,8 @@ def _gates(convo, tool, sink, customer, text, corrections) -> tuple[str, list[st
     """Gate 1, did it search; gate 2, is the reply drawn from a DIRECT passage. Returns the reply and its sources."""
     if not sink:
         convo.append(HumanMessage(content=NUDGE))
-        text = _loop(convo, tool)
+        corrections.append("nudged")
+        text = _loop(convo, tool, corrections)
     if not sink:
         try:
             grounding = _ground(customer, text, None)
@@ -116,7 +121,8 @@ def _gates(convo, tool, sink, customer, text, corrections) -> tuple[str, list[st
             return text, used
         if attempt == 1:
             convo.append(HumanMessage(content=NOTE + "a passage answers this directly; answer from it."))
-            text = _loop(convo, tool)
+            corrections.append("gate 2 retried")
+            text = _loop(convo, tool, corrections)
     corrections.append("respond declined a DIRECT passage")
     return _no_answer(convo, tool), []
 
@@ -129,8 +135,9 @@ def respond_agent(state: ChatState) -> dict:
     corrections: list[str] = []
     language = language_of(customer) or identity.language
     convo: list[BaseMessage] = [SystemMessage(content=prompt.respond_v2(state, language)), *state["messages"]]
+    
     try:
-        text = _loop(convo, tool)
+        text = _loop(convo, tool, corrections)
         for attempt in range(LANGUAGE_RETRIES + 1):
             text, sources = _gates(convo, tool, sink, customer, text, corrections)
             problem = language_problem(text, language) or (
@@ -140,8 +147,10 @@ def respond_agent(state: ChatState) -> dict:
             if attempt == LANGUAGE_RETRIES:
                 corrections.append(f"language: {problem}")
                 break
+
             convo.append(HumanMessage(content=NOTE + problem))
-            text = _loop(convo, tool)
+            corrections.append("language retried")
+            text = _loop(convo, tool, corrections)
     except llm.ModelFailed as exc:
         log.warning("respond_agent  model failed, sorry sent: %s", str(exc)[:300])
         text, sources = SORRY[language], []

@@ -531,7 +531,7 @@ def test_respond_agent_keeps_a_greeting_written_without_a_search(model, respond_
                                        AIMessage(content="أهلاً بك، كيف أقدر أساعدك؟")])
     assert sent(fake)[-1].content == NUDGE
     assert out["reply"].say == "أهلاً بك، كيف أقدر أساعدك؟" and out["reply"].sources == []
-    assert "replied without searching" in out["corrections"] and out["last_retrieval"] is None
+    assert out["corrections"] == ["nudged", "replied without searching"] and out["last_retrieval"] is None
 
 
 def test_respond_agent_searches_when_nudged(model, respond_node):
@@ -542,7 +542,7 @@ def test_respond_agent_searches_when_nudged(model, respond_node):
                                                         AIMessage(content="Press Save as draft.")], [hit("Guide")])
     assert sent(fake, 1)[-1].content == NUDGE
     assert out["reply"].say == "Press Save as draft." and out["reply"].sources == ["Guide"]
-    assert out["corrections"] == []
+    assert out["corrections"] == ["nudged"]
 
 
 def test_respond_agent_replaces_an_answer_written_without_a_search(model, respond_node):
@@ -553,7 +553,7 @@ def test_respond_agent_replaces_an_answer_written_without_a_search(model, respon
                                                            AIMessage(content="I have no answer for that. Open a ticket?")])
     assert "You have no answer for this" in sent(fake)[-1].content
     assert out["reply"].say.startswith("I have no answer") and out["reply"].sources == []
-    assert "answer without searching" in out["corrections"]
+    assert out["corrections"] == ["nudged", "answer without searching"]
 
 
 def test_respond_agent_declining_a_direct_passage_twice_gives_the_no_answer(model, respond_node):
@@ -567,7 +567,7 @@ def test_respond_agent_declining_a_direct_passage_twice_gives_the_no_answer(mode
     assert "a passage answers this directly" in sent(fake, 2)[-1].content
     assert len(grounding(model)) == 2
     assert out["reply"].say.startswith("I have no answer") and out["reply"].sources == []
-    assert "respond declined a DIRECT passage" in out["corrections"]
+    assert out["corrections"] == ["gate 2 retried", "respond declined a DIRECT passage"]
 
 
 def test_respond_agent_cites_every_direct_document_when_grounding_fails(model, respond_node):
@@ -584,7 +584,7 @@ def test_respond_agent_rewrites_a_reply_in_the_wrong_language(model, respond_nod
                                                AIMessage(content="Press Save as draft."),
                                                AIMessage(content="اضغط حفظ كمسودة.")], [hit("Guide")])
     assert "The customer wrote in Arabic" in sent(fake)[-1].content
-    assert out["reply"].say == "اضغط حفظ كمسودة." and out["corrections"] == []
+    assert out["reply"].say == "اضغط حفظ كمسودة." and out["corrections"] == ["language retried"]
 
 
 def test_respond_agent_sends_the_last_reply_after_two_language_retries(model, respond_node):
@@ -594,7 +594,8 @@ def test_respond_agent_sends_the_last_reply_after_two_language_retries(model, re
                                                *[AIMessage(content="Press Save as draft.")] * 3], [hit("Guide")])
     assert len(fake.calls) == 4
     assert out["reply"].say == "Press Save as draft."
-    assert any(c.startswith("language:") for c in out["corrections"])
+    assert out["corrections"][:2] == ["language retried", "language retried"]
+    assert out["corrections"][2].startswith("language:")
 
 
 def test_respond_agent_rewrites_a_reply_with_chinese_characters(model, respond_node):
@@ -604,7 +605,7 @@ def test_respond_agent_rewrites_a_reply_with_chinese_characters(model, respond_n
                                                AIMessage(content="اضغط 保存 كمسودة."),
                                                AIMessage(content="اضغط حفظ كمسودة.")], [hit("Guide")])
     assert "Chinese characters" in sent(fake)[-1].content
-    assert out["reply"].say == "اضغط حفظ كمسودة."
+    assert out["reply"].say == "اضغط حفظ كمسودة." and out["corrections"] == ["language retried"]
 
 
 def test_respond_agent_shows_a_failed_search_to_the_model(model, respond_node):
@@ -636,7 +637,7 @@ def test_respond_agent_stops_searching_at_the_cap(model, respond_node, monkeypat
                              [miss(), miss()])
     assert len(fake.calls) == 3
     assert "no more searches" in sent(fake)[-1].content
-    assert out["reply"].say.startswith("I have no answer")
+    assert out["reply"].say.startswith("I have no answer") and out["corrections"] == ["search cap reached"]
 
 
 def test_respond_agent_finds_the_title_inside_what_the_grounding_returns(model, respond_node):
