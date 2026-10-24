@@ -8,6 +8,7 @@ from langgraph.graph import END, START, StateGraph
 from ole5_chat import llm, products, values
 from ole5_chat.agent import prompt
 from ole5_chat.agent.contracts import Classification, Reply, RouterDecision, Step
+from ole5_chat.agent.respond_agent import respond_agent
 from ole5_chat.agent.state import ChatState, TicketDraft
 from ole5_chat.agent.validate import NAMES, SORRY, check_ticket, language_of, language_problem
 from ole5_chat.config import get_settings
@@ -48,7 +49,9 @@ def _no_answer() -> Step:
 
 
 def route(state: ChatState) -> str:
-    return "router" if state["messages"] else "greet"
+    if not state["messages"]:
+        return "greet"
+    return "respond_agent" if get_settings().respond_agent else "router"
 
 
 def greet(state: ChatState) -> dict:
@@ -206,6 +209,10 @@ def respond(state: ChatState) -> dict:
 
 def validate(state: ChatState) -> dict:
     reply, step = state["reply"], state["step"]
+    if step is None:
+        log.info("validate  respond_agent reply sources=%s", reply.sources)
+        return {"messages": [AIMessage(content=reply.say)], "sources": reply.sources, "last_retrieval": None,
+                "note": None}
     sources: list[str] = []
     if step == "answer":
         direct = _direct_documents(state)
@@ -220,14 +227,20 @@ def validate(state: ChatState) -> dict:
 
 def build(checkpointer):
     g = StateGraph(ChatState)
-    for name, node in (("greet", greet), ("router", router), ("search", search), ("classify", classify),
-                       ("respond", respond), ("validate", validate)):
-        g.add_node(name, node)
-    g.add_conditional_edges(START, route, ["greet", "router"])
-    g.add_conditional_edges("router", after_router, ["search", "classify", "respond"])
-    g.add_edge("search", "router")
-    g.add_edge("classify", "router")
-    g.add_edge("respond", "validate")
+    g.add_node("greet", greet)
+    g.add_node("validate", validate)
+    if get_settings().respond_agent:
+        g.add_node("respond_agent", respond_agent)
+        g.add_conditional_edges(START, route, ["greet", "respond_agent"])
+        g.add_edge("respond_agent", "validate")
+    else:
+        for name, node in (("router", router), ("search", search), ("classify", classify), ("respond", respond)):
+            g.add_node(name, node)
+        g.add_conditional_edges(START, route, ["greet", "router"])
+        g.add_conditional_edges("router", after_router, ["search", "classify", "respond"])
+        g.add_edge("search", "router")
+        g.add_edge("classify", "router")
+        g.add_edge("respond", "validate")
     g.add_edge("validate", END)
     g.add_edge("greet", END)
     return g.compile(checkpointer=checkpointer)
