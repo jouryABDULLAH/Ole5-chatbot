@@ -427,7 +427,10 @@ class ToolModel:
 
     def invoke(self, convo):
         self.calls.append((self.temperature, list(convo)))
-        return self.replies.pop(0)
+        reply = self.replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
 
 
 def passage(document, relation="DIRECT"):
@@ -470,3 +473,15 @@ def test_respond_agent_keeps_a_partial_answer_that_offers_a_ticket(model, respon
     assert out["reply"].say.startswith("Save it as a draft")
     assert out["reply"].sources == ["Guide"]
     assert "reply offered a ticket" in out["corrections"]
+
+
+def test_respond_agent_sends_the_apology_when_the_model_fails(respond_node):
+    from groq import BadRequestError
+    import httpx
+    rejected = BadRequestError("bad tool call", response=httpx.Response(400, request=httpx.Request("POST", "https://x")),
+                               body=None)
+    out, fake = respond_node("كيف أحفظ مسودة؟", [rejected, rejected])
+    assert out["reply"].say.startswith("عذراً") and out["reply"].sources == []
+    assert out["last_retrieval"] is None
+    assert any(c.startswith("respond failed:") for c in out["corrections"])
+    assert [t for t, _ in fake.calls] == [0, 0.3]

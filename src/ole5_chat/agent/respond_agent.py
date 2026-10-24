@@ -11,7 +11,7 @@ from ole5_chat import llm
 from ole5_chat.agent import prompt
 from ole5_chat.agent.contracts import Reply
 from ole5_chat.agent.state import ChatState
-from ole5_chat.agent.validate import NAMES, language_of, language_problem
+from ole5_chat.agent.validate import NAMES, SORRY, language_of, language_problem
 from ole5_chat.config import get_settings
 from ole5_chat.knowledge.contracts import Retrieval, merge
 from ole5_chat.knowledge.tool import make_search_tool
@@ -124,18 +124,23 @@ def respond_agent(state: ChatState) -> dict:
     corrections: list[str] = []
     language = language_of(customer) or identity.language
     convo: list[BaseMessage] = [SystemMessage(content=prompt.respond_v2(state, language)), *state["messages"]]
-    text = _loop(convo, tool)
-    for attempt in range(LANGUAGE_RETRIES + 1):
-        text, sources = _gates(convo, tool, sink, customer, text, corrections)
-        problem = language_problem(text, language) or (
-            CHINESE.search(text) and f"The reply contains Chinese characters; rewrite it in {NAMES[language]}.")
-        if not problem:
-            break
-        if attempt == LANGUAGE_RETRIES:
-            corrections.append(f"language: {problem}")
-            break
-        convo.append(HumanMessage(content=NOTE + problem))
+    try:
         text = _loop(convo, tool)
+        for attempt in range(LANGUAGE_RETRIES + 1):
+            text, sources = _gates(convo, tool, sink, customer, text, corrections)
+            problem = language_problem(text, language) or (
+                CHINESE.search(text) and f"The reply contains Chinese characters; rewrite it in {NAMES[language]}.")
+            if not problem:
+                break
+            if attempt == LANGUAGE_RETRIES:
+                corrections.append(f"language: {problem}")
+                break
+            convo.append(HumanMessage(content=NOTE + problem))
+            text = _loop(convo, tool)
+    except llm.ModelFailed as exc:
+        log.warning("respond_agent  model failed, sorry sent: %s", str(exc)[:300])
+        text, sources = SORRY[language], []
+        corrections.append(f"respond failed: {exc}")
     retrieval = merge(sink) if sink else None
     log.info("respond_agent  searches=%d sources=%s say=%r", len(sink), sources, text[:90])
     return {"reply": Reply(say=text, sources=sources), "last_retrieval": retrieval.as_json() if retrieval else None,

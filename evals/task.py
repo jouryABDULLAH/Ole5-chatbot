@@ -15,11 +15,12 @@ def _email() -> str:
                 if str(r.get("product") or "").upper() == "OLE5" and str(r.get("active") or "").lower() == "yes")
 
 
-def _evidence(sid: str) -> str:
-    """The passages shown to the agent in the turn just run. validate clears them from the state, so they are read from the newest checkpoint that still has them; on an answer turn that is this turn's search."""
+def _evidence(sid: str, state) -> str:
+    """The passages shown to the agent in the turn just run, or "" when it did not search. validate clears them from the state, so they are read from the newest checkpoint of this turn that still has them: one that already holds the customer's message."""
+    turn = len(state["messages"]) - 1
     return next((Retrieval.from_json(snapshot.values["last_retrieval"]).render()
                  for snapshot in sessions._graph.get_state_history(sessions._config(sid))
-                 if snapshot.values.get("last_retrieval")), "")
+                 if len(snapshot.values.get("messages") or []) >= turn and snapshot.values.get("last_retrieval")), "")
 
 
 def _turn(sid: str, state) -> dict:
@@ -28,7 +29,7 @@ def _turn(sid: str, state) -> dict:
         "answer": state["messages"][-1].text,
         "phase": state["phase"],
         "sources": list(state["sources"]),
-        "evidence": _evidence(sid) if state["phase"] == "answer" else "",
+        "evidence": _evidence(sid, state),
         "language": decision.language if decision else None,
         "draft": None if draft is None else {"ready": draft.classified, "missing": list(draft.missing),
                                              "unknown": list(draft.unknown), "urgent": draft.urgent},
