@@ -69,7 +69,7 @@ def _no_answer(convo: list[BaseMessage], tool) -> str:
 
 
 def _ground(customer: str, text: str, retrieval: Retrieval | None) -> Grounding:
-    passages = "\n\n".join(f"[{e.document}] {e.text.strip()}" for e in retrieval.direct) if retrieval else ""
+    passages = "\n\n".join(f"Document: {e.document}\n{e.text.strip()}" for e in retrieval.direct) if retrieval else ""
     content = f"Customer's message:\n{customer}\n\nReply:\n{text}\n\nPassages:\n{passages or 'none'}"
     return llm.structured(prompt.ground(), [HumanMessage(content=content)], Grounding, node="ground")
 
@@ -102,7 +102,7 @@ def _gates(convo, tool, sink, customer, text, corrections) -> tuple[str, list[st
             log.warning("respond_agent  grounding call failed: %s", str(exc)[:300])
             corrections.append("grounding call failed")
             return text, direct
-        used = [d for d in grounding.used if d in direct]
+        used = [d for d in direct if any(d in u for u in grounding.used)]
         log.info("respond_agent  grounding attempt=%d answered=%s offered=%s used=%s", attempt, grounding.answered,
                  grounding.offered, used)
         if grounding.answered and used:

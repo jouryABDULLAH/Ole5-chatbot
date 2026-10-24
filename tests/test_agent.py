@@ -637,3 +637,12 @@ def test_respond_agent_stops_searching_at_the_cap(model, respond_node, monkeypat
     assert len(fake.calls) == 3
     assert "no more searches" in sent(fake)[-1].content
     assert out["reply"].say.startswith("I have no answer")
+
+
+def test_respond_agent_finds_the_title_inside_what_the_grounding_returns(model, respond_node):
+    from ole5_chat.agent.respond_agent import Grounding
+    model.add(Grounding(used=["[Guide] Saving drafts"], answered=True, offered=False))
+    out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?"),
+                                                     AIMessage(content="Press Save as draft.")], [hit("Guide", "Manual")])
+    assert out["reply"].say == "Press Save as draft." and out["reply"].sources == ["Guide"]
+    assert out["corrections"] == []
