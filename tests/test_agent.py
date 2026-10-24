@@ -3,12 +3,14 @@
 import logging
 
 import pytest
+from langchain_core.messages import AIMessage, HumanMessage
 
 from ole5_chat import sessions
 from ole5_chat.agent import graph
+from ole5_chat.agent import prompt as prompt_module
 from ole5_chat.agent.contracts import Classification, Reply, RouterDecision
 from ole5_chat.agent.validate import Language, check_ticket
-from ole5_chat.knowledge.contracts import Retrieval, Verdict
+from ole5_chat.knowledge.contracts import Evidence, Retrieval, Verdict
 from ole5_chat.values import catalog
 
 GOOD = Classification(queue="Ole5 Technical", type="Mobile App Issue", subtype="Application crash",
@@ -409,3 +411,65 @@ def test_outline_for_an_urgent_offer(model):
               Reply(say="المشكلة عاجلة، هل أفتح تذكرة عاجلة الآن؟"))
     sessions.send(sid, "النظام كله ما يفتح")
     assert "The problem is urgent" in respond_prompt(model) and "Return the customer" not in respond_prompt(model)
+
+
+class ToolModel:
+    """Stands in for llm.tool_client: returns the scripted AIMessages in order and records each call's temperature and messages."""
+
+    def __init__(self, *replies):
+        self.replies, self.calls = list(replies), []
+
+    def __call__(self, temperature):
+        self.temperature = temperature
+        return self
+
+    def bind_tools(self, tools, tool_choice=None):
+        return self
+
+    def invoke(self, convo):
+        self.calls.append((self.temperature, list(convo)))
+        return self.replies.pop(0)
+
+
+def passage(document, relation="DIRECT"):
+    return Evidence(text=f"{document} text", document=document, section=None, source_file=None, relation=relation,
+                    score=3, reason="")
+
+
+@pytest.fixture
+def respond_node(monkeypatch):
+    """Runs respond_agent on one customer message with scripted tool-model replies and scripted search results."""
+    from ole5_chat import llm
+    from ole5_chat.agent import respond_agent
+    from ole5_chat.knowledge import tool
+
+    def run(message, replies, retrievals=()):
+        found = list(retrievals)
+        monkeypatch.setattr(tool, "search", lambda question, product: found.pop(0))
+        fake = ToolModel(*replies)
+        monkeypatch.setattr(llm, "tool_client", fake)
+        # respond_v2 arrives in point 7; until then the system prompt is a placeholder
+        monkeypatch.setattr(prompt_module, "respond_v2", lambda state: "system", raising=False)
+        state = sessions.get(chat())
+        state = {**state, "messages": [*state["messages"], HumanMessage(content=message)]}
+        return respond_agent.respond_agent(state), fake
+
+    return run
+
+
+def searching(question, call_id="c1"):
+    return AIMessage(content="", tool_calls=[{"name": "search_knowledge_base", "args": {"question": question},
+                                              "id": call_id}])
+
+
+def test_respond_agent_keeps_a_partial_answer_that_offers_a_ticket(model, respond_node):
+    from ole5_chat.agent.respond_agent import Grounding
+    model.add(Grounding(used=["Guide"], answered=True, offered=True))
+    hit = Retrieval(query="drafts", verdict=Verdict.PARTIAL, evidence=[passage("Guide")])
+    out, _ = respond_node("How do I save a draft, and how long is it kept?",
+                          [searching("How to save a draft?"),
+                           AIMessage(content="Save it as a draft from the message screen. Should I open a ticket for how long it is kept?")],
+                          [hit])
+    assert out["reply"].say.startswith("Save it as a draft")
+    assert out["reply"].sources == ["Guide"]
+    assert "reply offered a ticket" in out["corrections"]

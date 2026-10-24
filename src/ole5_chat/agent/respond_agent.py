@@ -29,6 +29,7 @@ CHINESE = re.compile(r"[一-鿿㐀-䶿]")
 class Grounding(BaseModel):
     used: list[str]
     answered: bool
+    offered: bool
 
 
 def _invoke(convo: list[BaseMessage], tool, tool_choice: str | None = None) -> AIMessage:
@@ -102,8 +103,11 @@ def _gates(convo, tool, sink, customer, text, corrections) -> tuple[str, list[st
             corrections.append("grounding call failed")
             return text, direct
         used = [d for d in grounding.used if d in direct]
-        log.info("respond_agent  grounding attempt=%d answered=%s used=%s", attempt, grounding.answered, used)
+        log.info("respond_agent  grounding attempt=%d answered=%s offered=%s used=%s", attempt, grounding.answered,
+                 grounding.offered, used)
         if grounding.answered and used:
+            if grounding.offered:
+                corrections.append("reply offered a ticket")
             return text, used
         if attempt == 1:
             convo.append(HumanMessage(content=NOTE + "a passage answers this directly; answer from it."))

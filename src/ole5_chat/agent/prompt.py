@@ -162,6 +162,11 @@ def respond(state: ChatState) -> str:
     )
 
 
+def ground() -> str:
+    from ole5_chat.agent.respond_agent import Grounding
+    return _fill("ground", schema=schema_text(Grounding))
+
+
 def _values_block(catalog: values.Catalog) -> str:
     lines = ["## Values", "", "### queue", ""]
     lines += [f"  {o.value}" + (f": {o.description}" if o.description else "") for o in catalog.queues]
