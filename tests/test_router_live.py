@@ -79,6 +79,7 @@ HELD_OUT = [
     ("collect", DENIED, ERROR, "مدري والله", "details"),
     ("collect", DENIED, ERROR, "ما أبي التذكرة خلاص، انحلت", "cancel"),
     ("collect", DENIED, ANYTHING_ELSE, "no that's all", "done"),
+    ("collect", DENIED, ERROR, "That's all I have, I don't know anything else", "done"),
     ("confirm", DENIED, SUMMARY, "the title is wrong", "change"),
     ("confirm", DENIED, SUMMARY, "يب تمام أرسل", "yes"),
     ("confirm", DENIED, SUMMARY, "غيرت رأيي، لا ترسلها", "cancel"),

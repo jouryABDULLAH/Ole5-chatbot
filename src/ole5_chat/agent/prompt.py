@@ -42,10 +42,11 @@ MEANINGS = {
     "status": "the customer asks about their own tickets: status, whether one was received, its number.",
     "accept": "agrees to the ticket the assistant just offered.",
     "decline": "turns the offer down.",
-    "details": "answers the assistant's questions about the problem, including \"I don't know\", a file sent (a "
-               "line \"[attached: name]\"), or more description.",
+    "details": "answers the assistant's questions about the problem, including \"I don't know\" about something the "
+               "assistant asked, a file sent (a line \"[attached: name]\"), or more description.",
     "done": "says there is nothing more to add, typically after the assistant asked whether there is anything else. "
-            "A message that gives a last detail and says it is all they have is done.",
+            "A message that gives a last detail and says it is all they have is done. \"That's all I have\" and \"I "
+            "don't know anything else\" are done.",
     "cancel": "drops the ticket being prepared or the summary shown.",
     "yes": "agrees to submit the summary shown.",
     "change": "asks to change something on the summary (priority, title, details).",
