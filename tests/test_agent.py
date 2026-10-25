@@ -198,6 +198,14 @@ def test_respond_agent_keeps_a_greeting_written_without_a_search(model, respond_
     assert out["corrections"] == ["nudged", "replied without searching"] and out["last_retrieval"] is None
 
 
+def test_respond_agent_keeps_the_first_reply_when_the_nudge_brings_no_search(model, respond_node):
+    from ole5_chat.agent.respond_agent import Grounding
+    model.add(Grounding(used=[], answered=False, offered=False, unsupported=[]))
+    out, _ = respond_node("مرحبا", [AIMessage(content="أهلاً بك، كيف أقدر أساعدك؟"),
+                                    AIMessage(content="أهلاً، لا يلزم البحث لهذه التحية.")])
+    assert out["reply"].say == "أهلاً بك، كيف أقدر أساعدك؟"
+
+
 def test_respond_agent_searches_when_nudged(model, respond_node):
     from ole5_chat.agent.respond_agent import NUDGE, Grounding
     model.add(Grounding(used=["Guide"], answered=True, offered=False, unsupported=[]))

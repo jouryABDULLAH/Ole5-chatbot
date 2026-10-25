@@ -90,9 +90,12 @@ def _gates(convo, tool, sink, customer, text, corrections, chat) -> tuple[str, l
     if not sink and not chat:
         return text, [], False
     if not sink:
+        first = text
         convo.append(HumanMessage(content=NUDGE))
         corrections.append("nudged")
         text = _loop(convo, tool, corrections)
+        if not sink:
+            text = first  # It answered the nudge without searching: the second reply adds nothing.
     for attempt in (1, 2):
         retrieval = merge(sink) if sink else None
         direct = list(dict.fromkeys(e.document for e in retrieval.direct)) if retrieval else []
