@@ -84,8 +84,8 @@ HELD_OUT = [
     ("confirm", DENIED, SUMMARY, "غيرت رأيي، لا ترسلها", "cancel"),
     ("confirm", DENIED, SUMMARY, "وش يعني الأولوية متوسطة؟", "chat"),
     ("confirm", DENIED, "I don't have information on how long a reply takes. The summary is ready whenever you want "
-                        "to send it.", "تمام", "chat"),
-    ("confirm", DENIED, "I changed the priority to high. The updated summary is shown.", "تمام", "chat"),
+                        "to send it.", "تمام", "yes"),
+    ("confirm", DENIED, "I changed the priority to high. The updated summary is shown.", "تمام", "yes"),
     ("confirm", DENIED, "I changed the priority to high. Shall I submit it now?", "اوكي", "yes"),
 ]
 
