@@ -1,4 +1,4 @@
-"""The agent with scripted models and searches: the greeting, classify and its value checks, respond_agent's gates, the router's options and prompt, and the graph's handlers, post_check and pending issues."""
+"""The agent with scripted models and searches: the greeting, classify and its value checks, respond_agent's gates, the router's options and prompt, the search node, and the graph's handlers, post_check and pending issues."""
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
@@ -76,22 +76,23 @@ def test_values_refused_twice_keep_the_draft_unclassified(model):
 
 
 class ToolModel:
-    """Stands in for llm.tool_client: returns the scripted AIMessages in order and records each call's temperature, messages and the tools bound to it."""
+    """Stands in for llm.tool_client: returns the scripted AIMessages in order and records each call's temperature, messages, the tools bound to it and the tool choice."""
 
     def __init__(self, *replies):
-        self.replies, self.calls, self.bound = list(replies), [], []
+        self.replies, self.calls, self.bound, self.choices = list(replies), [], [], []
 
     def __call__(self, temperature):
-        self.temperature, self.tools = temperature, None
+        self.temperature, self.tools, self.choice = temperature, None, None
         return self
 
     def bind_tools(self, tools, tool_choice=None):
-        self.tools = tools
+        self.tools, self.choice = tools, tool_choice
         return self
 
     def invoke(self, convo):
         self.calls.append((self.temperature, list(convo)))
         self.bound.append(self.tools)
+        self.choices.append(self.choice)
         reply = self.replies.pop(0)
         if isinstance(reply, Exception):
             raise reply
@@ -105,51 +106,39 @@ def passage(document, relation="DIRECT"):
 
 @pytest.fixture
 def respond_node(monkeypatch):
-    """Runs respond_agent on one customer message with scripted tool-model replies and scripted search results."""
+    """Runs the search node then respond_agent on one customer message, with scripted tool-model replies and scripted search results."""
     from ole5_chat import llm
-    from ole5_chat.agent import respond_agent
+    from ole5_chat.agent import handlers, respond_agent
     from ole5_chat.knowledge import tool
 
-    def run(message, replies, retrievals=()):
+    def run(message, replies, retrievals=(), next_="question"):
         found = list(retrievals)
         monkeypatch.setattr(tool, "search", lambda question, product: found.pop(0))
         fake = ToolModel(*replies)
         monkeypatch.setattr(llm, "tool_client", fake)
         state = sessions.get(chat())
-        state = {**state, "messages": [*state["messages"], HumanMessage(content=message)]}
-        return respond_agent.respond_agent(state), fake
+        state = {**state, "messages": [*state["messages"], HumanMessage(content=message)], "next": next_}
+        state["task"] = handlers.chat(state)["task"] if next_ in ("question", "talk") else None
+        searched = respond_agent.search(state)
+        out = respond_agent.respond_agent({**state, **searched})
+        return {**searched, **out}, fake
 
     return run
 
 
-def searching(question, call_id="c1"):
-    return AIMessage(content="", tool_calls=[{"name": "search_knowledge_base", "args": {"question": question},
-                                              "id": call_id}])
+def searching(*questions):
+    return AIMessage(content="", tool_calls=[{"name": "search_knowledge_base", "args": {"question": q}, "id": f"c{i}"}
+                                             for i, q in enumerate(questions)])
 
 
-def test_respond_agent_keeps_a_partial_answer_that_offers_a_ticket(model, respond_node):
-    from ole5_chat.agent.respond_agent import Grounding
-    model.add(Grounding(used=["Guide"], answered=True, offered=True, unsupported=[]))
-    hit = Retrieval(query="drafts", verdict=Verdict.PARTIAL, evidence=[passage("Guide")])
-    out, _ = respond_node("How do I save a draft, and how long is it kept?",
-                          [searching("How to save a draft?"),
-                           AIMessage(content="Save it as a draft from the message screen. Should I open a ticket for how long it is kept?")],
-                          [hit])
-    assert out["reply"].say.startswith("Save it as a draft")
-    assert out["reply"].sources == ["Guide"]
-    assert "reply offered a ticket" in out["corrections"]
+def answer(status, reply, used=(), unsupported=()):
+    """What respond writes from DIRECT passages, and the grounding call's verdict on it."""
+    from ole5_chat.agent.respond_agent import Answer, Grounding
+    return [Answer(status=status, reply=reply), Grounding(used=list(used), unsupported=list(unsupported))]
 
 
-def test_respond_agent_sends_the_apology_when_the_model_fails(respond_node):
-    out, fake = respond_node("كيف أحفظ مسودة؟", [rejected(), rejected()])
-    assert out["reply"].say.startswith("عذراً") and out["reply"].sources == []
-    assert out["last_retrieval"] is None
-    assert any(c.startswith("respond failed:") for c in out["corrections"])
-    assert [t for t, _ in fake.calls] == [0, 0.3]
-
-
-def hit(*documents):
-    return Retrieval(query="q", verdict=Verdict.ANSWERABLE, evidence=[passage(d) for d in documents])
+def hit(*documents, verdict=Verdict.ANSWERABLE):
+    return Retrieval(query="q", verdict=verdict, evidence=[passage(d) for d in documents])
 
 
 def miss():
@@ -172,206 +161,197 @@ def rejected():
                            body=None)
 
 
-def test_respond_agent_cites_the_document_the_grounding_names(model, respond_node):
-    from ole5_chat.agent.respond_agent import Grounding
-    model.add(Grounding(used=["Guide"], answered=True, offered=False, unsupported=[]))
-    out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?"),
-                                                     AIMessage(content="Press Save as draft.")], [hit("Guide", "Manual")])
-    assert out["reply"].say == "Press Save as draft." and out["reply"].sources == ["Guide"]
-    assert out["last_retrieval"] is not None and out["corrections"] == []
+def test_a_question_forces_the_search_and_respond_has_no_tool(model, respond_node):
+    model.add(*answer("answered", "Press Save as draft.", ["Guide"]))
+    out, fake = respond_node("How do I save a draft?", [searching("How to save a draft?")], [hit("Guide")])
+    assert fake.choices == ["required"] and fake.bound[0] and len(fake.calls) == 1
+    assert "You read a support chat" in sent(fake, 0)[0].content
+    assert out["reply"].say == "Press Save as draft." and out["last_retrieval"] is not None
 
 
-def test_respond_agent_without_a_direct_passage_is_grounded_with_no_passages(model, respond_node):
-    from ole5_chat.agent.respond_agent import Grounding
-    model.add(Grounding(used=[], answered=False, offered=True, unsupported=[]))
-    out, _ = respond_node("Does it run on Linux?", [searching("Does Ole5 run on Linux?"),
-                                                    AIMessage(content="I have no answer for that. Open a ticket?")],
-                          [miss()])
-    assert out["reply"].say.startswith("I have no answer") and out["reply"].sources == []
+def test_respond_agent_keeps_a_partial_answer_that_offers_a_ticket(model, respond_node):
+    model.add(*answer("partial", "Save it as a draft from the message screen. Should I open a ticket for how long it is "
+                      "kept?", ["Guide"]))
+    out, _ = respond_node("How do I save a draft, and how long is it kept?", [searching("How to save a draft?")],
+                          [hit("Guide", verdict=Verdict.PARTIAL)])
+    assert out["reply"].say.startswith("Save it as a draft") and out["reply"].sources == ["Guide"]
     assert out["offered"] is True and out["corrections"] == []
-    assert len(grounding(model)) == 1
 
 
-def test_respond_agent_keeps_a_thanks_without_a_nudge_or_a_search(model, respond_node):
-    from ole5_chat.agent.respond_agent import Grounding
-    model.add(Grounding(used=[], answered=False, offered=False, unsupported=[], needs_search=False))
-    out, fake = respond_node("شكراً", [AIMessage(content="العفو، أنا هنا إن احتجت شيئاً.")])
-    assert len(fake.calls) == 1 and len(grounding(model)) == 1
-    assert out["reply"].say == "العفو، أنا هنا إن احتجت شيئاً." and out["reply"].sources == []
-    assert out["corrections"] == ["no search needed"] and out["last_retrieval"] is None
-
-
-def test_respond_agent_nudges_a_clarifying_question_on_a_reported_problem(model, respond_node):
-    from ole5_chat.agent.respond_agent import NUDGE, Grounding
-    model.add(Grounding(used=[], answered=False, offered=False, unsupported=[], needs_search=True),
-              Grounding(used=[], answered=False, offered=True, unsupported=[]))
-    out, fake = respond_node("The barcode prints in the wrong place", [AIMessage(content="Which template do you use?"),
-                                                                       searching("barcode position"),
-                                                                       AIMessage(content="No answer. Open a ticket?")],
-                             [miss()])
-    assert sent(fake, 1)[-1].content == NUDGE and out["corrections"][0] == "nudged"
-    assert out["reply"].say == "No answer. Open a ticket?" and out["offered"] is True
-
-
-def test_respond_agent_searches_when_nudged(model, respond_node):
-    from ole5_chat.agent.respond_agent import NUDGE, Grounding
-    model.add(Grounding(used=[], answered=True, offered=False, unsupported=[]),
-              Grounding(used=["Guide"], answered=True, offered=False, unsupported=[]))
-    out, fake = respond_node("How do I save a draft?", [AIMessage(content="Press Save."),
-                                                        searching("How to save a draft?"),
-                                                        AIMessage(content="Press Save as draft.")], [hit("Guide")])
-    assert sent(fake, 1)[-1].content == NUDGE
+def test_respond_agent_cites_the_document_the_grounding_names(model, respond_node):
+    model.add(*answer("answered", "Press Save as draft.", ["Guide"]))
+    out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?")], [hit("Guide", "Manual")])
     assert out["reply"].say == "Press Save as draft." and out["reply"].sources == ["Guide"]
-    assert out["corrections"] == ["nudged"]
+    assert out["offered"] is False and out["corrections"] == []
 
 
-def test_respond_agent_replaces_an_answer_written_without_a_search(model, respond_node):
-    from ole5_chat.agent.respond_agent import Grounding
-    model.add(Grounding(used=[], answered=True, offered=False, unsupported=[]))
-    out, fake = respond_node("How long are drafts kept?", [AIMessage(content="Drafts are kept 30 days."),
-                                                           AIMessage(content="Drafts are kept 30 days."),
-                                                           AIMessage(content="I have no answer for that. Open a ticket?")])
-    assert "You have no answer for this" in sent(fake)[-1].content
+def test_a_question_without_a_direct_passage_gets_the_no_answer(model, respond_node):
+    out, fake = respond_node("Does it run on Linux?", [searching("Does Ole5 run on Linux?"),
+                                                       AIMessage(content="I have no answer for that. Open a ticket?")],
+                             [miss()])
     assert out["reply"].say.startswith("I have no answer") and out["reply"].sources == []
-    assert out["corrections"] == ["nudged", "answer without searching"]
+    assert out["offered"] is True and out["corrections"] == ["no DIRECT passage"] and grounding(model) == []
+    assert "You have no answer for this" in sent(fake)[-1].content
+    assert "The search for this message returned:" in sent(fake)[-2].content and "(inferential)" in sent(fake)[-2].content
+    assert fake.bound[1] is None
+
+
+def test_respond_agent_sends_the_apology_when_the_model_fails(respond_node):
+    out, fake = respond_node("شكراً", [rejected(), rejected()], next_="talk")
+    assert out["reply"].say.startswith("عذراً") and out["reply"].sources == [] and out["offered"] is False
+    assert any(c.startswith("respond failed:") for c in out["corrections"])
+    assert [t for t, _ in fake.calls] == [0, 0.3]
+
+
+def test_a_failed_search_call_sends_the_apology_not_an_offer(respond_node):
+    out, fake = respond_node("Does it run on Linux?", [rejected(), rejected()])
+    assert out["reply"].say.startswith("Sorry") and out["offered"] is False and out["corrections"] == ["search failed"]
+    assert len(fake.calls) == 2
+
+
+def test_a_status_question_is_a_question_turn(new_path):
+    sid = chat()
+    state, prompt_text = unanswered(new_path, sid, "what's the status of my tickets?", next_="status")
+    assert "Answer the customer from the passages" in prompt_text and state["messages"][-1].text.startswith("I have")
+
+
+def test_a_talk_turn_has_no_search_and_never_offers(model, respond_node):
+    out, fake = respond_node("شكراً", [AIMessage(content="العفو، أنا هنا إن احتجت شيئاً.")], next_="talk")
+    assert len(fake.calls) == 1 and fake.bound == [None] and grounding(model) == []
+    assert out["reply"].say == "العفو، أنا هنا إن احتجت شيئاً." and out["reply"].sources == []
+    assert out["offered"] is False and out["corrections"] == [] and "last_retrieval" not in out
+
+
+def test_a_question_about_the_assistant_needs_no_search(model, respond_node):
+    intro = "أنا مساعد دعم Ole5، أجيب عن أسئلتك حول النظام وأفتح لك تذكرة دعم عند الحاجة."
+    out, fake = respond_node("من أنت", [AIMessage(content=intro)], next_="talk")
+    assert len(fake.calls) == 1 and out["reply"].say == intro and out["offered"] is False
+    assert "This message needs no search" in sent(fake)[0].content
 
 
 def test_respond_agent_declining_a_direct_passage_twice_gives_the_no_answer(model, respond_node):
-    from ole5_chat.agent.respond_agent import Grounding
-    model.add(Grounding(used=[], answered=False, offered=True, unsupported=[]), Grounding(used=[], answered=False, offered=True, unsupported=[]))
-    out, fake = respond_node("How do I save a draft?", [searching("How to save a draft?"),
-                                                        AIMessage(content="Open a ticket?"),
-                                                        AIMessage(content="Open a ticket?"),
-                                                        AIMessage(content="I have no answer for that. Open a ticket?")],
-                             [hit("Guide")])
-    assert "Write what it says, even if it is one sentence, and nothing more." in sent(fake, 2)[-1].content
-    assert len(grounding(model)) == 2
+    model.add(answer("no_answer", "Open a ticket?")[0], answer("no_answer", "I have no answer for that. Open a ticket?")[0])
+    out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?")], [hit("Guide")])
     assert out["reply"].say.startswith("I have no answer") and out["reply"].sources == []
-    assert out["corrections"] == ["gate 2 retried: declined", "respond declined a DIRECT passage"]
+    assert out["offered"] is True and out["corrections"] == ["retried: declined"] and grounding(model) == []
+
+
+def test_a_partial_search_declined_is_not_retried(model, respond_node):
+    model.add(answer("no_answer", "I have no answer for that. Open a ticket?")[0])
+    out, _ = respond_node("How long are drafts kept?", [searching("draft retention")],
+                          [hit("Guide", verdict=Verdict.PARTIAL)])
+    assert out["offered"] is True and out["corrections"] == []
 
 
 def test_respond_agent_cites_every_direct_document_when_grounding_fails(model, respond_node):
-    out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?"),
-                                                     AIMessage(content="Press Save as draft.")], [hit("Guide", "Manual")])
+    model.add(answer("answered", "Press Save as draft.")[0])
+    out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?")], [hit("Guide", "Manual")])
     assert out["reply"].say == "Press Save as draft." and out["reply"].sources == ["Guide", "Manual"]
-    assert "grounding call failed" in out["corrections"]
+    assert out["corrections"] == ["grounding call failed"] and out["offered"] is False
 
 
-def test_respond_agent_rewrites_a_reply_in_the_wrong_language(model, respond_node):
-    from ole5_chat.agent.respond_agent import Grounding
-    model.add(*[Grounding(used=["Guide"], answered=True, offered=False, unsupported=[])] * 2)
-    out, fake = respond_node("كيف أحفظ مسودة؟", [searching("How to save a draft?"),
-                                               AIMessage(content="Press Save as draft."),
-                                               AIMessage(content="اضغط حفظ كمسودة.")], [hit("Guide")])
+def test_respond_agent_rewrites_an_answer_in_the_wrong_language(model, respond_node):
+    model.add(answer("answered", "Press Save as draft.")[0], *answer("answered", "اضغط حفظ كمسودة.", ["Guide"]))
+    out, _ = respond_node("كيف أحفظ مسودة؟", [searching("How to save a draft?")], [hit("Guide")])
+    assert out["reply"].say == "اضغط حفظ كمسودة." and any("Arabic" in p for p in model.problems)
+
+
+def test_respond_agent_keeps_an_answer_still_in_the_wrong_language(model, respond_node):
+    model.add(*answer("answered", "Press Save as draft.", ["Guide"]))
+    out, _ = respond_node("كيف أحفظ مسودة؟", [searching("How to save a draft?")], [hit("Guide")])
+    assert out["reply"].say == "Press Save as draft." and out["corrections"][0].startswith("language:")
+
+
+def test_respond_agent_rewrites_a_reply_in_the_wrong_language(respond_node):
+    out, fake = respond_node("كيف أحفظ مسودة؟", [searching("drafts"), AIMessage(content="I have no answer."),
+                                               AIMessage(content="ليس لدي إجابة.")], [miss()])
     assert "The customer wrote in Arabic" in sent(fake)[-1].content
-    assert out["reply"].say == "اضغط حفظ كمسودة." and out["corrections"] == ["language retried"]
+    assert out["reply"].say == "ليس لدي إجابة." and out["corrections"] == ["no DIRECT passage", "language retried"]
 
 
-def test_respond_agent_sends_the_last_reply_after_two_language_retries(model, respond_node):
-    from ole5_chat.agent.respond_agent import Grounding
-    model.add(*[Grounding(used=["Guide"], answered=True, offered=False, unsupported=[])] * 3)
-    out, fake = respond_node("كيف أحفظ مسودة؟", [searching("How to save a draft?"),
-                                               *[AIMessage(content="Press Save as draft.")] * 3], [hit("Guide")])
-    assert len(fake.calls) == 4
-    assert out["reply"].say == "Press Save as draft."
-    assert out["corrections"][:2] == ["language retried", "language retried"]
-    assert out["corrections"][2].startswith("language:")
+def test_respond_agent_sends_the_last_reply_after_two_language_retries(respond_node):
+    out, fake = respond_node("كيف أحفظ مسودة؟", [searching("drafts"), *[AIMessage(content="I have no answer.")] * 3],
+                             [miss()])
+    assert len(fake.calls) == 4 and out["reply"].say == "I have no answer."
+    assert out["corrections"][1:3] == ["language retried", "language retried"]
+    assert out["corrections"][3].startswith("language:")
 
 
-def test_respond_agent_rewrites_a_reply_with_chinese_characters(model, respond_node):
-    from ole5_chat.agent.respond_agent import Grounding
-    model.add(*[Grounding(used=["Guide"], answered=True, offered=False, unsupported=[])] * 2)
-    out, fake = respond_node("كيف أحفظ مسودة؟", [searching("How to save a draft?"),
-                                               AIMessage(content="اضغط 保存 كمسودة."),
-                                               AIMessage(content="اضغط حفظ كمسودة.")], [hit("Guide")])
+def test_respond_agent_rewrites_a_reply_with_chinese_characters(respond_node):
+    out, fake = respond_node("شكراً", [AIMessage(content="العفو 保存"), AIMessage(content="العفو")], next_="talk")
     assert "Chinese characters" in sent(fake)[-1].content
-    assert out["reply"].say == "اضغط حفظ كمسودة." and out["corrections"] == ["language retried"]
+    assert out["reply"].say == "العفو" and out["corrections"] == ["language retried"]
 
 
-def test_respond_agent_shows_a_failed_search_to_the_model(model, respond_node):
-    from langchain_core.messages import ToolMessage
+def test_a_failed_search_sends_the_apology_not_an_offer(respond_node):
     failed = Retrieval(query="q", verdict=Verdict.NOT_IN_KB, error="ReadTimeout")
-    out, fake = respond_node("How do I save a draft?", [searching("How to save a draft?"),
-                                                        AIMessage(content="I could not check that now. Open a ticket?")],
-                             [failed])
-    tool_reply = [m for m in sent(fake) if isinstance(m, ToolMessage)][0]
-    assert '"status": "search_failed"' in tool_reply.content and "does NOT" in tool_reply.content
-    assert out["reply"].sources == []
+    out, fake = respond_node("How do I save a draft?", [searching("How to save a draft?")], [failed])
+    assert out["reply"].say.startswith("Sorry") and out["offered"] is False and out["corrections"] == ["search failed"]
+    assert len(fake.calls) == 1
 
 
-def test_respond_agent_retries_a_rejected_call_warmer(model, respond_node):
-    from ole5_chat.agent.respond_agent import Grounding
-    model.add(Grounding(used=["Guide"], answered=True, offered=False, unsupported=[]))
-    out, fake = respond_node("How do I save a draft?", [rejected(), searching("How to save a draft?"),
-                                                        AIMessage(content="Press Save as draft.")], [hit("Guide")])
-    assert [t for t, _ in fake.calls] == [0, 0.3, 0]
+def test_the_search_call_is_retried_warmer(model, respond_node):
+    model.add(*answer("answered", "Press Save as draft.", ["Guide"]))
+    out, fake = respond_node("How do I save a draft?", [rejected(), searching("How to save a draft?")], [hit("Guide")])
+    assert [t for t, _ in fake.calls] == [0, 0.3]
     assert out["reply"].say == "Press Save as draft." and out["corrections"] == []
 
 
-def test_respond_agent_stops_searching_at_the_cap(model, respond_node, monkeypatch):
+def test_the_search_node_runs_at_most_the_cap(respond_node, monkeypatch):
     from ole5_chat.config import get_settings
-    from ole5_chat.agent.respond_agent import Grounding
     monkeypatch.setenv("KB_MAX_SEARCHES", "1")
     get_settings.cache_clear()
-    model.add(Grounding(used=[], answered=False, offered=True, unsupported=[]))
-    out, fake = respond_node("How do I save a draft?", [searching("a", "c1"), searching("b", "c2"),
-                                                        AIMessage(content="I have no answer for that. Open a ticket?")],
-                             [miss(), miss()])
-    assert len(fake.calls) == 3
-    assert "no more searches" in sent(fake)[-1].content
-    assert out["reply"].say.startswith("I have no answer") and out["corrections"] == ["search cap reached"]
+    out, _ = respond_node("How do I save a draft and export it?", [searching("a", "b"), AIMessage(content="No answer.")],
+                          [miss()])
+    assert out["reply"].say == "No answer." and out["offered"] is True
 
 
 def test_respond_agent_finds_the_title_inside_what_the_grounding_returns(model, respond_node):
-    from ole5_chat.agent.respond_agent import Grounding
-    model.add(Grounding(used=["[Guide] Saving drafts"], answered=True, offered=False, unsupported=[]))
-    out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?"),
-                                                     AIMessage(content="Press Save as draft.")], [hit("Guide", "Manual")])
-    assert out["reply"].say == "Press Save as draft." and out["reply"].sources == ["Guide"]
-    assert out["corrections"] == []
-
-
-def test_respond_agent_sees_direct_passages_whole_and_inferential_cut(model, respond_node):
-    import json
-    from langchain_core.messages import ToolMessage
-    from ole5_chat.agent.respond_agent import Grounding
-    from ole5_chat.knowledge.tool import PASSAGE_CHARS
-    direct, inferential = passage("Guide"), passage("Manual", relation="INFERENTIAL")
-    direct.text, inferential.text = "d" * 2000, "i" * 2000
-    model.add(Grounding(used=["Guide"], answered=True, offered=False, unsupported=[]))
-    _, fake = respond_node("How do I save a draft?", [searching("How to save a draft?"),
-                                                      AIMessage(content="Press Save as draft.")],
-                           [Retrieval(query="q", verdict=Verdict.ANSWERABLE, evidence=[direct, inferential])])
-    tool_reply = json.loads([m for m in sent(fake) if isinstance(m, ToolMessage)][0].content)
-    texts = {e["document"]: e["text"] for e in tool_reply["evidence"]}
-    assert texts["Guide"] == "d" * 2000
-    assert texts["Manual"] == "i" * PASSAGE_CHARS
+    model.add(*answer("answered", "Press Save as draft.", ["[Guide] Saving drafts"]))
+    out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?")], [hit("Guide", "Manual")])
+    assert out["reply"].sources == ["Guide"] and out["corrections"] == []
 
 
 def test_respond_agent_removes_unsupported_facts_on_retry(model, respond_node):
-    from ole5_chat.agent.respond_agent import Grounding
-    model.add(Grounding(used=["Guide"], answered=True, offered=False, unsupported=["Tenant ID"]),
-              Grounding(used=["Guide"], answered=True, offered=False, unsupported=[]))
-    out, fake = respond_node("How do I set up SSO?", [searching("How to set up SSO?"),
-                                                      AIMessage(content="Fill the form with your Tenant ID."),
-                                                      AIMessage(content="Fill the requirements form and send it to support.")],
-                             [hit("Guide")])
-    assert "Tenant ID" in sent(fake)[-1].content
+    model.add(*answer("answered", "Fill the form with your Tenant ID.", ["Guide"], ["Tenant ID"]),
+              *answer("answered", "Fill the requirements form and send it to support.", ["Guide"]))
+    out, _ = respond_node("How do I set up SSO?", [searching("How to set up SSO?")], [hit("Guide")])
     assert out["reply"].say == "Fill the requirements form and send it to support."
-    assert out["reply"].sources == ["Guide"] and out["corrections"] == ["gate 2 retried: unsupported"]
+    assert out["reply"].sources == ["Guide"] and out["corrections"] == ["retried: unsupported"]
 
 
 def test_respond_agent_unsupported_facts_twice_give_the_no_answer(model, respond_node):
-    from ole5_chat.agent.respond_agent import Grounding
-    model.add(*[Grounding(used=["Guide"], answered=True, offered=False, unsupported=["Tenant ID"])] * 2)
+    model.add(*answer("answered", "Fill the form with your Tenant ID.", ["Guide"], ["Tenant ID"]),
+              *answer("answered", "Enter your Tenant ID in the form.", ["Guide"], ["Tenant ID"]))
     out, fake = respond_node("How do I set up SSO?", [searching("How to set up SSO?"),
-                                                      AIMessage(content="Fill the form with your Tenant ID."),
-                                                      AIMessage(content="Enter your Tenant ID in the form."),
                                                       AIMessage(content="I have no answer for that. Open a ticket?")],
                              [hit("Guide")])
     assert "You have no answer for this" in sent(fake)[-1].content
-    assert out["reply"].say.startswith("I have no answer") and out["reply"].sources == []
-    assert out["corrections"] == ["gate 2 retried: unsupported", "reply kept unsupported facts"]
+    assert out["reply"].say.startswith("I have no answer") and out["reply"].sources == [] and out["offered"] is True
+    assert out["corrections"] == ["retried: unsupported", "reply not grounded"]
+
+
+def test_an_answer_on_a_ticket_turn_never_offers(model, respond_node):
+    model.add(*answer("partial", "Press Save as draft. Which version do you use?", ["Guide"]))
+    out, fake = respond_node("version 17, and how do I save a draft?", [searching("How to save a draft?")],
+                             [hit("Guide")], next_="details")
+    assert fake.choices == ["auto"] and out["offered"] is False and out["reply"].sources == ["Guide"]
+
+
+def test_a_ticket_turn_reply_with_unsupported_facts_is_written_without_them(model, respond_node):
+    model.add(*answer("no_answer", "العلامة المائية تحتاج تطبيق سطح المكتب. أي إصدار تستخدم؟", [], ["تطبيق سطح المكتب"]),
+              *answer("answered", "تحتاج تطبيق سطح المكتب. أي إصدار تستخدم؟", [], ["تطبيق سطح المكتب"]))
+    out, fake = respond_node("ايه", [searching("watermark on iPad"), AIMessage(content="أي إصدار تستخدم؟")], [hit("Guide")],
+                             next_="accept")
+    assert out["reply"].say == "أي إصدار تستخدم؟" and out["offered"] is False and out["reply"].sources == []
+    assert "without stating anything about the product" in sent(fake)[-1].content
+    assert out["corrections"] == ["retried: unsupported", "reply not grounded"]
+
+
+def test_a_ticket_turn_reply_that_uses_no_passage_is_kept(model, respond_node):
+    model.add(*answer("answered", "Which version do you use?"))
+    out, _ = respond_node("yes", [searching("anything")], [hit("Guide")], next_="accept")
+    assert out["reply"].say == "Which version do you use?" and out["corrections"] == [] and out["offered"] is False
 
 
 def router_state(email="ole5@example.com", phase="none", messages=("hi",)):
@@ -451,29 +431,30 @@ def test_initial_state_has_the_router_fields():
 
 @pytest.fixture
 def new_path(monkeypatch, model):
-    """The graph with a scripted router, tool model, searches and grounding calls. send() runs one turn and returns
-    the state and the system prompt respond_agent was given."""
+    """The graph with a scripted router, tool model, searches and structured calls. send() runs one turn and returns
+    the state and the system prompt respond_agent was given. On accept, details and change the search node calls the
+    tool model too; when the first scripted reply is not a search, a reply with no search is put before it."""
     from ole5_chat import llm
+    from ole5_chat.agent import prompt
     from ole5_chat.agent.contracts import route_schema
+    from ole5_chat.agent.respond_agent import SEARCHES
     from ole5_chat.knowledge import tool
-    found, fake = [], ToolModel()
+    found, fake, prompts = [], ToolModel(), []
     monkeypatch.setattr(tool, "search", lambda question, product: found.pop(0))
     monkeypatch.setattr(llm, "tool_client", fake)
+    real = prompt.respond
+    monkeypatch.setattr(prompt, "respond", lambda state, language: prompts.append(real(state, language)) or prompts[-1])
 
     def send(sid, message, next_, replies, retrievals=(), groundings=()):
         model.add(route_schema(sessions.get(sid)["phase"])(next=next_), *groundings)
+        if next_ in SEARCHES and not (replies and replies[0].tool_calls):
+            replies = [AIMessage(content=""), *replies]
         fake.replies.extend(replies)
         found.extend(retrievals)
-        first = len(fake.calls)
         state = sessions.send(sid, message)
-        return state, fake.calls[first][1][0].content
+        return state, prompts[-1]
 
     return send
-
-
-def ground(answered, offered, used=(), needs_search=True):
-    from ole5_chat.agent.respond_agent import Grounding
-    return Grounding(used=list(used), answered=answered, offered=offered, unsupported=[], needs_search=needs_search)
 
 
 def offered_seen(sid):
@@ -482,14 +463,13 @@ def offered_seen(sid):
 
 def unanswered(new_path, sid, question, next_="question"):
     return new_path(sid, question, next_, [searching(question), AIMessage(content="I have no answer. Open a ticket?")],
-                    [miss()], [ground(False, True)])
+                    [miss()])
 
 
 def test_new_path_answered_question_stays_in_none(new_path):
     sid = chat()
-    state, _ = new_path(sid, "How do I save a draft?", "question",
-                        [searching("How to save a draft?"), AIMessage(content="Press Save as draft.")],
-                        [hit("Guide")], [ground(True, False, ["Guide"])])
+    state, _ = new_path(sid, "How do I save a draft?", "question", [searching("How to save a draft?")],
+                        [hit("Guide")], answer("answered", "Press Save as draft.", ["Guide"]))
     assert (state["phase"], state["pending"], state["sources"]) == ("none", [], ["Guide"])
 
 
@@ -503,27 +483,15 @@ def test_new_path_unanswered_question_is_queued_and_offered(new_path):
 
 def test_new_path_partial_answer_is_cited_and_queued(new_path):
     sid = chat()
-    state, _ = new_path(sid, "How do I save a draft, and how long is it kept?", "question",
-                        [searching("drafts"), AIMessage(content="Press Save as draft. Open a ticket for the rest?")],
-                        [hit("Guide")], [ground(True, True, ["Guide"])])
+    state, _ = new_path(sid, "How do I save a draft, and how long is it kept?", "question", [searching("drafts")],
+                        [hit("Guide")], answer("partial", "Press Save as draft. Open a ticket for the rest?", ["Guide"]))
     assert state["sources"] == ["Guide"] and state["phase"] == "offer_ticket"
     assert [p.text for p in state["pending"]] == ["How do I save a draft, and how long is it kept?"]
 
 
-def test_new_path_answer_without_a_direct_passage_is_replaced(new_path):
-    sid = chat()
-    state, _ = new_path(sid, "Does it run on Linux?", "question",
-                        [searching("Linux"), AIMessage(content="Yes, Ole5 runs on Linux."),
-                         AIMessage(content="I have no answer. Open a ticket?")],
-                        [miss()], [ground(True, False)])
-    assert state["messages"][-1].text == "I have no answer. Open a ticket?" and offered_seen(sid)
-    assert "answer without a DIRECT passage" in state["corrections"]
-    assert len(state["pending"]) == 1 and state["phase"] == "offer_ticket"
-
-
 def test_new_path_greeting_queues_nothing(new_path):
     sid = chat()
-    state, _ = new_path(sid, "مرحبا", "talk", [AIMessage(content="أهلاً بك")], groundings=[ground(False, False, needs_search=False)])
+    state, _ = new_path(sid, "مرحبا", "talk", [AIMessage(content="أهلاً بك")])
     assert (state["phase"], state["pending"]) == ("none", []) and not offered_seen(sid)
 
 
@@ -569,9 +537,8 @@ def test_new_path_decline_with_two_issues_offers_the_next(new_path):
 def test_new_path_side_question_keeps_the_offer_open(new_path):
     sid = chat()
     unanswered(new_path, sid, "Does it run on Linux?")
-    state, prompt_text = new_path(sid, "How do I save a draft?", "question",
-                                  [searching("drafts"), AIMessage(content="Press Save as draft. Still want the ticket?")],
-                                  [hit("Guide")], [ground(True, True, ["Guide"])])
+    state, prompt_text = new_path(sid, "How do I save a draft?", "question", [searching("drafts")], [hit("Guide")],
+                                  answer("answered", "Press Save as draft. Still want the ticket?", ["Guide"]))
     assert [p.text for p in state["pending"]] == ["Does it run on Linux?"] and state["phase"] == "offer_ticket"
     assert state["sources"] == ["Guide"]
     assert "A ticket offer for this issue is still open: Does it run on Linux?" in prompt_text
@@ -584,13 +551,12 @@ def test_new_path_same_unanswered_question_is_queued_once(new_path):
     assert len(state["pending"]) == 1 and state["phase"] == "offer_ticket"
 
 
-def test_new_path_accept_is_not_nudged_to_search(new_path, model):
+def test_new_path_an_acknowledgement_is_never_queued(new_path):
     sid = chat()
-    unanswered(new_path, sid, "Does it run on Linux?")
-    before = len(grounding(model))
-    state, _ = new_path(sid, "ايه", "accept", [AIMessage(content="أي إصدار تستخدم؟")])
-    assert state["messages"][-1].text == "أي إصدار تستخدم؟" and "nudged" not in state["corrections"]
-    assert len(grounding(model)) == before
+    new_path(sid, "How do I save a draft?", "question", [searching("drafts")], [hit("Guide")],
+             answer("answered", "Press Save as draft.", ["Guide"]))
+    state, _ = new_path(sid, "ايه", "talk", [AIMessage(content="تمام، أي شيء ثاني؟")])
+    assert (state["phase"], state["pending"]) == ("none", [])
 
 
 def collecting(new_path, sid, question="Does it run on Linux?"):
@@ -715,27 +681,16 @@ def test_a_stale_next_does_not_skip_the_router(new_path, model):
     assert state["created_tickets"] == [] and state["phase"] == "collect" and state["ticket_draft"].rounds == 1
 
 
-@pytest.mark.parametrize("next_", ["details", "done", "change", "cancel", "yes"])
-def test_post_check_leaves_ticket_turns_alone(next_):
-    from ole5_chat.agent import handlers
-    from ole5_chat.agent.contracts import PendingIssue, Reply
-    state = {**sessions.get(chat()), "messages": [HumanMessage(content="hmm")], "next": next_, "offered": True,
-             "phase": "collect", "pending": [PendingIssue(text="Linux", source="no_answer")],
-             "reply": Reply(say="Open a ticket?")}
-    assert [p.text for p in handlers.post_check(state)["pending"]] == ["Linux"]
-
-
-def test_only_done_binds_no_tools_and_no_ticket_turn_is_nudged(new_path):
+def test_search_runs_on_question_accept_and_details_and_respond_never_binds_a_tool(new_path):
     from ole5_chat import llm
     sid = chat()
     unanswered(new_path, sid, "Does it run on Linux?")
-    start = len(llm.tool_client.bound)
     new_path(sid, "yes", "accept", [AIMessage(content="Which version do you use?")])
     new_path(sid, "version 17", "details", [AIMessage(content="Anything else?")])
-    state, _ = new_path(sid, "nothing else", "done", [AIMessage(content="Submit it?")], groundings=[GOOD])
-    accept, details, done = llm.tool_client.bound[start:]
-    assert accept and details and done is None
-    assert "nudged" not in state["corrections"]
+    new_path(sid, "nothing else", "done", [AIMessage(content="Submit it?")], groundings=[GOOD])
+    fake = llm.tool_client
+    assert fake.choices == ["required", None, "auto", None, "auto", None, None]
+    assert [bool(b) for b in fake.bound] == [True, False, True, False, True, False, False]
 
 
 def test_a_json_reply_is_retried_as_a_chat_message(new_path):
@@ -753,28 +708,26 @@ def test_done_moves_what_is_missing_to_unknown(new_path):
 
 
 def task_sent(new_path, *args, **kwargs):
-    """Runs one turn and returns the last message of its first tool-model call."""
+    """Runs one turn and returns the last message of respond_agent's first call (the search node's call is skipped)."""
     from ole5_chat import llm
     first = len(llm.tool_client.calls)
     new_path(*args, **kwargs)
-    return llm.tool_client.calls[first][1][-1].content
+    calls = [c for _, c in llm.tool_client.calls[first:] if not c[0].content.startswith("You read a support chat")]
+    return calls[0][-1].content
 
 
 def test_the_task_is_the_last_message_off_the_plain_chat_turn(new_path):
     from ole5_chat.agent.respond_agent import NOTE
     sid = chat()
-    plain = task_sent(new_path, sid, "How do I save a draft?", "question",
-                      [searching("drafts"), AIMessage(content="Press Save.")], [hit("Guide")], [ground(True, False, ["Guide"])])
-    assert plain == "How do I save a draft?"
+    plain = task_sent(new_path, sid, "thanks", "talk", [AIMessage(content="You're welcome.")])
+    assert plain == "thanks"
     unanswered(new_path, sid, "Does it run on Linux?")
     turns = [
         (("We need to migrate our data", "ticket", [AIMessage(content="After this one.")]), {}, "The customer raised a new issue: We need to migrate our data."),
-        (("How do I save a draft?", "question", [searching("drafts"), AIMessage(content="Press Save. Still want it?")], [hit("Guide")],
-          [ground(True, False, ["Guide"])]), {}, "Answer the customer's message as usual. A ticket offer"),
+        (("thanks", "talk", [AIMessage(content="Sure. Still want it?")]), {}, "Answer the customer's message as usual. A ticket offer"),
         (("yes", "accept", [AIMessage(content="Which version?")]), {}, "The customer agreed to a ticket"),
         (("version 17", "details", [AIMessage(content="Anything else?")]), {}, "Ask what else the support team needs"),
-        (("how long do replies take?", "question", [searching("replies"), AIMessage(content="No answer.")], [miss()],
-          [ground(False, False)]), {},
+        (("ok", "talk", [AIMessage(content="Anything else?")]), {},
          "Answer the customer's message as usual. Then continue the current ticket: ask what else the support team needs"),
         (("nothing else", "done", [AIMessage(content="Submit it?")]), {"groundings": [GOOD]}, "The ticket summary is ready"),
         (("high priority", "change", [AIMessage(content="Changed. Submit?")]), {"groundings": [GOOD]}, "The ticket summary was updated"),
@@ -782,6 +735,18 @@ def test_the_task_is_the_last_message_off_the_plain_chat_turn(new_path):
     ]
     for args, kwargs, task in turns:
         assert task_sent(new_path, sid, *args, **kwargs).startswith(NOTE + task), task
+
+
+def test_the_task_follows_the_passages_and_the_no_answer_note_follows_both(new_path):
+    from ole5_chat import llm
+    from ole5_chat.agent.respond_agent import NOTE
+    sid = chat()
+    unanswered(new_path, sid, "Does it run on Linux?")
+    unanswered(new_path, sid, "Can I export to Excel?")
+    last = llm.tool_client.calls[-1][1]
+    assert last[-3].content.startswith(NOTE + "The search for this message returned:")
+    assert last[-2].content.startswith(NOTE + "Answer the customer's message as usual. A ticket offer")
+    assert last[-1].content.startswith(NOTE + "You have no answer for this")
 
 
 def test_the_cancel_task_is_the_last_message(new_path):
@@ -795,11 +760,10 @@ def test_the_cancel_task_is_the_last_message(new_path):
 def test_a_question_in_a_details_turn_is_searched_and_answered(new_path):
     sid = chat()
     collecting(new_path, sid)
-    state, _ = new_path(sid, "version 17. also, how do I save a draft?", "details",
-                        [searching("How to save a draft?"), AIMessage(content="Press Save as draft. When did it start?")],
-                        [hit("Guide")], [ground(True, False, ["Guide"])])
+    state, _ = new_path(sid, "version 17. also, how do I save a draft?", "details", [searching("How to save a draft?")],
+                        [hit("Guide")], answer("answered", "Press Save as draft. When did it start?", ["Guide"]))
     assert state["sources"] == ["Guide"] and state["messages"][-1].text.startswith("Press Save as draft.")
-    assert "nudged" not in state["corrections"] and state["phase"] == "collect"
+    assert state["phase"] == "collect" and [p.text for p in state["pending"]] == ["Does it run on Linux?"]
 
 
 def test_a_details_turn_without_a_question_does_not_search(new_path):
@@ -808,8 +772,7 @@ def test_a_details_turn_without_a_question_does_not_search(new_path):
     collecting(new_path, sid)
     first = len(llm.tool_client.calls)
     state, _ = new_path(sid, "version 17", "details", [AIMessage(content="When did it start?")])
-    assert len(llm.tool_client.calls) == first + 1 and state["sources"] == []
-    assert "nudged" not in state["corrections"]
+    assert len(llm.tool_client.calls) == first + 2 and state["sources"] == []
 
 
 URGENT_ISSUE = "nobody in our organization can sign in"
@@ -911,27 +874,14 @@ def test_a_queued_issue_goes_back_to_the_current_ticket(new_path, phase):
 def test_a_chat_turn_in_confirm_goes_back_to_the_submit_question(new_path):
     sid = chat()
     confirming(new_path, sid)
-    task = task_sent(new_path, sid, "how long do replies take?", "question",
-                     [searching("reply time"), AIMessage(content="No answer. Submit the summary?")], [miss()],
-                     [ground(False, False)])
+    task = task_sent(new_path, sid, "thanks", "talk", [AIMessage(content="Sure. Submit the summary?")])
     assert task.endswith("the summary for Does it run on Linux? is still shown; ask whether to submit it.")
     assert "what the support team will need" not in task and sessions.get(sid)["phase"] == "confirm"
 
 
-def test_post_check_does_not_queue_an_unsearched_message():
-    from ole5_chat.agent import handlers
-    from ole5_chat.agent.contracts import Reply
-    state = {**sessions.get(chat()), "messages": [HumanMessage(content="ايه")], "next": "question", "offered": True,
-             "phase": "none", "pending": [], "reply": Reply(say="ليس لدي إجابة. هل ترغب بتذكرة؟"), "last_retrieval": None}
-    out = handlers.post_check(state)
-    assert out["pending"] == [] and out["phase"] == "none"
-
-
-
-def test_a_question_about_the_assistant_needs_no_search(model, respond_node):
-    from ole5_chat.agent.respond_agent import Grounding
-    model.add(Grounding(used=[], answered=False, offered=False, unsupported=[], needs_search=False))
-    intro = "أنا مساعد دعم Ole5، أجيب عن أسئلتك حول النظام وأفتح لك تذكرة دعم عند الحاجة."
-    out, fake = respond_node("من أنت", [AIMessage(content=intro)])
-    assert len(fake.calls) == 1 and out["reply"].say == intro and out["reply"].sources == []
-    assert out["corrections"] == ["no search needed"] and out["last_retrieval"] is None
+def test_an_unanswered_question_in_confirm_is_queued_behind_the_summary(new_path):
+    sid = chat()
+    confirming(new_path, sid)
+    state, _ = unanswered(new_path, sid, "how long do replies take?")
+    assert state["phase"] == "confirm" and [p.text for p in state["pending"]] == ["Does it run on Linux?",
+                                                                                 "how long do replies take?"]

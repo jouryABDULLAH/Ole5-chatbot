@@ -1,4 +1,4 @@
-"""The conversation graph, one invoke per customer message. The first run sends the persona's introduction from chat.yaml, with no model call. Every later message goes to the router, which picks next from the options of the conversation's phase. The handler for next applies it to the state and sets the task (a Submit button turn arrives with next already set and skips the router), respond_agent writes the reply, post_check queues a question the reply offered a ticket for, and validate posts the reply."""
+"""The conversation graph, one invoke per customer message. The first run sends the persona's introduction from chat.yaml, with no model call. Every later message goes to the router, which picks next from the options of the conversation's phase. The handler for next applies it to the state and sets the task (a Submit button turn arrives with next already set and skips the router), search runs the searches the message needs, respond_agent writes the reply, post_check queues a question the reply offered a ticket for, and validate posts the reply."""
 
 import logging
 
@@ -7,7 +7,7 @@ from langgraph.graph import END, START, StateGraph
 
 from ole5_chat import products
 from ole5_chat.agent import handlers
-from ole5_chat.agent.respond_agent import respond_agent
+from ole5_chat.agent.respond_agent import respond_agent, search
 from ole5_chat.agent.router import router
 from ole5_chat.agent.state import ChatState
 
@@ -39,14 +39,15 @@ def validate(state: ChatState) -> dict:
 
 def build(checkpointer):
     g = StateGraph(ChatState)
-    for name, node in (("greet", greet), ("router", router), ("respond_agent", respond_agent),
+    for name, node in (("greet", greet), ("router", router), ("search", search), ("respond_agent", respond_agent),
                        ("post_check", handlers.post_check), ("validate", validate)):
         g.add_node(name, node)
     for name in HANDLER_NODES:
         g.add_node(name, getattr(handlers, name))
-        g.add_edge(name, "respond_agent")
+        g.add_edge(name, "search")
     g.add_conditional_edges(START, route, ["greet", "router", *HANDLER_NODES])
     g.add_conditional_edges("router", handlers.handler, list(HANDLER_NODES))
+    g.add_edge("search", "respond_agent")
     g.add_edge("respond_agent", "post_check")
     g.add_edge("post_check", "validate")
     g.add_edge("validate", END)

@@ -46,7 +46,7 @@ class ChatState(MessagesState):
     next: Next | None
     task: str | None
     language: str | None
-    offered: bool  # Temporary: carries the grounding result from respond_agent to the post-check.
+    offered: bool  # Set by respond_agent on a question turn it had no answer for; read by post_check.
 
 
 def initial_state(identity: Identity) -> ChatState:

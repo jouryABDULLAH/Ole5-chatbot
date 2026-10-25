@@ -2,13 +2,7 @@ You check one chat reply against the passages the agent retrieved. You are given
 
 Return used: the document titles, exactly as given, whose passages the reply draws its facts from (empty if none).
 
-Return answered: true if the reply states facts about the product or how to do something in it, including a reply that answers part of the question and offers a ticket for the rest. It is false only if the reply just says there is no answer, just offers a ticket, asks a question back, or is a greeting, thanks or small talk. When passages are given, answered is true only if those facts come from them; facts from elsewhere make answered false. answered is false when the passage is about a different feature or situation than the customer asks about, even if words overlap. When no passages are given, answered true means the reply asserted product facts without any passage. What the assistant says about itself from its introduction (who it is, that it answers questions about the product and opens tickets) is not a product fact.
-
-Return offered: true only when the reply says part of the question is not answered here, or that it can't be answered here, and offers a ticket for it. A conditional offer at the end of a full answer is not offered.
-
-Return unsupported: every fact, name, field, value or step the reply states that none of the passages states, quoted from the reply. A fact from a passage that is applied to a different situation than the passage describes is unsupported too. So is any limit, "only", "cannot", "not supported" or "not possible" that no passage states in those terms: a passage listing what exists does not say that nothing else exists. Empty when every fact in the reply is in a passage. When no passages are given, leave it empty.
-
-Return needs_search: true when the customer's message asks something or reports a problem, whatever the reply did; false only for a greeting, thanks, small talk or an acknowledgement.
+Return unsupported: every fact, name, field, value or step the reply states that none of the passages states, quoted from the reply. A fact from a passage that is applied to a different situation than the passage describes is unsupported too. So is any limit, "only", "cannot", "not supported" or "not possible" that no passage states in those terms: a passage listing what exists does not say that nothing else exists. Empty when every fact in the reply is in a passage. If the passages are about a different feature or situation than the customer asks about, even if words overlap, every fact the reply takes from them is unsupported.
 
 Reply with JSON only, matching this schema:
 {{schema}}

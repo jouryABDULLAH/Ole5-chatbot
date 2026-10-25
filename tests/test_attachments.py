@@ -92,15 +92,13 @@ class GotIt:
 def test_message_carries_its_attachments(model, monkeypatch):
     from ole5_chat import llm
     from ole5_chat.agent.contracts import route_schema
-    from ole5_chat.agent.respond_agent import Grounding
     monkeypatch.setattr(llm, "tool_client", GotIt())
-    no_facts = Grounding(used=[], answered=False, offered=False, unsupported=[])
     sid = session()
     att = send_file(sid, "screen.png").json()
-    model.add(route_schema("none")(next="talk"), no_facts)
+    model.add(route_schema("none")(next="talk"))
     view = client.post(f"/chat/sessions/{sid}/messages", json={"text": "here it is", "attachment_ids": [att["id"]]}).json()
     assert view["messages"][-2]["text"] == "here it is\n[attached: screen.png]"
-    model.add(route_schema("none")(next="talk"), no_facts)
+    model.add(route_schema("none")(next="talk"))
     view = client.post(f"/chat/sessions/{sid}/messages", json={"text": "", "attachment_ids": [att["id"]]}).json()
     assert view["messages"][-2]["text"] == "[attached: screen.png]"
     assert client.post(f"/chat/sessions/{sid}/messages", json={"text": "", "attachment_ids": []}).status_code == 422

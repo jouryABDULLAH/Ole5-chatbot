@@ -129,15 +129,17 @@ def _persona(config: products.ProductConfig, language: str) -> str:
     return "\n".join(lines)
 
 
-RESPOND_TASK = ("If the message is only a greeting, thanks, small talk, or a question about who you are or what you can "
-                "do, reply as the persona's greeting rules say and don't search. Otherwise: answer the customer from what "
-                "the search returns. If no passage answers the question, say you have no answer for this and ask whether "
-                "they would like a ticket opened.")
+RESPOND_TASK = ("Answer the customer from the passages. If no passage answers the question, say you have no answer for "
+                "this and ask whether they would like a ticket opened.")
+TALK_TASK = ("This message needs no search: a greeting, thanks, small talk, a question about you, or a request to repeat "
+             "what you said. Reply as the persona's greeting rules say. Don't state a product fact that isn't already in "
+             "this chat.")
 
 
 # What respond_agent is asked to do this turn, set by the handler. {issue} is pending[0].text, {new} the issue just queued.
 TASKS = {
-    "chat": RESPOND_TASK,
+    "question": RESPOND_TASK,
+    "talk": TALK_TASK,
     "chat_offer_ticket": "Answer the customer's message as usual. A ticket offer for this issue is still open: {issue}. "
                          "If you answered something else, end by asking whether they would still like that ticket "
                          "opened. Example: the customer asks how to reset their password while a ticket offer for "
@@ -153,7 +155,7 @@ TASKS = {
               "out the likely cause and ask what would confirm or rule it out, a few things at a time, skipping what "
               "the customer already said. Ask about what the customer sees and did. Don't name a screen, template, "
               "setting or option unless a passage names it. If the customer also asked a question in this message, "
-              "search for it and answer it first, then continue. Otherwise don't search. Nothing has been created yet; "
+              "answer it first from the passages, then continue. Nothing has been created yet; "
               "the ticket is created only when they submit the summary. Don't say a ticket is opened, created or "
               "being opened.",
     "declined": "The customer said no to opening a ticket; none was opened. Acknowledge it in one line without saying "
@@ -165,8 +167,8 @@ TASKS = {
     "details": "Ask what else the support team needs to act on: {issue}. A few things at a time, skipping what the "
                "customer already said. If the team has enough, ask instead whether there is anything else they'd like "
                "to add. Ask about what the customer sees and did. Don't name a screen, template, setting or option "
-               "unless a passage names it. If the customer also asked a question in this message, search for it and "
-               "answer it first, then continue. Otherwise don't search. Nothing has been created yet; the ticket is "
+               "unless a passage names it. If the customer also asked a question in this message, answer it first "
+               "from the passages, then continue. Nothing has been created yet; the ticket is "
                "created only when they submit the summary. Don't say a ticket is opened, created or being opened. "
                "Don't ask again a question you already asked; if the customer didn't answer it, they don't know.",
     "open_question": "Ask whether there is anything else they'd like to add about: {issue}. Nothing else.",
@@ -176,7 +178,7 @@ TASKS = {
                "Don't say the ticket is created, opened or being opened. Don't repeat the summary.",
     "changed": "The ticket summary was updated as the customer asked and is shown again. Say what changed in one line "
                "and ask whether to submit the ticket for: {issue}. If the customer also asked a question in this message, "
-               "search for it and answer it first, then continue. Otherwise don't search.",
+               "answer it first from the passages, then continue.",
     "created": "The ticket {number} was created. Tell the customer its number and that the support team will reply by "
                "email. Nothing more.",
     "cancelled": "The customer cancelled the ticket. Acknowledge it in one line and say they can contact support at any "
@@ -195,8 +197,22 @@ QUEUED_URGENT = " Because the new issue is urgent, also say they can cancel the 
 
 def respond(state: ChatState, language: str) -> str:
     config = products.load(state["identity"].product)
-    return _fill("respond", persona=_persona(config, language), max_searches=str(get_settings().kb_max_searches),
-                 language=NAMES[language], task=state.get("task") or RESPOND_TASK, note=state.get("note") or "")
+    return _fill("respond", persona=_persona(config, language), language=NAMES[language],
+                 task=state.get("task") or RESPOND_TASK, note=state.get("note") or "")
+
+
+SEARCH_RULES = {
+    "question": "The message asks something or reports a problem: search for it.",
+    "own_issue": "The customer is answering the assistant about a ticket. Search only if the message itself asks a new "
+                 "question about the product. A yes, an answer, a detail, a file or a request to change the summary is "
+                 "not a question: reply without a tool call.",
+}
+
+
+def search(state: ChatState, question: bool) -> str:
+    config = products.load(state["identity"].product)
+    rule = SEARCH_RULES["question" if question else "own_issue"]
+    return _fill("search", product_name=config.name, rule=rule, max_searches=str(get_settings().kb_max_searches))
 
 
 def ground() -> str:
