@@ -26,6 +26,7 @@ class TicketDraft(BaseModel):
     missing: list[str] = []
     unknown: list[str] = []
     classified: bool = False
+    rounds: int = 0
     confidence: Literal["high", "medium", "low"] | None = None
     queue_reason: str | None = None
 
