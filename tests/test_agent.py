@@ -516,12 +516,15 @@ def test_respond_agent_cites_the_document_the_grounding_names(model, respond_nod
     assert out["last_retrieval"] is not None and out["corrections"] == []
 
 
-def test_respond_agent_without_a_direct_passage_skips_grounding(model, respond_node):
+def test_respond_agent_without_a_direct_passage_is_grounded_with_no_passages(model, respond_node):
+    from ole5_chat.agent.respond_agent import Grounding
+    model.add(Grounding(used=[], answered=False, offered=True, unsupported=[]))
     out, _ = respond_node("Does it run on Linux?", [searching("Does Ole5 run on Linux?"),
                                                     AIMessage(content="I have no answer for that. Open a ticket?")],
                           [miss()])
     assert out["reply"].say.startswith("I have no answer") and out["reply"].sources == []
-    assert grounding(model) == []
+    assert out["offered"] is True and out["corrections"] == []
+    assert len(grounding(model)) == 1
 
 
 def test_respond_agent_keeps_a_greeting_written_without_a_search(model, respond_node):
@@ -630,8 +633,10 @@ def test_respond_agent_retries_a_rejected_call_warmer(model, respond_node):
 
 def test_respond_agent_stops_searching_at_the_cap(model, respond_node, monkeypatch):
     from ole5_chat.config import get_settings
+    from ole5_chat.agent.respond_agent import Grounding
     monkeypatch.setenv("KB_MAX_SEARCHES", "1")
     get_settings.cache_clear()
+    model.add(Grounding(used=[], answered=False, offered=True, unsupported=[]))
     out, fake = respond_node("How do I save a draft?", [searching("a", "c1"), searching("b", "c2"),
                                                         AIMessage(content="I have no answer for that. Open a ticket?")],
                              [miss(), miss()])

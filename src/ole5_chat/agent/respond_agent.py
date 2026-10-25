@@ -84,46 +84,39 @@ def _ground(customer: str, text: str, retrieval: Retrieval | None) -> Grounding:
     return llm.structured(prompt.ground(), [HumanMessage(content=content)], Grounding, node="ground")
 
 
-def _gates(convo, tool, sink, customer, text, corrections) -> tuple[str, list[str]]:
-    """Gate 1, did it search; gate 2, is the reply drawn from a DIRECT passage. Returns the reply and its sources."""
+def _gates(convo, tool, sink, customer, text, corrections) -> tuple[str, list[str], bool]:
+    """Gate 1, did it search; gate 2, is the reply drawn from a DIRECT passage. A reply with no DIRECT passage behind it is grounded with no passages. Returns the reply, its sources and whether it offers a ticket."""
     if not sink:
         convo.append(HumanMessage(content=NUDGE))
         corrections.append("nudged")
         text = _loop(convo, tool, corrections)
-    if not sink:
-        try:
-            grounding = _ground(customer, text, None)
-        except llm.ModelFailed as exc:
-            log.warning("respond_agent  grounding call failed: %s", str(exc)[:300])
-            corrections.append("grounding call failed")
-            return text, []
-        if grounding.answered:
-            corrections.append("answer without searching")
-            return _no_answer(convo, tool), []
-        corrections.append("replied without searching")
-        return text, []
     for attempt in (1, 2):
-        retrieval = merge(sink)
-        direct = list(dict.fromkeys(e.document for e in retrieval.direct))
-        if not direct:
-            return text, []
+        retrieval = merge(sink) if sink else None
+        direct = list(dict.fromkeys(e.document for e in retrieval.direct)) if retrieval else []
         try:
             grounding = _ground(customer, text, retrieval)
         except llm.ModelFailed as exc:
             log.warning("respond_agent  grounding call failed: %s", str(exc)[:300])
             corrections.append("grounding call failed")
-            return text, direct
+            return text, direct, False
+        if not direct:
+            if grounding.answered:
+                corrections.append("answer without a DIRECT passage" if sink else "answer without searching")
+                return _no_answer(convo, tool), [], True
+            if not sink:
+                corrections.append("replied without searching")
+            return text, [], grounding.offered
         used = [d for d in direct if any(d in u for u in grounding.used)]
         log.info("respond_agent  grounding attempt=%d answered=%s offered=%s used=%s unsupported=%s", attempt,
                  grounding.answered, grounding.offered, used, grounding.unsupported)
         if grounding.answered and used and not grounding.unsupported:
             if grounding.offered:
                 corrections.append("reply offered a ticket")
-            return text, used
+            return text, used, grounding.offered
         if grounding.unsupported:
             if attempt == 2:
                 corrections.append("reply kept unsupported facts")
-                return _no_answer(convo, tool), []
+                return _no_answer(convo, tool), [], True
             convo.append(HumanMessage(content=NOTE + "Remove these from your reply; no passage states them: "
                                       + "; ".join(grounding.unsupported) + ". Keep only what the passages say."))
             corrections.append("gate 2 retried: unsupported")
@@ -135,7 +128,7 @@ def _gates(convo, tool, sink, customer, text, corrections) -> tuple[str, list[st
             corrections.append("gate 2 retried: declined")
             text = _loop(convo, tool, corrections)
     corrections.append("respond declined a DIRECT passage")
-    return _no_answer(convo, tool), []
+    return _no_answer(convo, tool), [], True
 
 
 def respond_agent(state: ChatState) -> dict:
@@ -150,7 +143,7 @@ def respond_agent(state: ChatState) -> dict:
     try:
         text = _loop(convo, tool, corrections)
         for attempt in range(LANGUAGE_RETRIES + 1):
-            text, sources = _gates(convo, tool, sink, customer, text, corrections)
+            text, sources, offered = _gates(convo, tool, sink, customer, text, corrections)
             problem = language_problem(text, language) or (
                 CHINESE.search(text) and f"The reply contains Chinese characters; rewrite it in {NAMES[language]}.")
             if not problem:
@@ -164,9 +157,9 @@ def respond_agent(state: ChatState) -> dict:
             text = _loop(convo, tool, corrections)
     except llm.ModelFailed as exc:
         log.warning("respond_agent  model failed, sorry sent: %s", str(exc)[:300])
-        text, sources = SORRY[language], []
+        text, sources, offered = SORRY[language], [], False
         corrections.append(f"respond failed: {exc}")
     retrieval = merge(sink) if sink else None
     log.info("respond_agent  searches=%d sources=%s say=%r", len(sink), sources, text[:90])
     return {"reply": Reply(say=text, sources=sources), "last_retrieval": retrieval.as_json() if retrieval else None,
-            "corrections": state["corrections"] + corrections}
+            "corrections": state["corrections"] + corrections, "offered": offered, "language": language}
