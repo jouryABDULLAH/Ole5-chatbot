@@ -5,7 +5,7 @@ import re
 from functools import lru_cache
 
 from ole5_chat import products, values
-from ole5_chat.agent.contracts import Classification, Reply, RouterDecision
+from ole5_chat.agent.contracts import OPTIONS, Classification, Reply, RouterDecision, route_schema
 from ole5_chat.agent.state import ChatState, TicketDraft
 from ole5_chat.agent.validate import NAMES, Language
 from ole5_chat.config import ROOT, get_settings
@@ -55,6 +55,84 @@ def router(state: ChatState) -> str:
                  urgent_when=_list(config.urgent_when), ask_before_ticket=_json(config.ask_before_ticket),
                  last_assistant=last, ticket=ticket_status(state.get("ticket_draft"), state.get("attachments") or []),
                  schema=schema_text(RouterDecision))
+
+
+PHASES = {
+    "none": "No ticket is being offered or prepared.",
+    "offer_ticket": "The assistant has just offered to open a ticket for the issue below and is waiting for an answer.",
+    "collect": "A ticket is being prepared for the issue below; the assistant is asking the customer for details.",
+    "confirm": "A ticket summary for the issue below is shown to the customer with a Submit button.",
+}
+
+MEANINGS = {
+    "chat": "none of the others: a question, a greeting, thanks, a side remark, a request to explain again. A request "
+            "to open a ticket about an ordinary topic is chat too: the agent searches first and offers a ticket only "
+            "when it has no answer.",
+    "ticket": "the message reports a topic from this list: {always_ticket}.",
+    "urgent": "the message describes a situation from this list: {urgent_when}. Judge it from the impact described, "
+              "not the tone.",
+    "status": "the customer asks about their own tickets: status, whether one was received, its number.",
+    "accept": "agrees to the ticket the agent just offered.",
+    "decline": "turns the offer down.",
+    "details": "answers the agent's questions about the problem, including \"I don't know\", a file sent (a line "
+               "\"[attached: name]\"), or more description.",
+    "done": "says there is nothing more to add, typically after the agent asked whether there is anything else.",
+    "cancel": "drops the ticket being prepared or the summary shown.",
+    "yes": "agrees to submit the summary shown.",
+    "change": "asks to change something on the summary (priority, title, details).",
+}
+
+# What the assistant had said before the examples of each phase's own options.
+AFTER = {
+    "offer_ticket": "after the assistant asked \"would you like me to open a ticket?\"",
+    "collect": "after the assistant asked \"what does the error message say?\"",
+    "confirm": "while the summary is shown",
+}
+
+OLE5_EXAMPLES = {
+    ("none", "chat"): ['"كيف أضيف علامة مائية؟"', '"مرحبا"', '"open a ticket for me about the archive button"'],
+    ("none", "ticket"): ['"نبي ننقل بياناتنا من النظام القديم"'],
+    ("none", "urgent"): ['"ولا موظف عندنا يقدر يسجل دخول"'],
+    ("none", "status"): ['"وش صار على تذكرتي؟"', '"what\'s the status of my tickets?"'],
+    ("offer_ticket", "accept"): ['"ايه"', '"yes please"'],
+    ("offer_ticket", "decline"): ['"لا شكراً"', '"no, it\'s fine"'],
+    ("offer_ticket", "chat"): ['"طيب وكيف أغير كلمة المرور؟"'],
+    ("collect", "details"): ['"تطلع رسالة Access denied"', '"ما أعرف"', '"[attached: screen.png]"'],
+    ("collect", "done"): ['"هذا كل شيء"', '"لا" (when the assistant asked whether there is anything else)'],
+    ("collect", "cancel"): ['"خلاص ألغ التذكرة"'],
+    ("collect", "chat"): ['"ايش يعني درجة السرية؟"'],
+    ("confirm", "yes"): ['"ارسلها"', '"submit it"'],
+    ("confirm", "change"): ['"خل الأولوية عالية"'],
+    ("confirm", "cancel"): ['"لا، ألغها"'],
+    ("confirm", "chat"): ['"كم ياخذ الرد عادة؟"'],
+}
+
+EXAMPLES = {
+    "OLE5": OLE5_EXAMPLES,
+    "RICH": {**OLE5_EXAMPLES,
+             ("none", "ticket"): ['"أبغى استرداد مبلغ الرسائل اللي ما وصلت"', '"we need our IP whitelisted"'],
+             ("none", "urgent"): ['"رسائل OTP ما توصل لأي عميل عندنا"', '"the API is down for us"']},
+}
+
+
+def _option(config: products.ProductConfig, phase: str, option: str) -> str:
+    meaning = MEANINGS[option].format(always_ticket=_list(config.always_ticket), urgent_when=_list(config.urgent_when))
+    examples = EXAMPLES[config.code]
+    own = (phase, option) in examples and phase != "none"
+    said = examples[(phase, option)] if own else examples[("none", option)]
+    lead = f"Examples, {AFTER[phase]}" if own else "Examples"
+    return f"{option}: {meaning}\n  {lead}: {', '.join(said)}"
+
+
+def router_v2(state: ChatState) -> str:
+    config = products.load(state["identity"].product)
+    phase = state["chat_phase"]
+    pending = state.get("pending") or []
+    last = next((m.text for m in reversed(state["messages"]) if m.type == "ai"), "none")
+    return _fill("router_v2", product_name=config.name, phase_description=PHASES[phase],
+                 issue=pending[0].text if pending else "none", last_assistant=last,
+                 options="\n\n".join(_option(config, phase, o) for o in OPTIONS[phase]),
+                 schema=schema_text(route_schema(phase)))
 
 
 def language() -> str:
