@@ -704,6 +704,15 @@ def test_submit_button_skips_the_router(new_path, model):
     state = sessions.submit(sid)
     assert [c for c in model.calls if c[0].__name__ == "RouteDecision"] == routed
     assert state["created_tickets"] and state["phase"] == "none" and state["ticket_draft"] is None
+    assert llm.tool_client.calls[-1][1][-1].content.endswith("the customer pressed Submit.")
+
+
+def test_a_stale_next_does_not_skip_the_router(new_path, model):
+    sid = chat()
+    collecting(new_path, sid)
+    sessions._graph.update_state(sessions._config(sid), {"next": "yes"}, as_node="validate")
+    state, _ = new_path(sid, "version 17", "details", [AIMessage(content="Anything else?")])
+    assert state["created_tickets"] == [] and state["phase"] == "collect" and state["ticket_draft"].rounds == 1
 
 
 @pytest.mark.parametrize("next_", ["details", "done", "change", "cancel", "yes"])
