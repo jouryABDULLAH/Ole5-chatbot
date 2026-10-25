@@ -132,8 +132,6 @@ def submit(session_id: str) -> SessionView:
         raise HTTPException(status_code=404, detail="Session not found") from exc
     except SubmitRefused as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except TicketApiError as exc:
-        raise HTTPException(status_code=502, detail="The ticket could not be created. Try again.") from exc
 
 
 @app.post("/chat/sessions/{session_id}/attachments")

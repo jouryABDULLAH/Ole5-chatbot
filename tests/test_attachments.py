@@ -58,7 +58,9 @@ def test_unknown_session_and_bad_link_are_404():
     assert client.get("/chat/attachments/../../etc").status_code == 404
 
 
-def test_submit_links_the_files_in_the_note_and_the_sheet():
+def test_submit_links_the_files_in_the_note_and_the_sheet(monkeypatch):
+    from ole5_chat import llm
+    monkeypatch.setattr(llm, "tool_client", GotIt())
     sid = session()
     att = send_file(sid).json()
     sessions._graph.update_state(sessions._config(sid), {

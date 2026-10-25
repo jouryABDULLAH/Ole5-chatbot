@@ -3,14 +3,22 @@
 import logging
 
 from ole5_chat import values
+from ole5_chat.agent import classify as classifier
 from ole5_chat.agent.contracts import PendingIssue, Phase
-from ole5_chat.agent.prompt import TASKS, URGENT
+from ole5_chat.agent.prompt import TASKS, THEN_OFFER, URGENT
 from ole5_chat.agent.state import ChatState, TicketDraft
+from ole5_chat.config import get_settings
+from ole5_chat.tickets import client as ticket_api
+from ole5_chat.tickets import submit as tickets
+from ole5_chat.tickets.client import TicketApiError
 
 log = logging.getLogger(__name__)
 
-# Handlers that queue, accept or decline an issue themselves; post_check leaves their turns alone.
-OWN_ISSUE = ("ticket", "urgent", "accept", "decline")
+# Handlers that work on an issue themselves; post_check leaves their turns alone.
+OWN_ISSUE = ("ticket", "urgent", "accept", "decline", "details", "done", "change", "cancel", "yes")
+HANDLERS = {"ticket": "queue", "urgent": "queue", "chat": "chat", "accept": "accept", "decline": "decline",
+            "details": "details", "done": "done", "change": "change", "cancel": "cancel", "yes": "submit"}
+NOT_CREATED = "The ticket could not be created. Say so in one line and ask them to try again."
 
 
 def advance(pending: list[PendingIssue]) -> Phase:
@@ -25,14 +33,19 @@ def _offer(issue: PendingIssue) -> str:
     return (URGENT if issue.urgent else "") + TASKS["offer"].format(issue=issue.text)
 
 
+def _then_offer(task: str, pending: list[PendingIssue]) -> str:
+    """The task, followed by the offer of the next issue when one is waiting."""
+    if not pending:
+        return task
+    return f"{task} {URGENT if pending[0].urgent else ''}{THEN_OFFER.format(next=pending[0].text)}"
+
+
 def handler(state: ChatState) -> str:
-    next_ = state["next"]
-    if next_ in ("ticket", "urgent"):
-        return "queue"
-    if next_ in ("chat", "accept", "decline"):
-        return next_
-    log.info("handlers  handler not built yet: %s", next_)
-    return "chat"
+    name = HANDLERS.get(state["next"])
+    if name is None:
+        log.info("handlers  handler not built yet: %s", state["next"])
+        return "chat"
+    return name
 
 
 def chat(state: ChatState) -> dict:
@@ -61,6 +74,47 @@ def decline(state: ChatState) -> dict:
     pending = state["pending"][1:]
     task = TASKS["decline_next"].format(issue=pending[0].text) if pending else TASKS["decline"]
     return {"pending": pending, "phase": advance(pending), "task": task}
+
+
+def details(state: ChatState) -> dict:
+    draft = state["ticket_draft"]
+    rounds = draft.rounds + 1
+    key = "open_question" if rounds >= get_settings().collect_rounds else "details"
+    return {"ticket_draft": draft.model_copy(update={"rounds": rounds}),
+            "task": TASKS[key].format(issue=state["pending"][0].text)}
+
+
+def done(state: ChatState) -> dict:
+    out = classifier.classify(state)
+    if "ticket_draft" in out:
+        return {**out, "phase": "confirm", "task": TASKS["confirm"]}
+    return {**out, "task": TASKS["open_question"].format(issue=state["pending"][0].text)}
+
+
+def change(state: ChatState) -> dict:
+    out = classifier.classify(state)
+    return {**out, "task": TASKS["changed"] if "ticket_draft" in out else TASKS["confirm"]}
+
+
+def cancel(state: ChatState) -> dict:
+    pending = state["pending"][1:]
+    return {"ticket_draft": None, "pending": pending, "phase": advance(pending),
+            "task": _then_offer(TASKS["cancelled"], pending)}
+
+
+def submit(state: ChatState) -> dict:
+    try:
+        tickets.check(state)
+        ticket, corrections = tickets.submit(state, ticket_api.ticket_client())
+    except (tickets.SubmitRefused, TicketApiError) as exc:
+        log.warning("handlers  ticket not created: %s", exc)
+        return {"note": NOT_CREATED, "task": TASKS["confirm"],
+                "corrections": state["corrections"] + [f"submit failed: {exc}"]}
+    pending = state["pending"][1:]
+    return {"created_tickets": [*state["created_tickets"], ticket], "ticket_draft": None, "attachments": [],
+            "pending": pending, "phase": advance(pending),
+            "task": _then_offer(TASKS["created"].format(number=ticket["ticket_number"]), pending),
+            "corrections": state["corrections"] + corrections}
 
 
 def post_check(state: ChatState) -> dict:

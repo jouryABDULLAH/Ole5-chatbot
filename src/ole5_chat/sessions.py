@@ -1,22 +1,20 @@
-"""Conversations. One LangGraph thread per session id, kept by MemorySaver; the session is also what identifies the customer, and every trace of it carries the session id so Phoenix groups them. Submit writes its result into the session with update_state: the closing message, the ticket added to created_tickets, and the draft cleared so a second Submit is refused and a new problem starts a new ticket."""
+"""Conversations. One LangGraph thread per session id, kept by MemorySaver; the session is also what identifies the customer, and every trace of it carries the session id so Phoenix groups them. The Submit button runs the graph with next set to yes, so the submit handler creates the ticket and respond_agent writes the reply; a second Submit is refused because the draft is cleared."""
 
 import logging
 import threading
 import uuid
 
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from openinference.instrumentation import using_session
 
 from ole5_chat import attachments
 from ole5_chat.agent.graph import build
-from ole5_chat.agent.handlers import advance
 from ole5_chat.agent.contracts import PendingIssue, Reply
 from ole5_chat.agent.state import ChatState, TicketDraft, initial_state
 from ole5_chat.identity import Identity, lookup
-from ole5_chat.tickets import client as ticket_api
-from ole5_chat.tickets.submit import submit as submit_ticket
+from ole5_chat.tickets.submit import check
 
 log = logging.getLogger(__name__)
 
@@ -94,12 +92,5 @@ def detach(session_id: str, att_id: str) -> bool:
 
 def submit(session_id: str) -> ChatState:
     with _submit_lock, using_session(session_id):
-        state = get(session_id)
-        ticket, closing, corrections = submit_ticket(state, ticket_api.ticket_client())
-        rest = state["pending"][1:]
-        _graph.update_state(_config(session_id), {
-            "messages": [AIMessage(content=closing)], "pending": rest, "phase": advance(rest), "sources": [],
-            "ticket_draft": None, "created_tickets": [*state["created_tickets"], ticket], "attachments": [],
-            "corrections": state["corrections"] + corrections,
-        }, as_node="validate")
-    return get(session_id)
+        check(get(session_id))
+        return _graph.invoke({"next": "yes"}, _config(session_id))

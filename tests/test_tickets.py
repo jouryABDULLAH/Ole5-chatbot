@@ -31,15 +31,38 @@ def api():
     return ticket_api.ticket_client()
 
 
-def test_submit_creates_the_ticket_as_the_spec_shows(api):
+class Writer:
+    """Stands in for llm.tool_client on the Submit turn: replies "تم." and records each system prompt."""
+
+    def __init__(self):
+        self.prompts = []
+
+    def __call__(self, temperature):
+        return self
+
+    def invoke(self, convo):
+        from langchain_core.messages import AIMessage
+        self.prompts.append(convo[0].content)
+        return AIMessage(content="تم.")
+
+
+@pytest.fixture(autouse=True)
+def writer(monkeypatch):
+    from ole5_chat import llm
+    fake = Writer()
+    monkeypatch.setattr(llm, "tool_client", fake)
+    return fake
+
+
+def test_submit_creates_the_ticket_as_the_spec_shows(api, writer):
     client = TestClient(app)
     sid = confirmed()
     view = client.post(f"/chat/sessions/{sid}/submit").json()
     assert view["phase"] == "none"
     number = view["ticket_number"]
     assert number.startswith("T-MOCK-")
-    assert view["messages"][-1] == {"author": "bot", "text": f"Your ticket {number} has been created. "
-                                                             "The support team will reply to you by email."}
+    assert view["messages"][-1] == {"author": "bot", "text": "تم."}
+    assert f"The ticket {number} was created." in writer.prompts[-1]
 
     (op1, create), (op2, update) = api.calls
     assert (op1, op2) == ("TicketCreate", "TicketUpdate")

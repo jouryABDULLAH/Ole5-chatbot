@@ -1,4 +1,4 @@
-"""The Submit flow: checks the ready draft again, creates the ticket with the summary and the conversation, classifies it with an internal note that links the attached files, records it in tickets.xlsx and the files in attachments.xlsx, and returns the closing message."""
+"""The Submit flow: checks the ready draft again, creates the ticket with the summary and the conversation, classifies it with an internal note that links the attached files, records it in tickets.xlsx and the files in attachments.xlsx, and returns the ticket."""
 
 import logging
 from datetime import datetime, timezone
@@ -14,10 +14,6 @@ from ole5_chat.tickets.client import TicketApi, TicketApiError
 log = logging.getLogger(__name__)
 
 REQUIRED = ("title", "summary", "queue", "type", "subtype", "reason", "priority")
-CLOSING = {
-    "en": "Your ticket {number} has been created. The support team will reply to you by email.",
-    "ar": "تم إنشاء تذكرتك رقم {number}. سيرد عليك فريق الدعم عبر البريد الإلكتروني.",
-}
 
 
 class SubmitRefused(Exception):
@@ -55,7 +51,7 @@ def check(state: ChatState) -> None:
         raise SubmitRefused("values not on the lists: " + "; ".join(problems))
 
 
-def submit(state: ChatState, api: TicketApi) -> tuple[dict, str, list[str]]:
+def submit(state: ChatState, api: TicketApi) -> tuple[dict, list[str]]:
     check(state)
     who, draft = state["identity"], state["ticket_draft"]
     log.info("tickets  sending queue=%s type=%s subtype=%s priority=%s urgent=%s reason=%r title=%r",
@@ -83,7 +79,6 @@ def submit(state: ChatState, api: TicketApi) -> tuple[dict, str, list[str]]:
     for f in state["attachments"]:
         sheets.add_attachment({"ticket_number": created["TicketNumber"], "file_name": f["file_name"],
                                "link": attachments.link(f["id"]), "uploaded_at": f["uploaded_at"]})
-    language = state.get("language") or who.language
     log.info("tickets  created number=%s product=%s queue=%s", created["TicketNumber"], who.product, draft.queue)
     ticket = {"ticket_id": created["TicketID"], "ticket_number": created["TicketNumber"]}
-    return ticket, CLOSING[language].format(number=created["TicketNumber"]), corrections
+    return ticket, corrections

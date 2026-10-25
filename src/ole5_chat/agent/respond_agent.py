@@ -40,10 +40,12 @@ class Grounding(BaseModel):
 
 
 def _invoke(convo: list[BaseMessage], tool, tool_choice: str | None = None) -> AIMessage:
+    """One model call; with no tool (every turn but a chat turn) the model cannot search."""
     error = "no attempt made"
     for temperature in (0, 0.3):
         try:
-            return llm.tool_client(temperature).bind_tools([tool], tool_choice=tool_choice).invoke(convo)
+            client = llm.tool_client(temperature)
+            return (client.bind_tools([tool], tool_choice=tool_choice) if tool else client).invoke(convo)
         except BadRequestError as exc:
             error = str(exc)[:400]
             log.warning("respond_agent  rejected by Groq at temperature %s: %s", temperature, error)
@@ -58,7 +60,7 @@ def _loop(convo: list[BaseMessage], tool, corrections: list[str]) -> str:
         if not reply.tool_calls:
             return reply.text
         for call in reply.tool_calls:
-            content = tool.invoke(call["args"]) if call["name"] == tool.name else f"No tool named {call['name']}."
+            content = tool.invoke(call["args"]) if tool and call["name"] == tool.name else f"No tool named {call['name']}."
             convo.append(ToolMessage(content=content, tool_call_id=call["id"]))
     
     log.warning("respond_agent  search cap reached, one final call")
@@ -139,12 +141,12 @@ def _gates(convo, tool, sink, customer, text, corrections, chat) -> tuple[str, l
 
 def respond_agent(state: ChatState) -> dict:
     identity = state["identity"]
-    customer = state["messages"][-1].text
+    customer = next((m.text for m in reversed(state["messages"]) if m.type == "human"), "")
+    chat = state.get("next") not in OWN_ISSUE
     sink: list[Retrieval] = []
-    tool = make_search_tool(identity.product, sink)
+    tool = make_search_tool(identity.product, sink) if chat else None
     corrections: list[str] = []
     language = language_of(customer) or identity.language
-    chat = state.get("next") not in OWN_ISSUE
     convo: list[BaseMessage] = [SystemMessage(content=prompt.respond(state, language)), *state["messages"]]
     
     try:
