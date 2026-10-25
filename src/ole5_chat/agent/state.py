@@ -48,9 +48,11 @@ class ChatState(MessagesState):
     next: Next | None
     task: str | None
     language: str | None
+    offered: bool  # Temporary: carries the grounding result from respond_agent to the post-check.
 
 
 def initial_state(identity: Identity) -> ChatState:
     return ChatState(messages=[], identity=identity, phase="greet", step=None, sources=[], decision=None,
                      last_retrieval=None, reply=None, note=None, ticket_draft=None, corrections=[], created_tickets=[],
-                     attachments=[], chat_phase="none", pending=[], next=None, task=None, language=None)
+                     attachments=[], chat_phase="none", pending=[], next=None, task=None, language=None,
+                     offered=False)
