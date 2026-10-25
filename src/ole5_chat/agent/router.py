@@ -15,7 +15,7 @@ def router(state: ChatState) -> dict:
     try:
         decision = llm.structured(prompt.router(state), state["messages"], route_schema(phase), node="router")
     except llm.ModelFailed as exc:
-        log.warning("router  phase=%s next=chat: model failed: %s", phase, exc)
-        return {"next": "chat", "corrections": state["corrections"] + [f"router failed: {exc}"]}
+        log.warning("router  phase=%s next=question: model failed: %s", phase, exc)
+        return {"next": "question", "corrections": state["corrections"] + [f"router failed: {exc}"]}
     log.info("router  phase=%s next=%s", phase, decision.next)
     return {"next": decision.next}

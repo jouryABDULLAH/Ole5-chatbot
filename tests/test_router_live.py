@@ -24,12 +24,13 @@ ANYTHING_ELSE = "Is there anything else you want to add?"
 SUMMARY = "Your ticket summary is ready. Shall I submit it?"
 ARCHIVE = "The archive button does nothing"
 DENIED = "Access denied when opening a correspondence"
+ANSWER = "To add a watermark, open the document settings and choose Watermark."
 
 # phase, the issue being handled, the assistant's last message, the customer's message, the expected next.
 CASES = [
-    ("none", None, GREETING, "كيف أضيف علامة مائية؟", "chat"),
-    ("none", None, GREETING, "مرحبا", "chat"),
-    ("none", None, GREETING, "open a ticket for me about the archive button", "chat"),
+    ("none", None, GREETING, "كيف أضيف علامة مائية؟", "question"),
+    ("none", None, GREETING, "مرحبا", "talk"),
+    ("none", None, GREETING, "open a ticket for me about the archive button", "question"),
     ("none", None, GREETING, "نبي ننقل بياناتنا من النظام القديم", "ticket"),
     ("none", None, GREETING, "ولا موظف عندنا يقدر يسجل دخول", "urgent"),
     ("none", None, GREETING, "وش صار على تذكرتي؟", "status"),
@@ -38,21 +39,21 @@ CASES = [
     ("offer_ticket", ARCHIVE, OFFER, "yes please", "accept"),
     ("offer_ticket", ARCHIVE, OFFER, "لا شكراً", "decline"),
     ("offer_ticket", ARCHIVE, OFFER, "no, it's fine", "decline"),
-    ("offer_ticket", ARCHIVE, OFFER, "طيب وكيف أغير كلمة المرور؟", "chat"),
+    ("offer_ticket", ARCHIVE, OFFER, "طيب وكيف أغير كلمة المرور؟", "question"),
     ("collect", DENIED, ERROR, "تطلع رسالة Access denied", "details"),
     ("collect", DENIED, ERROR, "ما أعرف", "details"),
     ("collect", DENIED, ERROR, "[attached: screen.png]", "details"),
     ("collect", DENIED, ERROR, "هذا كل شيء", "done"),
     ("collect", DENIED, ANYTHING_ELSE, "لا", "done"),
     ("collect", DENIED, ERROR, "خلاص ألغ التذكرة", "cancel"),
-    ("collect", DENIED, ERROR, "ايش يعني درجة السرية؟", "chat"),
+    ("collect", DENIED, ERROR, "ايش يعني درجة السرية؟", "question"),
     ("confirm", DENIED, SUMMARY, "ارسلها", "yes"),
     ("confirm", DENIED, SUMMARY, "submit it", "yes"),
     ("confirm", DENIED, SUMMARY, "خل الأولوية عالية", "change"),
     ("confirm", DENIED, SUMMARY, "لا، ألغها", "cancel"),
-    ("confirm", DENIED, SUMMARY, "كم ياخذ الرد عادة؟", "chat"),
+    ("confirm", DENIED, SUMMARY, "كم ياخذ الرد عادة؟", "question"),
     ("none", None, GREETING, "النظام ما يفتح عند أحد في الوزارة من الصبح", "urgent"),
-    ("offer_ticket", ARCHIVE, OFFER, "ايه بس قبل كذا كيف أرفق ملف؟", "chat"),
+    ("offer_ticket", ARCHIVE, OFFER, "ايه بس قبل كذا كيف أرفق ملف؟", "question"),
     ("collect", DENIED, ERROR, "يظهر الخطأ لما أضغط حفظ، وهذا كل اللي عندي", "done"),
     ("collect", DENIED, ERROR, "بعد عندي مشكلة ثانية: نبي نرحل بيانات", "ticket"),
     ("confirm", DENIED, SUMMARY, "ممكن تغير العنوان وبعدها أرسلها", "change"),
@@ -71,9 +72,9 @@ HELD_OUT = [
     ("none", None, GREETING, "كل المستخدمين عندنا طالعين من النظام وما أحد يقدر يدخل", "urgent"),
     ("none", None, GREETING, "nobody in our ministry can log in since 8am, شغلنا واقف", "urgent"),
     ("none", None, GREETING, "أبي أرحّل الأرشيف القديم حقنا للنظام", "ticket"),
-    ("none", None, GREETING, "how do I forward a correspondence? أبي الخطوات", "chat"),
-    ("none", None, GREETING, "شكراً على المساعدة", "chat"),
-    ("none", None, GREETING, "I can't log in to my account", "chat"),
+    ("none", None, GREETING, "how do I forward a correspondence? أبي الخطوات", "question"),
+    ("none", None, GREETING, "شكراً على المساعدة", "talk"),
+    ("none", None, GREETING, "I can't log in to my account", "question"),
     ("collect", DENIED, ERROR, "تطلع Access denied، بس هل هذا يعني ما عندي صلاحية؟", "details"),
     ("collect", DENIED, ERROR, "it says error 403 forbidden", "details"),
     ("collect", DENIED, ERROR, "مدري والله", "details"),
@@ -83,11 +84,21 @@ HELD_OUT = [
     ("confirm", DENIED, SUMMARY, "the title is wrong", "change"),
     ("confirm", DENIED, SUMMARY, "يب تمام أرسل", "yes"),
     ("confirm", DENIED, SUMMARY, "غيرت رأيي، لا ترسلها", "cancel"),
-    ("confirm", DENIED, SUMMARY, "وش يعني الأولوية متوسطة؟", "chat"),
+    ("confirm", DENIED, SUMMARY, "وش يعني الأولوية متوسطة؟", "question"),
     ("confirm", DENIED, "I don't have information on how long a reply takes. The summary is ready whenever you want "
                         "to send it.", "تمام", "yes"),
     ("confirm", DENIED, "I changed the priority to high. The updated summary is shown.", "تمام", "yes"),
     ("confirm", DENIED, "I changed the priority to high. Shall I submit it now?", "اوكي", "yes"),
+    ("none", None, ANSWER, "وعلى الآيباد؟", "question"),
+    ("none", None, ANSWER, "and can I change its color?", "question"),
+    ("none", None, ANSWER, "ايه", "talk"),
+    ("none", None, ANSWER, "ok thanks", "talk"),
+    ("none", None, ANSWER, "ممكن تعيد الخطوات؟", "talk"),
+    ("none", None, GREETING, "وش تقدر تسوي؟", "talk"),
+    ("none", None, GREETING, "who are you?", "talk"),
+    ("offer_ticket", ARCHIVE, OFFER, "انت روبوت؟", "talk"),
+    ("collect", DENIED, ERROR, "وين ألقى رقم الخطأ؟", "question"),
+    ("confirm", DENIED, SUMMARY, "how do I attach a file to a ticket?", "question"),
 ]
 
 

@@ -407,7 +407,7 @@ def test_router_prompt_defines_only_the_options_of_its_phase(phase):
     from ole5_chat.agent import prompt
     from ole5_chat.agent.contracts import OPTIONS
     text = prompt.router(router_state(phase=phase))
-    for option in ("chat", "ticket", "urgent", "status", "accept", "decline", "details", "done", "cancel", "yes",
+    for option in ("question", "talk", "ticket", "urgent", "status", "accept", "decline", "details", "done", "cancel", "yes",
                    "change"):
         assert (f"\n{option}: " in text) == (option in OPTIONS[phase])
     assert phase != "none" or "accept" not in text
@@ -422,10 +422,10 @@ def test_router_prompt_carries_each_products_lists():
     assert "data migration requests" not in rich and "whitelisting an IP or a user" not in ole5
 
 
-def test_router_failure_gives_chat_and_a_correction(model):
+def test_router_failure_gives_question_and_a_correction(model):
     from ole5_chat.agent.router import router
     out = router(router_state())
-    assert out["next"] == "chat" and out["corrections"][-1].startswith("router failed: nothing scripted")
+    assert out["next"] == "question" and out["corrections"][-1].startswith("router failed: nothing scripted")
 
 
 def test_router_sends_the_whole_transcript(monkeypatch):
@@ -480,14 +480,14 @@ def offered_seen(sid):
     return any(s.values.get("offered") for s in sessions._graph.get_state_history(sessions._config(sid)))
 
 
-def unanswered(new_path, sid, question, next_="chat"):
+def unanswered(new_path, sid, question, next_="question"):
     return new_path(sid, question, next_, [searching(question), AIMessage(content="I have no answer. Open a ticket?")],
                     [miss()], [ground(False, True)])
 
 
 def test_new_path_answered_question_stays_in_none(new_path):
     sid = chat()
-    state, _ = new_path(sid, "How do I save a draft?", "chat",
+    state, _ = new_path(sid, "How do I save a draft?", "question",
                         [searching("How to save a draft?"), AIMessage(content="Press Save as draft.")],
                         [hit("Guide")], [ground(True, False, ["Guide"])])
     assert (state["phase"], state["pending"], state["sources"]) == ("none", [], ["Guide"])
@@ -503,7 +503,7 @@ def test_new_path_unanswered_question_is_queued_and_offered(new_path):
 
 def test_new_path_partial_answer_is_cited_and_queued(new_path):
     sid = chat()
-    state, _ = new_path(sid, "How do I save a draft, and how long is it kept?", "chat",
+    state, _ = new_path(sid, "How do I save a draft, and how long is it kept?", "question",
                         [searching("drafts"), AIMessage(content="Press Save as draft. Open a ticket for the rest?")],
                         [hit("Guide")], [ground(True, True, ["Guide"])])
     assert state["sources"] == ["Guide"] and state["phase"] == "offer_ticket"
@@ -512,7 +512,7 @@ def test_new_path_partial_answer_is_cited_and_queued(new_path):
 
 def test_new_path_answer_without_a_direct_passage_is_replaced(new_path):
     sid = chat()
-    state, _ = new_path(sid, "Does it run on Linux?", "chat",
+    state, _ = new_path(sid, "Does it run on Linux?", "question",
                         [searching("Linux"), AIMessage(content="Yes, Ole5 runs on Linux."),
                          AIMessage(content="I have no answer. Open a ticket?")],
                         [miss()], [ground(True, False)])
@@ -523,7 +523,7 @@ def test_new_path_answer_without_a_direct_passage_is_replaced(new_path):
 
 def test_new_path_greeting_queues_nothing(new_path):
     sid = chat()
-    state, _ = new_path(sid, "مرحبا", "chat", [AIMessage(content="أهلاً بك")], groundings=[ground(False, False, needs_search=False)])
+    state, _ = new_path(sid, "مرحبا", "talk", [AIMessage(content="أهلاً بك")], groundings=[ground(False, False, needs_search=False)])
     assert (state["phase"], state["pending"]) == ("none", []) and not offered_seen(sid)
 
 
@@ -569,7 +569,7 @@ def test_new_path_decline_with_two_issues_offers_the_next(new_path):
 def test_new_path_side_question_keeps_the_offer_open(new_path):
     sid = chat()
     unanswered(new_path, sid, "Does it run on Linux?")
-    state, prompt_text = new_path(sid, "How do I save a draft?", "chat",
+    state, prompt_text = new_path(sid, "How do I save a draft?", "question",
                                   [searching("drafts"), AIMessage(content="Press Save as draft. Still want the ticket?")],
                                   [hit("Guide")], [ground(True, True, ["Guide"])])
     assert [p.text for p in state["pending"]] == ["Does it run on Linux?"] and state["phase"] == "offer_ticket"
@@ -763,17 +763,17 @@ def task_sent(new_path, *args, **kwargs):
 def test_the_task_is_the_last_message_off_the_plain_chat_turn(new_path):
     from ole5_chat.agent.respond_agent import NOTE
     sid = chat()
-    plain = task_sent(new_path, sid, "How do I save a draft?", "chat",
+    plain = task_sent(new_path, sid, "How do I save a draft?", "question",
                       [searching("drafts"), AIMessage(content="Press Save.")], [hit("Guide")], [ground(True, False, ["Guide"])])
     assert plain == "How do I save a draft?"
     unanswered(new_path, sid, "Does it run on Linux?")
     turns = [
         (("We need to migrate our data", "ticket", [AIMessage(content="After this one.")]), {}, "The customer raised a new issue: We need to migrate our data."),
-        (("How do I save a draft?", "chat", [searching("drafts"), AIMessage(content="Press Save. Still want it?")], [hit("Guide")],
+        (("How do I save a draft?", "question", [searching("drafts"), AIMessage(content="Press Save. Still want it?")], [hit("Guide")],
           [ground(True, False, ["Guide"])]), {}, "Answer the customer's message as usual. A ticket offer"),
         (("yes", "accept", [AIMessage(content="Which version?")]), {}, "The customer agreed to a ticket"),
         (("version 17", "details", [AIMessage(content="Anything else?")]), {}, "Ask what else the support team needs"),
-        (("how long do replies take?", "chat", [searching("replies"), AIMessage(content="No answer.")], [miss()],
+        (("how long do replies take?", "question", [searching("replies"), AIMessage(content="No answer.")], [miss()],
           [ground(False, False)]), {},
          "Answer the customer's message as usual. Then continue the current ticket: ask what else the support team needs"),
         (("nothing else", "done", [AIMessage(content="Submit it?")]), {"groundings": [GOOD]}, "The ticket summary is ready"),
@@ -881,7 +881,7 @@ def test_change_keeps_an_urgent_draft_urgent(new_path):
 def test_post_check_never_classifies(model):
     from ole5_chat.agent import handlers
     from ole5_chat.agent.contracts import Reply
-    state = {**sessions.get(chat()), "messages": [HumanMessage(content="Does it run on Linux?")], "next": "chat",
+    state = {**sessions.get(chat()), "messages": [HumanMessage(content="Does it run on Linux?")], "next": "question",
              "offered": True, "phase": "none", "pending": [], "reply": Reply(say="No answer. Open a ticket?"),
              "last_retrieval": miss().as_json()}
     out = handlers.post_check(state)
@@ -911,7 +911,7 @@ def test_a_queued_issue_goes_back_to_the_current_ticket(new_path, phase):
 def test_a_chat_turn_in_confirm_goes_back_to_the_submit_question(new_path):
     sid = chat()
     confirming(new_path, sid)
-    task = task_sent(new_path, sid, "how long do replies take?", "chat",
+    task = task_sent(new_path, sid, "how long do replies take?", "question",
                      [searching("reply time"), AIMessage(content="No answer. Submit the summary?")], [miss()],
                      [ground(False, False)])
     assert task.endswith("the summary for Does it run on Linux? is still shown; ask whether to submit it.")
@@ -921,7 +921,7 @@ def test_a_chat_turn_in_confirm_goes_back_to_the_submit_question(new_path):
 def test_post_check_does_not_queue_an_unsearched_message():
     from ole5_chat.agent import handlers
     from ole5_chat.agent.contracts import Reply
-    state = {**sessions.get(chat()), "messages": [HumanMessage(content="ايه")], "next": "chat", "offered": True,
+    state = {**sessions.get(chat()), "messages": [HumanMessage(content="ايه")], "next": "question", "offered": True,
              "phase": "none", "pending": [], "reply": Reply(say="ليس لدي إجابة. هل ترغب بتذكرة؟"), "last_retrieval": None}
     out = handlers.post_check(state)
     assert out["pending"] == [] and out["phase"] == "none"

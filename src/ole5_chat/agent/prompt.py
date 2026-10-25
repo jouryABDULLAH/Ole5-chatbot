@@ -33,9 +33,12 @@ PHASES = {
 }
 
 MEANINGS = {
-    "chat": "none of the others: a question, a greeting, thanks, a side remark, a request to explain again. A request "
-            "to open a ticket about an ordinary topic is chat too: the assistant searches first and offers a ticket "
-            "only when it has no answer.",
+    "question": "asks about the product or reports a problem with it, including a follow-up to an earlier answer. A "
+                "request to open a ticket about an ordinary topic is a question too: the assistant searches first and "
+                "offers a ticket only when it has no answer.",
+    "talk": "nothing to look up: a greeting, thanks, a question about the assistant itself (who it is, what it can do), "
+            "an acknowledgement with nothing open to agree to, a side remark, a request to repeat what the assistant "
+            "just said.",
     "ticket": "the message reports a topic from this list: {always_ticket}.",
     "urgent": "the message describes a situation from this list: {urgent_when}. Judge it from the impact described, "
               "not the tone.",
@@ -60,22 +63,27 @@ AFTER = {
 }
 
 OLE5_EXAMPLES = {
-    ("none", "chat"): ['"كيف أضيف علامة مائية؟"', '"مرحبا"', '"open a ticket for me about the archive button"'],
+    ("none", "question"): ['"كيف أضيف علامة مائية؟"', '"open a ticket for me about the archive button"',
+                           '"وعلى الآيباد؟" (after an answer)'],
+    ("none", "talk"): ['"مرحبا"', '"what can you do?"', '"تمام" (after an answer)'],
     ("none", "ticket"): ['"نبي ننقل بياناتنا من النظام القديم"'],
     ("none", "urgent"): ['"ولا موظف عندنا يقدر يسجل دخول"'],
     ("none", "status"): ['"وش صار على تذكرتي؟"', '"what\'s the status of my tickets?"'],
     ("offer_ticket", "accept"): ['"ايه"', '"yes please"'],
     ("offer_ticket", "decline"): ['"لا شكراً"', '"no, it\'s fine"', '"ألغها"', '"cancel it"'],
-    ("offer_ticket", "chat"): ['"طيب وكيف أغير كلمة المرور؟"'],
+    ("offer_ticket", "question"): ['"طيب وكيف أغير كلمة المرور؟"'],
+    ("offer_ticket", "talk"): ['"مين أنت؟"'],
     ("collect", "details"): ['"تطلع رسالة Access denied"', '"ما أعرف"', '"[attached: screen.png]"'],
     ("collect", "done"): ['"هذا كل شيء"', '"لا" (when the assistant asked whether there is anything else)',
                           '"التطبيق يقفل لحاله بعد التحديث، وهذا اللي أعرفه"'],
     ("collect", "cancel"): ['"خلاص ألغ التذكرة"'],
-    ("collect", "chat"): ['"ايش يعني درجة السرية؟"'],
+    ("collect", "question"): ['"ايش يعني درجة السرية؟"'],
+    ("collect", "talk"): ['"ليش تحتاج هالمعلومة؟"'],
     ("confirm", "yes"): ['"ارسلها"', '"submit it"'],
     ("confirm", "change"): ['"خل الأولوية عالية"'],
     ("confirm", "cancel"): ['"لا، ألغها"'],
-    ("confirm", "chat"): ['"كم ياخذ الرد عادة؟"'],
+    ("confirm", "question"): ['"كم ياخذ الرد عادة؟"'],
+    ("confirm", "talk"): ['"لحظة، بشوف شي"'],
 }
 
 EXAMPLES = {

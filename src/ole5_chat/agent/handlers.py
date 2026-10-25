@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 
 # Handlers that work on an issue themselves; post_check leaves their turns alone.
 OWN_ISSUE = ("ticket", "urgent", "accept", "decline", "details", "done", "change", "cancel", "yes")
-HANDLERS = {"ticket": "queue", "urgent": "queue", "chat": "chat", "accept": "accept", "decline": "decline",
+HANDLERS = {"ticket": "queue", "urgent": "queue", "question": "chat", "talk": "chat", "accept": "accept", "decline": "decline",
             "details": "details", "done": "done", "change": "change", "cancel": "cancel", "yes": "submit"}
 NOT_CREATED = "The ticket could not be created. Say so in one line and ask them to try again."
 

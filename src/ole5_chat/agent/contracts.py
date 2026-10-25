@@ -6,13 +6,13 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
 Phase = Literal["none", "offer_ticket", "collect", "confirm"]
-Next = Literal["chat", "ticket", "urgent", "status", "accept", "decline", "details", "done", "cancel", "yes", "change"]
+Next = Literal["question", "talk", "ticket", "urgent", "status", "accept", "decline", "details", "done", "cancel", "yes", "change"]
 
 OPTIONS: dict[Phase, tuple[Next, ...]] = {
-    "none": ("chat", "ticket", "urgent", "status"),
-    "offer_ticket": ("accept", "decline", "chat", "ticket", "urgent", "status"),
-    "collect": ("details", "done", "cancel", "chat", "ticket", "urgent", "status"),
-    "confirm": ("yes", "change", "cancel", "chat", "ticket", "urgent", "status"),
+    "none": ("question", "talk", "ticket", "urgent", "status"),
+    "offer_ticket": ("accept", "decline", "question", "talk", "ticket", "urgent", "status"),
+    "collect": ("details", "done", "cancel", "question", "talk", "ticket", "urgent", "status"),
+    "confirm": ("yes", "change", "cancel", "question", "talk", "ticket", "urgent", "status"),
 }
 
 

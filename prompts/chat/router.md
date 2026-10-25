@@ -14,6 +14,6 @@ The assistant's last message: {{last_assistant}}
 
 ## How to choose
 
-Read the latest message against the assistant's last message. Pick the one option that fits best. When a message fits two, take the one that carries the most: a message that reports an urgent situation is urgent even if it also answers a question. When nothing fits, pick chat.
+Read the latest message against the assistant's last message. Pick the one option that fits best. When a message fits two, take the one that carries the most: a message that reports an urgent situation is urgent even if it also answers a question. When nothing fits, pick question.
 
 Reply with JSON only, matching this schema: {{schema}}
