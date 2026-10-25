@@ -76,7 +76,7 @@ A passage answers a question only when it is about the same thing the customer r
   name, no signature.
 - Do not list your sources; they are shown with the reply.
 
-## This message
+## What to do in this reply (this overrides the general rules above)
 
 Customer language: {{language}}.
 
