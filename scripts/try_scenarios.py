@@ -1,4 +1,4 @@
-"""Three conversations through the graph, printing the reply, phase and pending after each turn."""
+"""Three ticket conversations through the graph, printing the reply, phase, pending, the draft and the tickets created after each turn."""
 import os, sys
 from pathlib import Path
 
@@ -10,10 +10,13 @@ from ole5_chat import sessions, sheets
 EMAIL = next(str(r["email"]) for r in sheets.customers()
              if str(r.get("product") or "").upper() == "OLE5" and str(r.get("active") or "").lower() == "yes")
 
+# TICKET_API_URL unset in .env: ticket_client() is the mock, so nothing reaches the real ticket system.
+FIRST = ["تطبيق التواقيع يطلع لي شاشة سوداء على الآيباد", "نعم", "النسخة 17، بدأت أمس"]
 CONVERSATIONS = [
-    ["هل يمكن جدولة إرسال مراسلة في وقت لاحق؟", "ايه"],
-    ["هل يمكن جدولة إرسال مراسلة في وقت لاحق؟", "كيف أضيف علامة مائية؟", "لا شكراً"],
-    ["هل يمكن جدولة إرسال مراسلة في وقت لاحق؟", "هل يتكامل النظام مع Microsoft Teams؟", "لا", "ايه"],
+    FIRST + ["لا شيء غير هذا", "ارسلها"],
+    FIRST + ["خل الأولوية عالية", "لا، ألغها"],
+    ["هل يمكن جدولة إرسال مراسلة في وقت لاحق؟", "هل يتكامل النظام مع Microsoft Teams؟", "ايه", "النسخة 17",
+     "هذا كل شيء", "ارسلها"],
 ]
 
 for n, turns in enumerate(CONVERSATIONS, 1):
@@ -23,5 +26,7 @@ for n, turns in enumerate(CONVERSATIONS, 1):
         state = sessions.send(sid, text)
         print(f"\nCustomer: {text}")
         print(f"Bot: {state['messages'][-1].text}")
-        print(f"  phase={state['phase']}  next={state.get('next')}  "
-              f"pending={[p.text for p in state['pending']]}  draft={'yes' if state.get('ticket_draft') else 'no'}")
+        draft = state.get("ticket_draft")
+        print(f"  phase={state['phase']}  pending={[p.text for p in state['pending']]}  "
+              f"draft={'no' if draft is None else 'classified' if draft.classified else 'yes'}  "
+              f"tickets={[t['ticket_number'] for t in state['created_tickets']]}")
