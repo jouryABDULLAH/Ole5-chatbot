@@ -133,7 +133,9 @@ TASKS = {
     "chat": RESPOND_TASK,
     "chat_offer_ticket": "Answer the customer's message as usual. A ticket offer for this issue is still open: {issue}. "
                          "If you answered something else, end by asking whether they would still like that ticket "
-                         "opened.",
+                         "opened. Example: the customer asks how to reset their password while a ticket offer for "
+                         "'dark mode' is open. Reply with the password steps, then: 'Would you still like me to open "
+                         "the ticket about dark mode?'",
     "chat_ticket": "Answer the customer's message as usual. A ticket is being prepared for: {issue}. Then ask what the "
                    "support team will need to act on it, a few things at a time, skipping what the customer already "
                    "said.",
