@@ -882,7 +882,8 @@ def test_post_check_never_classifies(model):
     from ole5_chat.agent import handlers
     from ole5_chat.agent.contracts import Reply
     state = {**sessions.get(chat()), "messages": [HumanMessage(content="Does it run on Linux?")], "next": "chat",
-             "offered": True, "phase": "none", "pending": [], "reply": Reply(say="No answer. Open a ticket?")}
+             "offered": True, "phase": "none", "pending": [], "reply": Reply(say="No answer. Open a ticket?"),
+             "last_retrieval": miss().as_json()}
     out = handlers.post_check(state)
     assert out["phase"] == "offer_ticket" and not out["pending"][0].urgent
     assert Classification not in [c[0] for c in model.calls]
@@ -915,4 +916,13 @@ def test_a_chat_turn_in_confirm_goes_back_to_the_submit_question(new_path):
                      [ground(False, False)])
     assert task.endswith("the summary for Does it run on Linux? is still shown; ask whether to submit it.")
     assert "what the support team will need" not in task and sessions.get(sid)["phase"] == "confirm"
+
+
+def test_post_check_does_not_queue_an_unsearched_message():
+    from ole5_chat.agent import handlers
+    from ole5_chat.agent.contracts import Reply
+    state = {**sessions.get(chat()), "messages": [HumanMessage(content="ايه")], "next": "chat", "offered": True,
+             "phase": "none", "pending": [], "reply": Reply(say="ليس لدي إجابة. هل ترغب بتذكرة؟"), "last_retrieval": None}
+    out = handlers.post_check(state)
+    assert out["pending"] == [] and out["phase"] == "none"
 

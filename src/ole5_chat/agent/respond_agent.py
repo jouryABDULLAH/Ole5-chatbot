@@ -85,9 +85,10 @@ def _no_answer(convo: list[BaseMessage], tool) -> str:
     return reply.text
 
 
-def _ground(customer: str, text: str, retrieval: Retrieval | None) -> Grounding:
+def _ground(exchange: str, text: str, retrieval: Retrieval | None) -> Grounding:
+    """exchange is the assistant's previous message and the customer's."""
     passages = "\n\n".join(f"Document: {e.document}\n{e.text.strip()}" for e in retrieval.direct) if retrieval else ""
-    content = f"Customer's message:\n{customer}\n\nReply:\n{text}\n\nPassages:\n{passages or 'none'}"
+    content = f"{exchange}\n\nReply:\n{text}\n\nPassages:\n{passages or 'none'}"
     return llm.structured(prompt.ground(), [HumanMessage(content=content)], Grounding, node="ground")
 
 
@@ -101,13 +102,13 @@ def _is_json(text: str) -> bool:
         return False
 
 
-def _gates(convo, tool, sink, customer, text, corrections, chat) -> tuple[str, list[str], bool]:
+def _gates(convo, tool, sink, exchange, text, corrections, chat) -> tuple[str, list[str], bool]:
     """Gate 1 runs only on the chat path, when nothing was searched: the grounding call with no passages asks whether the reply states product facts and whether the message needs a search. A greeting, thanks or small talk is kept with no nudge; anything else gets the nudge, and a reply still unsearched becomes the no-answer wording. Gate 2, is the reply drawn from a DIRECT passage; a reply with no DIRECT passage behind it is grounded with no passages. Returns the reply, its sources and whether it offers a ticket."""
     if not sink and not chat:
         return text, [], False
     if not sink:
         try:
-            grounding = _ground(customer, text, None)
+            grounding = _ground(exchange, text, None)
         except llm.ModelFailed as exc:
             log.warning("respond_agent  grounding call failed: %s", str(exc)[:300])
             corrections.append("grounding call failed")
@@ -125,7 +126,7 @@ def _gates(convo, tool, sink, customer, text, corrections, chat) -> tuple[str, l
         retrieval = merge(sink) if sink else None
         direct = list(dict.fromkeys(e.document for e in retrieval.direct)) if retrieval else []
         try:
-            grounding = _ground(customer, text, retrieval)
+            grounding = _ground(exchange, text, retrieval)
         except llm.ModelFailed as exc:
             log.warning("respond_agent  grounding call failed: %s", str(exc)[:300])
             corrections.append("grounding call failed")
@@ -163,6 +164,9 @@ def _gates(convo, tool, sink, customer, text, corrections, chat) -> tuple[str, l
 def respond_agent(state: ChatState) -> dict:
     identity = state["identity"]
     customer = next((m.text for m in reversed(state["messages"]) if m.type == "human"), "")
+    before = state["messages"][:-1] if state["messages"][-1].type == "human" else state["messages"]
+    previous = next((m.text for m in reversed(before) if m.type == "ai"), "none")
+    exchange = f"Assistant's previous message:\n{previous}\n\nCustomer's message:\n{customer}"
     chat = state.get("next") not in OWN_ISSUE
     search = chat or state.get("next") in SEARCHES
     sink: list[Retrieval] = []
@@ -181,13 +185,13 @@ def respond_agent(state: ChatState) -> dict:
         text = _loop(convo, tool, corrections)
         json_retried = False
         for attempt in range(LANGUAGE_RETRIES + 1):
-            text, sources, offered = _gates(convo, tool, sink, customer, text, corrections, chat)
+            text, sources, offered = _gates(convo, tool, sink, exchange, text, corrections, chat)
             if _is_json(text) and not json_retried:
                 json_retried = True
                 convo.append(HumanMessage(content=NOTE + "Write a plain chat message to the customer, not JSON."))
                 corrections.append("reply was JSON")
                 text = _loop(convo, tool, corrections)
-                text, sources, offered = _gates(convo, tool, sink, customer, text, corrections, chat)
+                text, sources, offered = _gates(convo, tool, sink, exchange, text, corrections, chat)
             problem = language_problem(text, language) or (
                 CHINESE.search(text) and f"The reply contains Chinese characters; rewrite it in {NAMES[language]}.")
             if not problem:

@@ -152,7 +152,8 @@ def post_check(state: ChatState) -> dict:
     In offer_ticket the chat task makes every reply ask about the open offer again, 
     so there a reply with sources is a reminder, not an offer."""
     text, before, pending = state["messages"][-1].text, state["phase"], list(state["pending"])
-    offered = state["offered"] and state["next"] not in OWN_ISSUE
+    # Only a message the turn searched for is an issue: a real question is searched on the nudge, an "ايه" is not.
+    offered = state["offered"] and state["next"] not in OWN_ISSUE and state.get("last_retrieval") is not None
     if before == "offer_ticket":
         offered = offered and not state["reply"].sources
     if offered and not any(p.text == text for p in pending):
