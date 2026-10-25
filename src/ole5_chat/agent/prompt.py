@@ -79,7 +79,7 @@ MEANINGS = {
     "done": "says there is nothing more to add, typically after the assistant asked whether there is anything else. "
             "A message that gives a last detail and says it is all they have is done.",
     "cancel": "drops the ticket being prepared or the summary shown.",
-    "yes": "agrees to submit the summary shown.",
+    "yes": "agrees to submit the summary shown, in reply to the assistant asking whether to submit it.",
     "change": "asks to change something on the summary (priority, title, details).",
 }
 
