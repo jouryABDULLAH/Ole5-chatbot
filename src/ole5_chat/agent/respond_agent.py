@@ -5,6 +5,7 @@ Gate 2 (the grounding call) compares the reply with the DIRECT passages and name
 those are the sources, never the respond model's own list. 
 Then the language guardrails."""
 
+import json
 import logging
 import re
 
@@ -87,6 +88,16 @@ def _ground(customer: str, text: str, retrieval: Retrieval | None) -> Grounding:
     return llm.structured(prompt.ground(), [HumanMessage(content=content)], Grounding, node="ground")
 
 
+def _is_json(text: str) -> bool:
+    text = text.strip()
+    if text.startswith("{"):
+        return True
+    try:
+        return isinstance(json.loads(text), (dict, list))
+    except ValueError:
+        return False
+
+
 def _gates(convo, tool, sink, customer, text, corrections, chat) -> tuple[str, list[str], bool]:
     """Gate 1, did it search, runs only on the chat path: the offer, accept and decline tasks need no search. Gate 2, is the reply drawn from a DIRECT passage. A reply with no DIRECT passage behind it is grounded with no passages. Returns the reply, its sources and whether it offers a ticket."""
     if not sink and not chat:
@@ -154,8 +165,15 @@ def respond_agent(state: ChatState) -> dict:
     
     try:
         text = _loop(convo, tool, corrections)
+        json_retried = False
         for attempt in range(LANGUAGE_RETRIES + 1):
             text, sources, offered = _gates(convo, tool, sink, customer, text, corrections, chat)
+            if _is_json(text) and not json_retried:
+                json_retried = True
+                convo.append(HumanMessage(content=NOTE + "Write a plain chat message to the customer, not JSON."))
+                corrections.append("reply was JSON")
+                text = _loop(convo, tool, corrections)
+                text, sources, offered = _gates(convo, tool, sink, customer, text, corrections, chat)
             problem = language_problem(text, language) or (
                 CHINESE.search(text) and f"The reply contains Chinese characters; rewrite it in {NAMES[language]}.")
             if not problem:

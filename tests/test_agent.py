@@ -735,3 +735,12 @@ def test_ticket_turns_bind_no_tools_and_send_no_nudge(new_path):
     state, _ = new_path(sid, "nothing else", "done", [AIMessage(content="Submit it?")], groundings=[GOOD])
     assert llm.tool_client.bound[start:] == [None, None, None]
     assert "nudged" not in state["corrections"]
+
+
+def test_a_json_reply_is_retried_as_a_chat_message(new_path):
+    sid = chat()
+    unanswered(new_path, sid, "Does it run on Linux?")
+    state, _ = new_path(sid, "yes", "accept", [AIMessage(content='{"queue": "Ole5 Support", "action": "CreateTicket"}'),
+                                               AIMessage(content="Which version do you use?")])
+    assert state["messages"][-1].text == "Which version do you use?" and "reply was JSON" in state["corrections"]
+

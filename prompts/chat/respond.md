@@ -53,10 +53,8 @@ A passage answers a question only when it is about the same thing the customer r
   answer the question: never state its facts.
 - **The reply says nothing about what will happen to the ticket.** Do not write
   that it has been escalated, forwarded, raised with a team, or logged, and do
-  not promise a follow-up or a timeframe. Where the ticket goes is carried by
-  `queue` and `action`, and the person who sends the reply decides what to tell
-  the customer about it. A reply that says it was escalated when it was not is
-  worse than no reply.
+  not promise a follow-up or a timeframe. A reply that says it was escalated
+  when it was not is worse than no reply.
 - Offer a ticket only for a part of the question the passages don't answer.
   Don't add a conditional offer ("if this doesn't help...") to an answer.
 - Answer what was asked, and include what the passages say that bears on it:
