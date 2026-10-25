@@ -1,6 +1,8 @@
 """router_v2 against the real model on fixed cases: prints what it chose for each, the accuracy and the median latency of one call. Runs only with RUN_LIVE=1."""
 
+import logging
 import os
+import re
 import statistics
 import time
 
@@ -19,7 +21,7 @@ GREETING = "أهلاً بك، أنا مساعد دعم Ole5. أجيب عن أس�
 OFFER = "I don't have an answer for that. Would you like me to open a ticket?"
 ERROR = "What does the error message say?"
 ANYTHING_ELSE = "Is there anything else you want to add?"
-SUMMARY = "Your ticket summary is ready. Press Submit to send it."
+SUMMARY = "Your ticket summary is ready. Shall I submit it?"
 ARCHIVE = "The archive button does nothing"
 DENIED = "Access denied when opening a correspondence"
 
@@ -51,7 +53,7 @@ CASES = [
     ("confirm", DENIED, SUMMARY, "كم ياخذ الرد عادة؟", "chat"),
     ("none", None, GREETING, "النظام ما يفتح عند أحد في الوزارة من الصبح", "urgent"),
     ("offer_ticket", ARCHIVE, OFFER, "ايه بس قبل كذا كيف أرفق ملف؟", "chat"),
-    ("collect", DENIED, ERROR, "يظهر الخطأ لما أضغط حفظ، وهذا كل اللي عندي", "details"),
+    ("collect", DENIED, ERROR, "يظهر الخطأ لما أضغط حفظ، وهذا كل اللي عندي", "done"),
     ("collect", DENIED, ERROR, "بعد عندي مشكلة ثانية: نبي نرحل بيانات", "ticket"),
     ("confirm", DENIED, SUMMARY, "ممكن تغير العنوان وبعدها أرسلها", "change"),
     ("confirm", DENIED, SUMMARY, "تمام", "yes"),
@@ -81,24 +83,32 @@ HELD_OUT = [
     ("confirm", DENIED, SUMMARY, "يب تمام أرسل", "yes"),
     ("confirm", DENIED, SUMMARY, "غيرت رأيي، لا ترسلها", "cancel"),
     ("confirm", DENIED, SUMMARY, "وش يعني الأولوية متوسطة؟", "chat"),
+    ("confirm", DENIED, "I don't have information on how long a reply takes. The summary is ready whenever you want "
+                        "to send it.", "تمام", "chat"),
+    ("confirm", DENIED, "I changed the priority to high. The updated summary is shown.", "تمام", "chat"),
+    ("confirm", DENIED, "I changed the priority to high. Shall I submit it now?", "اوكي", "yes"),
 ]
 
 
 @pytest.mark.live
 @pytest.mark.skipif(os.getenv("RUN_LIVE") != "1", reason="set RUN_LIVE=1 to call the real model")
-def test_router_v2_live(monkeypatch):
+def test_router_v2_live(monkeypatch, caplog):
     monkeypatch.setattr(llm, "structured", REAL)
     identity = Identity(customer_id="live", email="ole5@example.com", name="Sara Omar", organization="Test Org",
                         product="OLE5", language="ar")
-    rows, latencies = [], []
+    rows, latencies, calls = [], [], []
     for phase, issue, assistant, customer, expected in CASES + HELD_OUT:
         state = initial_state(identity)
         state["chat_phase"] = phase
         state["pending"] = [PendingIssue(text=issue, source="no_answer")] if issue else []
         state["messages"] = [AIMessage(content=assistant), HumanMessage(content=customer)]
+        caplog.clear()
         started = time.perf_counter()
-        out = router_v2(state)
+        with caplog.at_level(logging.WARNING, logger=llm.__name__):
+            out = router_v2(state)
         latencies.append(time.perf_counter() - started)
+        slow = [int(m.group(1)) for r in caplog.records if (m := re.search(r"attempts=(\d+)", r.getMessage()))]
+        calls.append((latencies[-1], slow[0] if slow else 1, phase, customer))
         rows.append((phase, customer, expected, out["next"], out.get("corrections", [])))
     print()
     for phase, customer, expected, got, corrections in rows:
@@ -106,5 +116,7 @@ def test_router_v2_live(monkeypatch):
     for name, part in (("examples", rows[:len(CASES)]), ("held out", rows[len(CASES):])):
         hits = sum(expected == got for _, _, expected, got, _ in part)
         print(f"{name}: accuracy {hits}/{len(part)} = {hits / len(part):.0%}")
-    print(f"median latency {statistics.median(latencies):.2f}s")
+    print(f"median latency {statistics.median(latencies):.2f}s\nslowest 5 calls:")
+    for seconds, attempts, phase, customer in sorted(calls, reverse=True)[:5]:
+        print(f"  {seconds:.2f}s attempts={attempts} {phase:<12} {customer}")
     assert not any(corrections for *_, corrections in rows), "a router call failed"
