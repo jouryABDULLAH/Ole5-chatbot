@@ -148,10 +148,11 @@ TASKS = {
               "search for it and answer it first, then continue. Otherwise don't search. Nothing has been created yet; "
               "the ticket is created only when they submit the summary. Don't say a ticket is opened, created or "
               "being opened.",
-    "decline": "The customer said no to opening a ticket; none was opened. Acknowledge it in one line without saying a "
-               "ticket was cancelled or closed, and say they can contact support at any time. Stay available.",
-    "decline_next": "The customer said no to opening a ticket; none was opened. Acknowledge it in one line without "
-                    "saying a ticket was cancelled or closed, then offer a ticket for their other issue: {issue}.",
+    "declined": "The customer said no to opening a ticket; none was opened. Acknowledge it in one line without saying "
+                "a ticket was cancelled or closed, and say they can contact support at any time.",
+    "urgent_ready": "This is urgent, so the ticket was prepared right away without the usual questions: {issue}. The "
+                    "summary is shown with a Submit button. Nothing has been created yet. Say in one line that because "
+                    "it is urgent the summary is ready now, and ask whether to submit it. Don't repeat the summary.",
     "details": "Ask what else the support team needs to act on: {issue}. A few things at a time, skipping what the "
                "customer already said. If the team has enough, ask instead whether there is anything else they'd like "
                "to add. Ask about what the customer sees and did. Don't name a screen, template, setting or option "
@@ -171,8 +172,8 @@ TASKS = {
                  "time.",
 }
 URGENT = "This sounds urgent. "
-# Appended to created and cancelled when another issue is waiting; URGENT goes in front when it is urgent.
-THEN_OFFER = "Then offer a ticket for their other issue: {next}."
+# Appended to queued when the new issue is urgent.
+QUEUED_URGENT = " Because the new issue is urgent, also say they can cancel the current one to start it now."
 
 
 def respond(state: ChatState, language: str) -> str:

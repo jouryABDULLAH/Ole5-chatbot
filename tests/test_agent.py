@@ -563,7 +563,7 @@ def test_new_path_decline_with_two_issues_offers_the_next(new_path):
     assert "A ticket offer for this issue is still open: Does it run on Linux?" in prompt_text
     state, prompt_text = new_path(sid, "لا", "decline", [AIMessage(content="تمام. تبغى تذكرة للتصدير؟")])
     assert [p.text for p in state["pending"]] == ["Can I export to Excel?"] and state["phase"] == "offer_ticket"
-    assert "offer a ticket for their other issue: Can I export to Excel?" in prompt_text
+    assert "This needs the support team: Can I export to Excel?" in prompt_text
 
 
 def test_new_path_side_question_keeps_the_offer_open(new_path):
@@ -653,7 +653,7 @@ def test_yes_creates_the_ticket(new_path):
     number = state["created_tickets"][-1]["ticket_number"]
     assert number.startswith("T-MOCK-") and state["ticket_draft"] is None
     assert (state["phase"], state["pending"]) == ("none", [])
-    assert f"The ticket {number} was created." in prompt_text and "Then offer" not in prompt_text
+    assert f"The ticket {number} was created." in prompt_text and "This needs the support team" not in prompt_text
 
 
 def test_yes_with_a_second_issue_offers_it(new_path):
@@ -664,7 +664,7 @@ def test_yes_with_a_second_issue_offers_it(new_path):
     new_path(sid, "nothing else", "done", [AIMessage(content="Submit it?")], groundings=[GOOD])
     state, prompt_text = new_path(sid, "submit it", "yes", [AIMessage(content="Created. A ticket for the export?")])
     assert state["phase"] == "offer_ticket" and [p.text for p in state["pending"]] == ["Can I export to Excel?"]
-    assert "Then offer a ticket for their other issue: Can I export to Excel?" in prompt_text
+    assert "This needs the support team: Can I export to Excel?" in prompt_text
 
 
 def test_yes_with_the_ticket_api_failing_stays_in_confirm(new_path, monkeypatch):

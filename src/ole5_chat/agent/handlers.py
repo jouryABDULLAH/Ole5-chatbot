@@ -5,7 +5,7 @@ import logging
 from ole5_chat import values
 from ole5_chat.agent import classify as classifier
 from ole5_chat.agent.contracts import PendingIssue, Phase
-from ole5_chat.agent.prompt import TASKS, THEN_OFFER, URGENT
+from ole5_chat.agent.prompt import QUEUED_URGENT, TASKS, URGENT
 from ole5_chat.agent.state import ChatState, TicketDraft
 from ole5_chat.config import get_settings
 from ole5_chat.tickets import client as ticket_api
@@ -30,14 +30,27 @@ def _new_draft(state: ChatState) -> TicketDraft:
 
 
 def _offer(issue: PendingIssue) -> str:
-    return (URGENT if issue.urgent else "") + TASKS["offer"].format(issue=issue.text)
+    return TASKS["offer"].format(issue=issue.text)
 
 
-def _then_offer(task: str, pending: list[PendingIssue]) -> str:
-    """The task, followed by the offer of the next issue when one is waiting."""
+def next_issue(state: ChatState, pending: list[PendingIssue]) -> tuple[dict, str]:
+    """The state update and task fragment for pending[0] after pending changed. An urgent issue skips the offer and
+    the questions: its draft is classified now and shown for Submit."""
     if not pending:
-        return task
-    return f"{task} {URGENT if pending[0].urgent else ''}{THEN_OFFER.format(next=pending[0].text)}"
+        return {"pending": pending, "phase": "none"}, ""
+    issue = pending[0]
+    if not issue.urgent:
+        return {"pending": pending, "phase": "offer_ticket"}, _offer(issue)
+    out = classifier.classify({**state, "pending": pending, "ticket_draft": _new_draft(state)})
+    if "ticket_draft" not in out:
+        return {**out, "pending": pending, "phase": "offer_ticket"}, URGENT + _offer(issue)
+    draft = out["ticket_draft"].model_copy(update={"urgent": True,
+                                                   "urgent_reason": out["ticket_draft"].urgent_reason or issue.text})
+    return {"pending": pending, "phase": "confirm", "ticket_draft": draft}, TASKS["urgent_ready"].format(issue=issue.text)
+
+
+def _then(task: str, fragment: str) -> str:
+    return f"{task} {fragment}" if fragment else task
 
 
 def handler(state: ChatState) -> str:
@@ -61,8 +74,10 @@ def queue(state: ChatState) -> dict:
     if not any(p.text == text for p in pending):
         pending.append(PendingIssue(text=text, urgent=state["next"] == "urgent", source="always_ticket"))
     if state["phase"] == "none":
-        return {"pending": pending, "phase": advance(pending), "task": _offer(pending[0])}
-    return {"pending": pending, "task": TASKS["queued"].format(new=text, issue=pending[0].text)}
+        update, fragment = next_issue(state, pending)
+        return {**update, "task": fragment}
+    queued = TASKS["queued"].format(new=text, issue=pending[0].text)
+    return {"pending": pending, "task": queued + (QUEUED_URGENT if state["next"] == "urgent" else "")}
 
 
 def accept(state: ChatState) -> dict:
@@ -71,9 +86,8 @@ def accept(state: ChatState) -> dict:
 
 
 def decline(state: ChatState) -> dict:
-    pending = state["pending"][1:]
-    task = TASKS["decline_next"].format(issue=pending[0].text) if pending else TASKS["decline"]
-    return {"pending": pending, "phase": advance(pending), "task": task}
+    update, fragment = next_issue(state, state["pending"][1:])
+    return {**update, "task": _then(TASKS["declined"], fragment)}
 
 
 def details(state: ChatState) -> dict:
@@ -98,15 +112,19 @@ def done(state: ChatState) -> dict:
 
 def change(state: ChatState) -> dict:
     out = classifier.classify(state)
-    if "ticket_draft" in out:
-        return {"ticket_draft": _nothing_missing(out["ticket_draft"]), "task": TASKS["changed"]}
-    return {**out, "task": TASKS["confirm"]}
+    if "ticket_draft" not in out:
+        return {**out, "task": TASKS["confirm"]}
+    draft, old = out["ticket_draft"], state["ticket_draft"]
+    if state["pending"][0].urgent:  # An urgent ticket stays urgent and keeps what is missing: it skipped the questions.
+        draft = draft.model_copy(update={"urgent": True, "urgent_reason": draft.urgent_reason or old.urgent_reason})
+    else:
+        draft = _nothing_missing(draft)
+    return {"ticket_draft": draft, "task": TASKS["changed"]}
 
 
 def cancel(state: ChatState) -> dict:
-    pending = state["pending"][1:]
-    return {"ticket_draft": None, "pending": pending, "phase": advance(pending),
-            "task": _then_offer(TASKS["cancelled"], pending)}
+    update, fragment = next_issue({**state, "ticket_draft": None}, state["pending"][1:])
+    return {"ticket_draft": None, **update, "task": _then(TASKS["cancelled"], fragment)}
 
 
 def submit(state: ChatState) -> dict:
@@ -117,11 +135,11 @@ def submit(state: ChatState) -> dict:
         log.warning("handlers  ticket not created: %s", exc)
         return {"note": NOT_CREATED, "task": TASKS["confirm"],
                 "corrections": state["corrections"] + [f"submit failed: {exc}"]}
-    pending = state["pending"][1:]
+    done_state = {**state, "ticket_draft": None, "corrections": state["corrections"] + corrections}
+    update, fragment = next_issue(done_state, state["pending"][1:])
     return {"created_tickets": [*state["created_tickets"], ticket], "ticket_draft": None, "attachments": [],
-            "pending": pending, "phase": advance(pending),
-            "task": _then_offer(TASKS["created"].format(number=ticket["ticket_number"]), pending),
-            "corrections": state["corrections"] + corrections}
+            "corrections": done_state["corrections"], **update,
+            "task": _then(TASKS["created"].format(number=ticket["ticket_number"]), fragment)}
 
 
 def post_check(state: ChatState) -> dict:
