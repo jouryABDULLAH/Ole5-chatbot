@@ -37,7 +37,6 @@ class Settings(BaseSettings):
     kb_find_timeout: float = 260.0
     kb_find_retries: int = 1
     kb_max_searches: int = 4
-    respond_agent: bool = False
 
     sheets_dir: Path = ROOT / "sheets"
     products_dir: Path = ROOT / "products"

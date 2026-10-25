@@ -3,7 +3,6 @@
 import os
 
 from ole5_chat import sessions, sheets
-from ole5_chat.config import get_settings
 from ole5_chat.knowledge.contracts import Retrieval
 
 EMAIL = os.environ.get("EVAL_EMAIL")
@@ -26,8 +25,6 @@ def _evidence(sid: str, state) -> str:
 
 def _phase(state) -> str:
     """The old step name, so the current datasets still grade the new path. This mapping goes in step 8."""
-    if not get_settings().respond_agent:
-        return state["phase"]
     if state["chat_phase"] == "none":
         return "answer" if state["sources"] else "ask"
     return state["chat_phase"]
@@ -35,10 +32,9 @@ def _phase(state) -> str:
 
 def _turn(sid: str, state) -> dict:
     draft, decision = state.get("ticket_draft"), state.get("decision")
-    extra = {"chat_phase": state["chat_phase"], "pending": [p.text for p in state["pending"]]} \
-        if get_settings().respond_agent else {}
     return {
-        **extra,
+        "chat_phase": state["chat_phase"],
+        "pending": [p.text for p in state["pending"]],
         "answer": state["messages"][-1].text,
         "phase": _phase(state),
         "sources": list(state["sources"]),

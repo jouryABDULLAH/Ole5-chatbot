@@ -4,7 +4,6 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
 from ole5_chat import sessions
-from ole5_chat.agent import graph
 from ole5_chat.agent.contracts import Classification
 from ole5_chat.agent.validate import check_ticket
 from ole5_chat.knowledge.contracts import Evidence, Retrieval, Verdict
@@ -436,16 +435,11 @@ def test_initial_state_has_the_router_v2_fields():
 
 @pytest.fixture
 def new_path(monkeypatch, model):
-    """The RESPOND_AGENT graph with a scripted router, tool model, searches and grounding calls. send() runs one turn
-    and returns the state and the system prompt respond_agent was given."""
-    from langgraph.checkpoint.memory import MemorySaver
+    """The graph with a scripted router, tool model, searches and grounding calls. send() runs one turn and returns
+    the state and the system prompt respond_agent was given."""
     from ole5_chat import llm
     from ole5_chat.agent.contracts import route_schema
-    from ole5_chat.config import get_settings
     from ole5_chat.knowledge import tool
-    monkeypatch.setenv("RESPOND_AGENT", "true")
-    get_settings.cache_clear()
-    monkeypatch.setattr(sessions, "_graph", graph.build(MemorySaver(serde=sessions._serde)))
     found, fake = [], ToolModel()
     monkeypatch.setattr(tool, "search", lambda question, product: found.pop(0))
     monkeypatch.setattr(llm, "tool_client", fake)

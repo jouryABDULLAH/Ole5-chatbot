@@ -3,7 +3,6 @@
 from fastapi.testclient import TestClient
 
 from ole5_chat import sessions, sheets
-from ole5_chat.agent import prompt
 from ole5_chat.agent.contracts import RouterDecision
 from ole5_chat.agent.state import TicketDraft
 from ole5_chat.api import app
@@ -58,13 +57,6 @@ def test_removed_file_is_gone():
 def test_unknown_session_and_bad_link_are_404():
     assert send_file("nope").status_code == 404
     assert client.get("/chat/attachments/../../etc").status_code == 404
-
-
-def test_file_names_reach_the_agent():
-    sid = session()
-    send_file(sid, "error.png")
-    assert "Files the customer attached for the ticket: error.png" in prompt.ticket_status(
-        None, sessions.get(sid)["attachments"])
 
 
 def test_submit_links_the_files_in_the_note_and_the_sheet():
