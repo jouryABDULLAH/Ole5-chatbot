@@ -863,8 +863,7 @@ def test_new_path_greeting_queues_nothing(new_path, searches):
 @pytest.mark.parametrize("next_", ["ticket", "urgent"])
 def test_new_path_router_ticket_or_urgent_is_queued_and_offered(new_path, next_):
     sid = chat()
-    state, prompt_text = new_path(sid, "We need to migrate our data", next_, plain("Shall I open a ticket?"),
-                                  groundings=[ground(False, True)])
+    state, prompt_text = new_path(sid, "We need to migrate our data", next_, [AIMessage(content="Shall I open a ticket?")])
     issue = state["pending"][0]
     assert (issue.text, issue.source, issue.urgent) == ("We need to migrate our data", "always_ticket", next_ == "urgent")
     assert state["chat_phase"] == "offer_ticket" and len(state["pending"]) == 1
@@ -875,7 +874,7 @@ def test_new_path_router_ticket_or_urgent_is_queued_and_offered(new_path, next_)
 def test_new_path_accept_creates_the_draft(new_path):
     sid = chat()
     unanswered(new_path, sid, "Does it run on Linux?")
-    state, prompt_text = new_path(sid, "ايه", "accept", plain("أي إصدار تستخدم؟"), groundings=[ground(False, False)])
+    state, prompt_text = new_path(sid, "ايه", "accept", [AIMessage(content="أي إصدار تستخدم؟")])
     assert state["ticket_draft"] is not None and state["chat_phase"] == "collect"
     assert [p.text for p in state["pending"]] == ["Does it run on Linux?"]
     assert "The customer agreed to a ticket for: Does it run on Linux?" in prompt_text
@@ -884,7 +883,7 @@ def test_new_path_accept_creates_the_draft(new_path):
 def test_new_path_decline_with_one_issue_empties_pending(new_path):
     sid = chat()
     unanswered(new_path, sid, "Does it run on Linux?")
-    state, prompt_text = new_path(sid, "لا شكراً", "decline", plain("تمام، تقدر تتواصل معنا في أي وقت."), groundings=[ground(False, False)])
+    state, prompt_text = new_path(sid, "لا شكراً", "decline", [AIMessage(content="تمام، تقدر تتواصل معنا في أي وقت.")])
     assert (state["chat_phase"], state["pending"]) == ("none", [])
     assert "The customer declined the ticket. Acknowledge it in one line and say they can contact" in prompt_text
 
@@ -895,8 +894,7 @@ def test_new_path_decline_with_two_issues_offers_the_next(new_path):
     state, prompt_text = unanswered(new_path, sid, "Can I export to Excel?")
     assert len(state["pending"]) == 2 and state["chat_phase"] == "offer_ticket"
     assert "A ticket offer for this issue is still open: Does it run on Linux?" in prompt_text
-    state, prompt_text = new_path(sid, "لا", "decline", plain("تمام. تبغى تذكرة للتصدير؟"),
-                                  groundings=[ground(False, True)])
+    state, prompt_text = new_path(sid, "لا", "decline", [AIMessage(content="تمام. تبغى تذكرة للتصدير؟")])
     assert [p.text for p in state["pending"]] == ["Can I export to Excel?"] and state["chat_phase"] == "offer_ticket"
     assert "offer a ticket for their other issue: Can I export to Excel?" in prompt_text
 
@@ -917,3 +915,12 @@ def test_new_path_same_unanswered_question_is_queued_once(new_path):
     unanswered(new_path, sid, "Does it run on Linux?")
     state, _ = unanswered(new_path, sid, "Does it run on Linux?")
     assert len(state["pending"]) == 1 and state["chat_phase"] == "offer_ticket"
+
+
+def test_new_path_accept_is_not_nudged_to_search(new_path, model):
+    sid = chat()
+    unanswered(new_path, sid, "Does it run on Linux?")
+    before = len(grounding(model))
+    state, _ = new_path(sid, "ايه", "accept", [AIMessage(content="أي إصدار تستخدم؟")])
+    assert state["messages"][-1].text == "أي إصدار تستخدم؟" and "nudged" not in state["corrections"]
+    assert len(grounding(model)) == before

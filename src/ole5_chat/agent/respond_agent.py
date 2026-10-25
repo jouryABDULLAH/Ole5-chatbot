@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from ole5_chat import llm
 from ole5_chat.agent import prompt
 from ole5_chat.agent.contracts import Reply
+from ole5_chat.agent.lanes import OWN_ISSUE
 from ole5_chat.agent.state import ChatState
 from ole5_chat.agent.validate import NAMES, SORRY, language_of, language_problem
 from ole5_chat.config import get_settings
@@ -84,8 +85,10 @@ def _ground(customer: str, text: str, retrieval: Retrieval | None) -> Grounding:
     return llm.structured(prompt.ground(), [HumanMessage(content=content)], Grounding, node="ground")
 
 
-def _gates(convo, tool, sink, customer, text, corrections) -> tuple[str, list[str], bool]:
-    """Gate 1, did it search; gate 2, is the reply drawn from a DIRECT passage. A reply with no DIRECT passage behind it is grounded with no passages. Returns the reply, its sources and whether it offers a ticket."""
+def _gates(convo, tool, sink, customer, text, corrections, chat) -> tuple[str, list[str], bool]:
+    """Gate 1, did it search, runs only on the chat path: the offer, accept and decline tasks need no search. Gate 2, is the reply drawn from a DIRECT passage. A reply with no DIRECT passage behind it is grounded with no passages. Returns the reply, its sources and whether it offers a ticket."""
+    if not sink and not chat:
+        return text, [], False
     if not sink:
         convo.append(HumanMessage(content=NUDGE))
         corrections.append("nudged")
@@ -138,12 +141,13 @@ def respond_agent(state: ChatState) -> dict:
     tool = make_search_tool(identity.product, sink)
     corrections: list[str] = []
     language = language_of(customer) or identity.language
+    chat = state.get("next") not in OWN_ISSUE
     convo: list[BaseMessage] = [SystemMessage(content=prompt.respond_v2(state, language)), *state["messages"]]
     
     try:
         text = _loop(convo, tool, corrections)
         for attempt in range(LANGUAGE_RETRIES + 1):
-            text, sources, offered = _gates(convo, tool, sink, customer, text, corrections)
+            text, sources, offered = _gates(convo, tool, sink, customer, text, corrections, chat)
             problem = language_problem(text, language) or (
                 CHINESE.search(text) and f"The reply contains Chinese characters; rewrite it in {NAMES[language]}.")
             if not problem:
