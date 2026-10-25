@@ -154,8 +154,7 @@ TASKS = {
     "accept": "The customer agreed to a ticket for: {issue}. Ask what the support team will need to act on it: work "
               "out the likely cause and ask what would confirm or rule it out, a few things at a time, skipping what "
               "the customer already said. Ask about what the customer sees and did. Don't name a screen, template, "
-              "setting or option unless a passage names it. If the customer also asked a question in this message, "
-              "answer it first from the passages, then continue. Nothing has been created yet; "
+              "setting or option unless a passage names it. Nothing has been created yet; "
               "the ticket is created only when they submit the summary. Don't say a ticket is opened, created or "
               "being opened.",
     "declined": "The customer said no to opening a ticket; none was opened. Acknowledge it in one line without saying "

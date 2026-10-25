@@ -342,7 +342,7 @@ def test_a_ticket_turn_reply_with_unsupported_facts_is_written_without_them(mode
     model.add(*answer("no_answer", "العلامة المائية تحتاج تطبيق سطح المكتب. أي إصدار تستخدم؟", [], ["تطبيق سطح المكتب"]),
               *answer("answered", "تحتاج تطبيق سطح المكتب. أي إصدار تستخدم؟", [], ["تطبيق سطح المكتب"]))
     out, fake = respond_node("ايه", [searching("watermark on iPad"), AIMessage(content="أي إصدار تستخدم؟")], [hit("Guide")],
-                             next_="accept")
+                             next_="details")
     assert out["reply"].say == "أي إصدار تستخدم؟" and out["offered"] is False and out["reply"].sources == []
     assert "without stating anything about the product" in sent(fake)[-1].content
     assert out["corrections"] == ["retried: unsupported", "reply not grounded"]
@@ -350,7 +350,7 @@ def test_a_ticket_turn_reply_with_unsupported_facts_is_written_without_them(mode
 
 def test_a_ticket_turn_reply_that_uses_no_passage_is_kept(model, respond_node):
     model.add(*answer("answered", "Which version do you use?"))
-    out, _ = respond_node("yes", [searching("anything")], [hit("Guide")], next_="accept")
+    out, _ = respond_node("version 17", [searching("anything")], [hit("Guide")], next_="details")
     assert out["reply"].say == "Which version do you use?" and out["corrections"] == [] and out["offered"] is False
 
 
@@ -432,7 +432,7 @@ def test_initial_state_has_the_router_fields():
 @pytest.fixture
 def new_path(monkeypatch, model):
     """The graph with a scripted router, tool model, searches and structured calls. send() runs one turn and returns
-    the state and the system prompt respond_agent was given. On accept, details and change the search node calls the
+    the state and the system prompt respond_agent was given. On details and change the search node calls the
     tool model too; when the first scripted reply is not a search, a reply with no search is put before it."""
     from ole5_chat import llm
     from ole5_chat.agent import prompt
@@ -681,7 +681,7 @@ def test_a_stale_next_does_not_skip_the_router(new_path, model):
     assert state["created_tickets"] == [] and state["phase"] == "collect" and state["ticket_draft"].rounds == 1
 
 
-def test_search_runs_on_question_accept_and_details_and_respond_never_binds_a_tool(new_path):
+def test_search_runs_on_question_and_details_and_respond_never_binds_a_tool(new_path):
     from ole5_chat import llm
     sid = chat()
     unanswered(new_path, sid, "Does it run on Linux?")
@@ -689,8 +689,8 @@ def test_search_runs_on_question_accept_and_details_and_respond_never_binds_a_to
     new_path(sid, "version 17", "details", [AIMessage(content="Anything else?")])
     new_path(sid, "nothing else", "done", [AIMessage(content="Submit it?")], groundings=[GOOD])
     fake = llm.tool_client
-    assert fake.choices == ["required", None, "auto", None, "auto", None, None]
-    assert [bool(b) for b in fake.bound] == [True, False, True, False, True, False, False]
+    assert fake.choices == ["required", None, None, "auto", None, None]
+    assert [bool(b) for b in fake.bound] == [True, False, False, True, False, False]
 
 
 def test_a_json_reply_is_retried_as_a_chat_message(new_path):

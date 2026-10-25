@@ -1,6 +1,6 @@
 """The search node and the respond node.
 search: on a question turn one model call writes the searches for the customer's message, and code runs them; on
-accept, details and change it searches only if the message also asks a question. Every other turn passes through.
+details and change it searches only if the message also asks a question. Every other turn passes through.
 respond_agent writes the reply with no tool. With DIRECT passages it answers from them with a status, and the
 grounding call names the documents the reply draws on (those are the sources) and any statement no passage makes.
 A question with no DIRECT passage gets the no-answer wording. Code, not the model, sets whether the reply offers a
@@ -28,8 +28,9 @@ log = logging.getLogger(__name__)
 
 NOTE = "Note from the system, not the customer: "
 LANGUAGE_RETRIES = 2
-# Ticket turns where the customer may also ask a question; the search is there if they do.
-SEARCHES = ("accept", "details", "change")
+# Ticket turns where the customer may also ask a question; the search is there if they do. An accept that asks
+# something is routed to question.
+SEARCHES = ("details", "change")
 # Turns answered as a question: status has no handler of its own yet.
 QUESTIONS = ("question", "status")
 CHINESE = re.compile(r"[一-鿿㐀-䶿]")
