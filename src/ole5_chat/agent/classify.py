@@ -1,4 +1,4 @@
-"""classify: one model call that picks the ticket's queue, type, subtype, priority and title from the conversation, checked against values.xlsx and retried once with the refused values named. Nothing calls it yet; the ticket paths of step 5 do."""
+"""classify: one model call that picks the ticket's queue, type, subtype, priority and title from the conversation, checked against values.xlsx and retried once with the refused values named. Nothing calls it yet; the ticket handlers of step 5 do."""
 
 import logging
 

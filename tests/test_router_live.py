@@ -99,7 +99,7 @@ def test_router_live(monkeypatch, caplog):
     rows, latencies, calls = [], [], []
     for phase, issue, assistant, customer, expected in CASES + HELD_OUT:
         state = initial_state(identity)
-        state["chat_phase"] = phase
+        state["phase"] = phase
         state["pending"] = [PendingIssue(text=issue, source="no_answer")] if issue else []
         state["messages"] = [AIMessage(content=assistant), HumanMessage(content=customer)]
         caplog.clear()
