@@ -150,8 +150,9 @@ TASKS = {
                "customer already said. If the team has enough, ask instead whether there is anything else they'd like "
                "to add.",
     "open_question": "Ask whether there is anything else they'd like to add about: {issue}. Nothing else.",
-    "confirm": "The ticket summary is ready and shown to the customer with a Submit button. Say so in one line and ask "
-               "whether to submit it. Do not repeat the summary.",
+    "confirm": "The ticket summary is ready and shown with a Submit button. Nothing has been created yet; the ticket is "
+               "created only when they submit. Say the summary is ready in one line and ask whether to submit it. "
+               "Don't say the ticket is created, opened or being opened. Don't repeat the summary.",
     "changed": "The ticket summary was updated as the customer asked and is shown again. Say what changed in one line "
                "and ask whether to submit it.",
     "created": "The ticket {number} was created. Tell the customer its number and that the support team will reply by "
