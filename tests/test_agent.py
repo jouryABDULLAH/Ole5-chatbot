@@ -76,20 +76,22 @@ def test_values_refused_twice_keep_the_draft_unclassified(model):
 
 
 class ToolModel:
-    """Stands in for llm.tool_client: returns the scripted AIMessages in order and records each call's temperature and messages."""
+    """Stands in for llm.tool_client: returns the scripted AIMessages in order and records each call's temperature, messages and the tools bound to it."""
 
     def __init__(self, *replies):
-        self.replies, self.calls = list(replies), []
+        self.replies, self.calls, self.bound = list(replies), [], []
 
     def __call__(self, temperature):
-        self.temperature = temperature
+        self.temperature, self.tools = temperature, None
         return self
 
     def bind_tools(self, tools, tool_choice=None):
+        self.tools = tools
         return self
 
     def invoke(self, convo):
         self.calls.append((self.temperature, list(convo)))
+        self.bound.append(self.tools)
         reply = self.replies.pop(0)
         if isinstance(reply, Exception):
             raise reply
@@ -590,3 +592,137 @@ def test_new_path_accept_is_not_nudged_to_search(new_path, model):
     state, _ = new_path(sid, "ايه", "accept", [AIMessage(content="أي إصدار تستخدم؟")])
     assert state["messages"][-1].text == "أي إصدار تستخدم؟" and "nudged" not in state["corrections"]
     assert len(grounding(model)) == before
+
+
+def collecting(new_path, sid, question="Does it run on Linux?"):
+    """An unanswered question, then accept: a draft in collect."""
+    unanswered(new_path, sid, question)
+    return new_path(sid, "yes", "accept", [AIMessage(content="Which version do you use?")])
+
+
+def confirming(new_path, sid, **found):
+    """collecting, then done with classify scripted: the summary shown in confirm."""
+    collecting(new_path, sid)
+    return new_path(sid, "nothing else", "done", [AIMessage(content="The summary is ready. Submit it?")],
+                    groundings=[GOOD.model_copy(update=found)])
+
+
+def test_details_count_rounds_then_ask_the_open_question(new_path):
+    sid = chat()
+    collecting(new_path, sid)
+    state, prompt_text = new_path(sid, "version 17", "details", [AIMessage(content="When did it start?")])
+    assert state["ticket_draft"].rounds == 1 and "Ask what else the support team needs" in prompt_text
+    state, prompt_text = new_path(sid, "yesterday", "details", [AIMessage(content="Anything else to add?")])
+    assert state["ticket_draft"].rounds == 2 and state["phase"] == "collect"
+    assert "Ask whether there is anything else they'd like to add about: Does it run on Linux?" in prompt_text
+
+
+def test_done_classifies_once_and_shows_the_summary(new_path, model):
+    sid = chat()
+    state, prompt_text = confirming(new_path, sid, collected={"version": "17"}, missing=["device"],
+                                    unknown=["since when"])
+    draft = state["ticket_draft"]
+    assert state["phase"] == "confirm" and draft.classified and draft.queue == "Ole5 Technical"
+    assert (draft.collected, draft.missing, draft.unknown) == ({"version": "17"}, ["device"], ["since when"])
+    assert "The ticket summary is ready" in prompt_text
+    assert [c[0] for c in model.calls].count(Classification) == 1
+
+
+def test_done_with_classify_failing_stays_in_collect(new_path):
+    sid = chat()
+    collecting(new_path, sid)
+    state, prompt_text = new_path(sid, "nothing else", "done", [AIMessage(content="Please send that again.")])
+    assert state["phase"] == "collect" and not state["ticket_draft"].classified
+    assert "could not be built" in prompt_text and any("classify failed" in c for c in state["corrections"])
+
+
+def test_change_classifies_again(new_path, model):
+    sid = chat()
+    confirming(new_path, sid)
+    state, prompt_text = new_path(sid, "make the priority high", "change",
+                                  [AIMessage(content="Priority is now High. Submit it?")],
+                                  groundings=[GOOD.model_copy(update={"priority": "High"})])
+    assert state["phase"] == "confirm" and state["ticket_draft"].priority == "High"
+    assert "The ticket summary was updated" in prompt_text
+    assert [c[0] for c in model.calls].count(Classification) == 2
+
+
+def test_yes_creates_the_ticket(new_path):
+    sid = chat()
+    confirming(new_path, sid)
+    state, prompt_text = new_path(sid, "submit it", "yes", [AIMessage(content="Created.")])
+    number = state["created_tickets"][-1]["ticket_number"]
+    assert number.startswith("T-MOCK-") and state["ticket_draft"] is None
+    assert (state["phase"], state["pending"]) == ("none", [])
+    assert f"The ticket {number} was created." in prompt_text and "Then offer" not in prompt_text
+
+
+def test_yes_with_a_second_issue_offers_it(new_path):
+    sid = chat()
+    unanswered(new_path, sid, "Does it run on Linux?")
+    unanswered(new_path, sid, "Can I export to Excel?")
+    new_path(sid, "yes", "accept", [AIMessage(content="Which version do you use?")])
+    new_path(sid, "nothing else", "done", [AIMessage(content="Submit it?")], groundings=[GOOD])
+    state, prompt_text = new_path(sid, "submit it", "yes", [AIMessage(content="Created. A ticket for the export?")])
+    assert state["phase"] == "offer_ticket" and [p.text for p in state["pending"]] == ["Can I export to Excel?"]
+    assert "Then offer a ticket for their other issue: Can I export to Excel?" in prompt_text
+
+
+def test_yes_with_the_ticket_api_failing_stays_in_confirm(new_path, monkeypatch):
+    from ole5_chat.tickets import client as ticket_api
+    from ole5_chat.tickets.client import TicketApiError
+    sid = chat()
+    confirming(new_path, sid)
+
+    def broken(*args, **kwargs):
+        raise TicketApiError("TicketCreate: HTTP 500")
+
+    monkeypatch.setattr(ticket_api.ticket_client(), "create", broken)
+    state, prompt_text = new_path(sid, "submit it", "yes", [AIMessage(content="It could not be created.")])
+    assert state["phase"] == "confirm" and state["created_tickets"] == [] and state["ticket_draft"].classified
+    assert "The ticket could not be created" in prompt_text
+
+
+@pytest.mark.parametrize("where", ["collect", "confirm"])
+def test_cancel_drops_the_draft_and_the_issue(new_path, where):
+    sid = chat()
+    if where == "collect":
+        collecting(new_path, sid)
+    else:
+        confirming(new_path, sid)
+    state, prompt_text = new_path(sid, "cancel it", "cancel", [AIMessage(content="Cancelled.")])
+    assert (state["ticket_draft"], state["pending"], state["phase"]) == (None, [], "none")
+    assert "The customer cancelled the ticket." in prompt_text
+
+
+def test_submit_button_skips_the_router(new_path, model):
+    from ole5_chat import llm
+    sid = chat()
+    confirming(new_path, sid)
+    routed = [c for c in model.calls if c[0].__name__ == "RouteDecision"]
+    llm.tool_client.replies.append(AIMessage(content="Created."))
+    state = sessions.submit(sid)
+    assert [c for c in model.calls if c[0].__name__ == "RouteDecision"] == routed
+    assert state["created_tickets"] and state["phase"] == "none" and state["ticket_draft"] is None
+
+
+@pytest.mark.parametrize("next_", ["details", "done", "change", "cancel", "yes"])
+def test_post_check_leaves_ticket_turns_alone(next_):
+    from ole5_chat.agent import handlers
+    from ole5_chat.agent.contracts import PendingIssue, Reply
+    state = {**sessions.get(chat()), "messages": [HumanMessage(content="hmm")], "next": next_, "offered": True,
+             "phase": "collect", "pending": [PendingIssue(text="Linux", source="no_answer")],
+             "reply": Reply(say="Open a ticket?")}
+    assert [p.text for p in handlers.post_check(state)["pending"]] == ["Linux"]
+
+
+def test_ticket_turns_bind_no_tools_and_send_no_nudge(new_path):
+    from ole5_chat import llm
+    sid = chat()
+    unanswered(new_path, sid, "Does it run on Linux?")
+    start = len(llm.tool_client.bound)
+    new_path(sid, "yes", "accept", [AIMessage(content="Which version do you use?")])
+    new_path(sid, "version 17", "details", [AIMessage(content="Anything else?")])
+    state, _ = new_path(sid, "nothing else", "done", [AIMessage(content="Submit it?")], groundings=[GOOD])
+    assert llm.tool_client.bound[start:] == [None, None, None]
+    assert "nudged" not in state["corrections"]
