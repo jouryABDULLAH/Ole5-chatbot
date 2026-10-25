@@ -49,3 +49,6 @@ class Classification(BaseModel):
     summary: str | None = None
     confidence: Literal["high", "medium", "low"] | None = None
     queue_reason: str | None = None
+    collected: dict[str, str] = {}
+    missing: list[str] = []
+    unknown: list[str] = []
