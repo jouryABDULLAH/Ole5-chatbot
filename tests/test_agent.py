@@ -810,3 +810,78 @@ def test_a_details_turn_without_a_question_does_not_search(new_path):
     assert len(llm.tool_client.calls) == first + 1 and state["sources"] == []
     assert "nudged" not in state["corrections"]
 
+
+URGENT_ISSUE = "nobody in our organization can sign in"
+
+
+def test_urgent_goes_straight_to_the_summary(new_path, model):
+    from ole5_chat.agent.respond_agent import NOTE
+    sid = chat()
+    last = task_sent(new_path, sid, URGENT_ISSUE, "urgent", [AIMessage(content="It is urgent; the summary is ready.")],
+                     groundings=[GOOD])
+    state = sessions.get(sid)
+    draft = state["ticket_draft"]
+    assert state["phase"] == "confirm" and draft.classified and draft.urgent and draft.urgent_reason == URGENT_ISSUE
+    assert [p.text for p in state["pending"]] == [URGENT_ISSUE] and state["pending"][0].urgent
+    assert last.startswith(NOTE + "This is urgent, so the ticket was prepared right away")
+    assert [c[0] for c in model.calls].count(Classification) == 1
+
+
+def test_urgent_with_classify_failing_is_offered(new_path):
+    sid = chat()
+    state, prompt_text = new_path(sid, URGENT_ISSUE, "urgent", [AIMessage(content="Urgent. Open a ticket?")])
+    assert state["phase"] == "offer_ticket" and state["ticket_draft"] is None
+    assert f"This sounds urgent. This needs the support team: {URGENT_ISSUE}." in prompt_text
+    assert "could not be built" in prompt_text
+
+
+def test_urgent_waits_behind_the_current_issue_until_it_is_cancelled(new_path):
+    sid = chat()
+    collecting(new_path, sid)
+    state, prompt_text = new_path(sid, URGENT_ISSUE, "urgent", [AIMessage(content="After this one.")])
+    assert state["phase"] == "collect" and [p.text for p in state["pending"]] == ["Does it run on Linux?", URGENT_ISSUE]
+    assert "cancel the current one to start it now" in prompt_text
+    state, prompt_text = new_path(sid, "cancel the first one", "cancel", [AIMessage(content="Cancelled. Urgent one ready.")],
+                                  groundings=[GOOD])
+    assert state["phase"] == "confirm" and state["ticket_draft"].urgent and [p.text for p in state["pending"]] == [URGENT_ISSUE]
+    assert "The customer cancelled the ticket." in prompt_text and "This is urgent" in prompt_text
+
+
+def test_submit_starts_the_urgent_issue_waiting(new_path):
+    sid = chat()
+    collecting(new_path, sid)
+    new_path(sid, URGENT_ISSUE, "urgent", [AIMessage(content="After this one.")])
+    new_path(sid, "nothing else", "done", [AIMessage(content="Submit it?")], groundings=[GOOD])
+    state, prompt_text = new_path(sid, "submit it", "yes", [AIMessage(content="Created. The urgent one is ready.")],
+                                  groundings=[GOOD])
+    assert len(state["created_tickets"]) == 1 and state["phase"] == "confirm" and state["ticket_draft"].urgent
+    assert "was created." in prompt_text and "This is urgent" in prompt_text
+
+
+def test_decline_starts_the_urgent_issue_waiting(new_path):
+    sid = chat()
+    unanswered(new_path, sid, "Does it run on Linux?")
+    new_path(sid, URGENT_ISSUE, "urgent", [AIMessage(content="After this one.")])
+    state, prompt_text = new_path(sid, "no thanks", "decline", [AIMessage(content="Okay. The urgent one is ready.")],
+                                  groundings=[GOOD])
+    assert state["phase"] == "confirm" and state["ticket_draft"].urgent and [p.text for p in state["pending"]] == [URGENT_ISSUE]
+    assert "This is urgent" in prompt_text
+
+
+def test_change_keeps_an_urgent_draft_urgent(new_path):
+    sid = chat()
+    new_path(sid, URGENT_ISSUE, "urgent", [AIMessage(content="Ready.")], groundings=[GOOD])
+    state, _ = new_path(sid, "make the priority high", "change", [AIMessage(content="Changed.")],
+                        groundings=[GOOD.model_copy(update={"priority": "High", "urgent": False, "missing": ["device"]})])
+    draft = state["ticket_draft"]
+    assert draft.urgent and draft.urgent_reason == URGENT_ISSUE and draft.missing == ["device"] and draft.priority == "High"
+
+
+def test_post_check_never_classifies(model):
+    from ole5_chat.agent import handlers
+    from ole5_chat.agent.contracts import Reply
+    state = {**sessions.get(chat()), "messages": [HumanMessage(content="Does it run on Linux?")], "next": "chat",
+             "offered": True, "phase": "none", "pending": [], "reply": Reply(say="No answer. Open a ticket?")}
+    out = handlers.post_check(state)
+    assert out["phase"] == "offer_ticket" and not out["pending"][0].urgent
+    assert Classification not in [c[0] for c in model.calls]
