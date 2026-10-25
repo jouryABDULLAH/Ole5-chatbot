@@ -56,23 +56,32 @@ def current_identity(session_id: str) -> Identity:
 ATTACHED = "[attached: {}]"
 
 
+_locks: dict[str, threading.Lock] = {}
+_locks_guard = threading.Lock()
+
+
+def _lock(session_id: str) -> threading.Lock:
+    """One lock per session: a typed yes and the Submit button cannot both pass check() and create two tickets."""
+    with _locks_guard:
+        return _locks.setdefault(session_id, threading.Lock())
+
+
 def send(session_id: str, text: str, attachment_ids: list[str] = ()) -> ChatState:
-    state = get(session_id)
-    names = [f["file_name"] for f in state["attachments"] if f["id"] in attachment_ids]
-    if len(names) != len(set(attachment_ids)):
-        raise AttachmentNotFound()
-    if names:
-        text = f"{text}\n{ATTACHED.format(', '.join(names))}".strip()
-    log.info("message  session=%s %r", session_id[:8], text)
-    with using_session(session_id):
-        return _graph.invoke({"messages": [HumanMessage(content=text)]}, _config(session_id))
-
-
-_submit_lock = threading.Lock()
+    with _lock(session_id):
+        state = get(session_id)
+        names = [f["file_name"] for f in state["attachments"] if f["id"] in attachment_ids]
+        if len(names) != len(set(attachment_ids)):
+            raise AttachmentNotFound()
+        if names:
+            text = f"{text}\n{ATTACHED.format(', '.join(names))}".strip()
+        log.info("message  session=%s %r", session_id[:8], text)
+        with using_session(session_id):
+            # next cleared: after a turn that failed past the router, this message must not go straight to a handler.
+            return _graph.invoke({"messages": [HumanMessage(content=text)], "next": None}, _config(session_id))
 
 
 def attach(session_id: str, file_name: str, data: bytes) -> dict:
-    with _submit_lock:
+    with _lock(session_id):
         state = get(session_id)
         added = attachments.save(session_id, file_name, data, len(state["attachments"]))
         _graph.update_state(_config(session_id), {"attachments": [*state["attachments"], added]}, as_node="validate")
@@ -80,7 +89,7 @@ def attach(session_id: str, file_name: str, data: bytes) -> dict:
 
 
 def detach(session_id: str, att_id: str) -> bool:
-    with _submit_lock:
+    with _lock(session_id):
         state = get(session_id)
         kept = [f for f in state["attachments"] if f["id"] != att_id]
         if len(kept) == len(state["attachments"]):
@@ -91,6 +100,6 @@ def detach(session_id: str, att_id: str) -> bool:
 
 
 def submit(session_id: str) -> ChatState:
-    with _submit_lock, using_session(session_id):
+    with _lock(session_id), using_session(session_id):
         check(get(session_id))
         return _graph.invoke({"next": "yes"}, _config(session_id))
