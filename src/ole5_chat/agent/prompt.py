@@ -134,13 +134,12 @@ TASKS = {
                          "opened. Example: the customer asks how to reset their password while a ticket offer for "
                          "'dark mode' is open. Reply with the password steps, then: 'Would you still like me to open "
                          "the ticket about dark mode?'",
-    "chat_ticket": "Answer the customer's message as usual. A ticket is being prepared for: {issue}. Then ask what the "
-                   "support team will need to act on it, a few things at a time, skipping what the customer already "
-                   "said.",
+    "chat_ticket": "Answer the customer's message as usual. Then continue the current ticket: {current}",
     "offer": "This needs the support team: {issue}. Say in one line that you can't resolve it here, and ask whether "
              "they would like a ticket opened.",
-    "queued": "Answer the customer's message as usual. Their new issue ({new}) will be handled after the current one "
-              "({issue}); say so in one line.",
+    "queued": "The customer raised a new issue: {new}. It will be handled after the current ticket ({issue}). Say so in "
+              "one line. Don't answer the new issue and don't offer a ticket for it now. Then continue the current "
+              "ticket: {current}",
     "accept": "The customer agreed to a ticket for: {issue}. Ask what the support team will need to act on it: work "
               "out the likely cause and ask what would confirm or rule it out, a few things at a time, skipping what "
               "the customer already said. Ask about what the customer sees and did. Don't name a screen, template, "
@@ -152,20 +151,23 @@ TASKS = {
                 "a ticket was cancelled or closed, and say they can contact support at any time.",
     "urgent_ready": "This is urgent, so the ticket was prepared right away without the usual questions: {issue}. The "
                     "summary is shown with a Submit button. Nothing has been created yet. Say in one line that because "
-                    "it is urgent the summary is ready now, and ask whether to submit it. Don't repeat the summary.",
+                    "it is urgent the summary is ready now, and ask whether to submit the ticket for: {issue}. Don't "
+                    "repeat the summary.",
     "details": "Ask what else the support team needs to act on: {issue}. A few things at a time, skipping what the "
                "customer already said. If the team has enough, ask instead whether there is anything else they'd like "
                "to add. Ask about what the customer sees and did. Don't name a screen, template, setting or option "
                "unless a passage names it. If the customer also asked a question in this message, search for it and "
                "answer it first, then continue. Otherwise don't search. Nothing has been created yet; the ticket is "
-               "created only when they submit the summary. Don't say a ticket is opened, created or being opened.",
+               "created only when they submit the summary. Don't say a ticket is opened, created or being opened. "
+               "Don't ask again a question you already asked; if the customer didn't answer it, they don't know.",
     "open_question": "Ask whether there is anything else they'd like to add about: {issue}. Nothing else.",
     "confirm": "The ticket summary is ready and shown with a Submit button. Nothing has been created yet; the ticket is "
-               "created only when they submit. Say the summary is ready in one line and ask whether to submit it. "
+               "created only when they submit. Say the summary is ready in one line and ask whether to submit the "
+               "ticket for: {issue}. "
                "Don't say the ticket is created, opened or being opened. Don't repeat the summary.",
     "changed": "The ticket summary was updated as the customer asked and is shown again. Say what changed in one line "
-               "and ask whether to submit it. If the customer also asked a question in this message, search for it and "
-               "answer it first, then continue. Otherwise don't search.",
+               "and ask whether to submit the ticket for: {issue}. If the customer also asked a question in this message, "
+               "search for it and answer it first, then continue. Otherwise don't search.",
     "created": "The ticket {number} was created. Tell the customer its number and that the support team will reply by "
                "email. Nothing more.",
     "cancelled": "The customer cancelled the ticket. Acknowledge it in one line and say they can contact support at any "
@@ -173,6 +175,12 @@ TASKS = {
 }
 URGENT = "This sounds urgent. "
 # Appended to queued when the new issue is urgent.
+# How a reply goes back to the current ticket, by phase (the queued task, and chat in collect or confirm).
+CURRENT = {
+    "offer_ticket": "ask whether they would like a ticket for: {issue}.",
+    "collect": "ask what else the support team needs for: {issue}.",
+    "confirm": "the summary for {issue} is still shown; ask whether to submit it.",
+}
 QUEUED_URGENT = " Because the new issue is urgent, also say they can cancel the current one to start it now."
 
 

@@ -5,7 +5,7 @@ import logging
 from ole5_chat import values
 from ole5_chat.agent import classify as classifier
 from ole5_chat.agent.contracts import PendingIssue, Phase
-from ole5_chat.agent.prompt import QUEUED_URGENT, TASKS, URGENT
+from ole5_chat.agent.prompt import CURRENT, QUEUED_URGENT, TASKS, URGENT
 from ole5_chat.agent.state import ChatState, TicketDraft
 from ole5_chat.config import get_settings
 from ole5_chat.tickets import client as ticket_api
@@ -65,8 +65,10 @@ def chat(state: ChatState) -> dict:
     phase, pending = state["phase"], state["pending"]
     if phase == "none":
         return {"task": TASKS["chat"]}
-    key = "chat_offer_ticket" if phase == "offer_ticket" else "chat_ticket"
-    return {"task": TASKS[key].format(issue=pending[0].text)}
+    issue = pending[0].text
+    if phase == "offer_ticket":
+        return {"task": TASKS["chat_offer_ticket"].format(issue=issue)}
+    return {"task": TASKS["chat_ticket"].format(current=CURRENT[phase].format(issue=issue))}
 
 
 def queue(state: ChatState) -> dict:
@@ -76,7 +78,9 @@ def queue(state: ChatState) -> dict:
     if state["phase"] == "none":
         update, fragment = next_issue(state, pending)
         return {**update, "task": fragment}
-    queued = TASKS["queued"].format(new=text, issue=pending[0].text)
+    issue = pending[0].text
+    current = CURRENT[state["phase"]].format(issue=issue)
+    queued = TASKS["queued"].format(new=text, issue=issue, current=current)
     return {"pending": pending, "task": queued + (QUEUED_URGENT if state["next"] == "urgent" else "")}
 
 
@@ -106,20 +110,21 @@ def _nothing_missing(draft: TicketDraft) -> TicketDraft:
 def done(state: ChatState) -> dict:
     out = classifier.classify(state)
     if "ticket_draft" in out:
-        return {"ticket_draft": _nothing_missing(out["ticket_draft"]), "phase": "confirm", "task": TASKS["confirm"]}
+        return {"ticket_draft": _nothing_missing(out["ticket_draft"]), "phase": "confirm",
+                "task": TASKS["confirm"].format(issue=state["pending"][0].text)}
     return {**out, "task": TASKS["open_question"].format(issue=state["pending"][0].text)}
 
 
 def change(state: ChatState) -> dict:
     out = classifier.classify(state)
     if "ticket_draft" not in out:
-        return {**out, "task": TASKS["confirm"]}
+        return {**out, "task": TASKS["confirm"].format(issue=state["pending"][0].text)}
     draft, old = out["ticket_draft"], state["ticket_draft"]
     if state["pending"][0].urgent:  # An urgent ticket stays urgent and keeps what is missing: it skipped the questions.
         draft = draft.model_copy(update={"urgent": True, "urgent_reason": draft.urgent_reason or old.urgent_reason})
     else:
         draft = _nothing_missing(draft)
-    return {"ticket_draft": draft, "task": TASKS["changed"]}
+    return {"ticket_draft": draft, "task": TASKS["changed"].format(issue=state["pending"][0].text)}
 
 
 def cancel(state: ChatState) -> dict:
@@ -133,7 +138,7 @@ def submit(state: ChatState) -> dict:
         ticket, corrections = tickets.submit(state, ticket_api.ticket_client())
     except (tickets.SubmitRefused, TicketApiError) as exc:
         log.warning("handlers  ticket not created: %s", exc)
-        return {"note": NOT_CREATED, "task": TASKS["confirm"],
+        return {"note": NOT_CREATED, "task": TASKS["confirm"].format(issue=state["pending"][0].text),
                 "corrections": state["corrections"] + [f"submit failed: {exc}"]}
     done_state = {**state, "ticket_draft": None, "corrections": state["corrections"] + corrections}
     update, fragment = next_issue(done_state, state["pending"][1:])

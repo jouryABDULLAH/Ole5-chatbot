@@ -768,13 +768,14 @@ def test_the_task_is_the_last_message_off_the_plain_chat_turn(new_path):
     assert plain == "How do I save a draft?"
     unanswered(new_path, sid, "Does it run on Linux?")
     turns = [
-        (("We need to migrate our data", "ticket", [AIMessage(content="After this one.")]), {}, "Answer the customer's message as usual. Their new issue"),
+        (("We need to migrate our data", "ticket", [AIMessage(content="After this one.")]), {}, "The customer raised a new issue: We need to migrate our data."),
         (("How do I save a draft?", "chat", [searching("drafts"), AIMessage(content="Press Save. Still want it?")], [hit("Guide")],
           [ground(True, False, ["Guide"])]), {}, "Answer the customer's message as usual. A ticket offer"),
         (("yes", "accept", [AIMessage(content="Which version?")]), {}, "The customer agreed to a ticket"),
         (("version 17", "details", [AIMessage(content="Anything else?")]), {}, "Ask what else the support team needs"),
         (("how long do replies take?", "chat", [searching("replies"), AIMessage(content="No answer.")], [miss()],
-          [ground(False, False)]), {}, "Answer the customer's message as usual. A ticket is being"),
+          [ground(False, False)]), {},
+         "Answer the customer's message as usual. Then continue the current ticket: ask what else the support team needs"),
         (("nothing else", "done", [AIMessage(content="Submit it?")]), {"groundings": [GOOD]}, "The ticket summary is ready"),
         (("high priority", "change", [AIMessage(content="Changed. Submit?")]), {"groundings": [GOOD]}, "The ticket summary was updated"),
         (("submit", "yes", [AIMessage(content="Created.")]), {}, "The ticket T-MOCK-"),
@@ -885,3 +886,33 @@ def test_post_check_never_classifies(model):
     out = handlers.post_check(state)
     assert out["phase"] == "offer_ticket" and not out["pending"][0].urgent
     assert Classification not in [c[0] for c in model.calls]
+
+
+@pytest.mark.parametrize("phase", ["offer_ticket", "collect", "confirm"])
+def test_a_queued_issue_goes_back_to_the_current_ticket(new_path, phase):
+    from ole5_chat.agent.respond_agent import NOTE
+    sid = chat()
+    if phase == "offer_ticket":
+        unanswered(new_path, sid, "Does it run on Linux?")
+    elif phase == "collect":
+        collecting(new_path, sid)
+    else:
+        confirming(new_path, sid)
+    task = task_sent(new_path, sid, "We need to migrate our data", "ticket", [AIMessage(content="After this one.")])
+    ending = {"offer_ticket": "ask whether they would like a ticket for: Does it run on Linux?.",
+              "collect": "ask what else the support team needs for: Does it run on Linux?.",
+              "confirm": "the summary for Does it run on Linux? is still shown; ask whether to submit it."}[phase]
+    assert task.startswith(NOTE + "The customer raised a new issue: We need to migrate our data.") and task.endswith(ending)
+    assert "don't offer a ticket for it now" in task and "This needs the support team" not in task
+    assert sessions.get(sid)["phase"] == phase
+
+
+def test_a_chat_turn_in_confirm_goes_back_to_the_submit_question(new_path):
+    sid = chat()
+    confirming(new_path, sid)
+    task = task_sent(new_path, sid, "how long do replies take?", "chat",
+                     [searching("reply time"), AIMessage(content="No answer. Submit the summary?")], [miss()],
+                     [ground(False, False)])
+    assert task.endswith("the summary for Does it run on Linux? is still shown; ask whether to submit it.")
+    assert "what the support team will need" not in task and sessions.get(sid)["phase"] == "confirm"
+
