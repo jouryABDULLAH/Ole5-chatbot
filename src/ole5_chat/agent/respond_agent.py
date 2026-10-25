@@ -38,6 +38,7 @@ class Grounding(BaseModel):
     answered: bool
     offered: bool
     unsupported: list[str]
+    needs_search: bool = True
 
 
 def _invoke(convo: list[BaseMessage], tool, tool_choice: str | None = None) -> AIMessage:
@@ -99,7 +100,7 @@ def _is_json(text: str) -> bool:
 
 
 def _gates(convo, tool, sink, customer, text, corrections, chat) -> tuple[str, list[str], bool]:
-    """Gate 1 runs only on the chat path, when nothing was searched: the grounding call with no passages asks whether the reply states product facts. If not (a greeting, thanks), it is kept with no nudge; if so, the nudge asks for a search, and a reply still unsearched becomes the no-answer wording. Gate 2, is the reply drawn from a DIRECT passage; a reply with no DIRECT passage behind it is grounded with no passages. Returns the reply, its sources and whether it offers a ticket."""
+    """Gate 1 runs only on the chat path, when nothing was searched: the grounding call with no passages asks whether the reply states product facts and whether the message needs a search. A greeting, thanks or small talk is kept with no nudge; anything else gets the nudge, and a reply still unsearched becomes the no-answer wording. Gate 2, is the reply drawn from a DIRECT passage; a reply with no DIRECT passage behind it is grounded with no passages. Returns the reply, its sources and whether it offers a ticket."""
     if not sink and not chat:
         return text, [], False
     if not sink:
@@ -109,7 +110,7 @@ def _gates(convo, tool, sink, customer, text, corrections, chat) -> tuple[str, l
             log.warning("respond_agent  grounding call failed: %s", str(exc)[:300])
             corrections.append("grounding call failed")
             return text, [], False
-        if not grounding.answered:
+        if not grounding.answered and not grounding.needs_search:
             corrections.append("no search needed")
             return text, [], grounding.offered
         convo.append(HumanMessage(content=NUDGE))

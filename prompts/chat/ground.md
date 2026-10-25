@@ -8,5 +8,7 @@ Return offered: true only when the reply says part of the question is not answer
 
 Return unsupported: every fact, name, field, value or step the reply states that none of the passages states, quoted from the reply. A fact from a passage that is applied to a different situation than the passage describes is unsupported too. So is any limit, "only", "cannot", "not supported" or "not possible" that no passage states in those terms: a passage listing what exists does not say that nothing else exists. Empty when every fact in the reply is in a passage. When no passages are given, leave it empty.
 
+Return needs_search: true when the customer's message asks something or reports a problem, whatever the reply did; false only for a greeting, thanks, small talk or an acknowledgement.
+
 Reply with JSON only, matching this schema:
 {{schema}}

@@ -194,11 +194,23 @@ def test_respond_agent_without_a_direct_passage_is_grounded_with_no_passages(mod
 
 def test_respond_agent_keeps_a_thanks_without_a_nudge_or_a_search(model, respond_node):
     from ole5_chat.agent.respond_agent import Grounding
-    model.add(Grounding(used=[], answered=False, offered=False, unsupported=[]))
+    model.add(Grounding(used=[], answered=False, offered=False, unsupported=[], needs_search=False))
     out, fake = respond_node("شكراً", [AIMessage(content="العفو، أنا هنا إن احتجت شيئاً.")])
     assert len(fake.calls) == 1 and len(grounding(model)) == 1
     assert out["reply"].say == "العفو، أنا هنا إن احتجت شيئاً." and out["reply"].sources == []
     assert out["corrections"] == ["no search needed"] and out["last_retrieval"] is None
+
+
+def test_respond_agent_nudges_a_clarifying_question_on_a_reported_problem(model, respond_node):
+    from ole5_chat.agent.respond_agent import NUDGE, Grounding
+    model.add(Grounding(used=[], answered=False, offered=False, unsupported=[], needs_search=True),
+              Grounding(used=[], answered=False, offered=True, unsupported=[]))
+    out, fake = respond_node("The barcode prints in the wrong place", [AIMessage(content="Which template do you use?"),
+                                                                       searching("barcode position"),
+                                                                       AIMessage(content="No answer. Open a ticket?")],
+                             [miss()])
+    assert sent(fake, 1)[-1].content == NUDGE and out["corrections"][0] == "nudged"
+    assert out["reply"].say == "No answer. Open a ticket?" and out["offered"] is True
 
 
 def test_respond_agent_searches_when_nudged(model, respond_node):
@@ -459,9 +471,9 @@ def new_path(monkeypatch, model):
     return send
 
 
-def ground(answered, offered, used=()):
+def ground(answered, offered, used=(), needs_search=True):
     from ole5_chat.agent.respond_agent import Grounding
-    return Grounding(used=list(used), answered=answered, offered=offered, unsupported=[])
+    return Grounding(used=list(used), answered=answered, offered=offered, unsupported=[], needs_search=needs_search)
 
 
 def offered_seen(sid):
@@ -511,7 +523,7 @@ def test_new_path_answer_without_a_direct_passage_is_replaced(new_path):
 
 def test_new_path_greeting_queues_nothing(new_path):
     sid = chat()
-    state, _ = new_path(sid, "مرحبا", "chat", [AIMessage(content="أهلاً بك")], groundings=[ground(False, False)])
+    state, _ = new_path(sid, "مرحبا", "chat", [AIMessage(content="أهلاً بك")], groundings=[ground(False, False, needs_search=False)])
     assert (state["phase"], state["pending"]) == ("none", []) and not offered_seen(sid)
 
 
