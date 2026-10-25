@@ -6,9 +6,7 @@
 __pycache__/
 *.pyc
 .pytest_cache/
-kb_export/
 uploads/
-/sheets
 *.egg-info/
 exp_results/
 .evalkit/
