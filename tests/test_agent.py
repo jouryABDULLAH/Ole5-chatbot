@@ -192,27 +192,19 @@ def test_respond_agent_without_a_direct_passage_is_grounded_with_no_passages(mod
     assert len(grounding(model)) == 1
 
 
-def test_respond_agent_keeps_a_greeting_written_without_a_search(model, respond_node):
-    from ole5_chat.agent.respond_agent import NUDGE, Grounding
-    model.add(Grounding(used=[], answered=False, offered=False, unsupported=[]))
-    out, fake = respond_node("مرحبا", [AIMessage(content="أهلاً بك، كيف أقدر أساعدك؟"),
-                                       AIMessage(content="أهلاً بك، كيف أقدر أساعدك؟")])
-    assert sent(fake)[-1].content == NUDGE
-    assert out["reply"].say == "أهلاً بك، كيف أقدر أساعدك؟" and out["reply"].sources == []
-    assert out["corrections"] == ["nudged", "replied without searching"] and out["last_retrieval"] is None
-
-
-def test_respond_agent_keeps_the_first_reply_when_the_nudge_brings_no_search(model, respond_node):
+def test_respond_agent_keeps_a_thanks_without_a_nudge_or_a_search(model, respond_node):
     from ole5_chat.agent.respond_agent import Grounding
     model.add(Grounding(used=[], answered=False, offered=False, unsupported=[]))
-    out, _ = respond_node("مرحبا", [AIMessage(content="أهلاً بك، كيف أقدر أساعدك؟"),
-                                    AIMessage(content="أهلاً، لا يلزم البحث لهذه التحية.")])
-    assert out["reply"].say == "أهلاً بك، كيف أقدر أساعدك؟"
+    out, fake = respond_node("شكراً", [AIMessage(content="العفو، أنا هنا إن احتجت شيئاً.")])
+    assert len(fake.calls) == 1 and len(grounding(model)) == 1
+    assert out["reply"].say == "العفو، أنا هنا إن احتجت شيئاً." and out["reply"].sources == []
+    assert out["corrections"] == ["no search needed"] and out["last_retrieval"] is None
 
 
 def test_respond_agent_searches_when_nudged(model, respond_node):
     from ole5_chat.agent.respond_agent import NUDGE, Grounding
-    model.add(Grounding(used=["Guide"], answered=True, offered=False, unsupported=[]))
+    model.add(Grounding(used=[], answered=True, offered=False, unsupported=[]),
+              Grounding(used=["Guide"], answered=True, offered=False, unsupported=[]))
     out, fake = respond_node("How do I save a draft?", [AIMessage(content="Press Save."),
                                                         searching("How to save a draft?"),
                                                         AIMessage(content="Press Save as draft.")], [hit("Guide")])
@@ -472,11 +464,6 @@ def ground(answered, offered, used=()):
     return Grounding(used=list(used), answered=answered, offered=offered, unsupported=[])
 
 
-def plain(text):
-    """A reply written without a search, and the same reply again after the nudge."""
-    return [AIMessage(content=text), AIMessage(content=text)]
-
-
 def offered_seen(sid):
     return any(s.values.get("offered") for s in sessions._graph.get_state_history(sessions._config(sid)))
 
@@ -524,7 +511,7 @@ def test_new_path_answer_without_a_direct_passage_is_replaced(new_path):
 
 def test_new_path_greeting_queues_nothing(new_path):
     sid = chat()
-    state, _ = new_path(sid, "مرحبا", "chat", plain("أهلاً بك"), groundings=[ground(False, False)])
+    state, _ = new_path(sid, "مرحبا", "chat", [AIMessage(content="أهلاً بك")], groundings=[ground(False, False)])
     assert (state["phase"], state["pending"]) == ("none", []) and not offered_seen(sid)
 
 

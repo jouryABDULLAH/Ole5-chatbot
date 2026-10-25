@@ -99,16 +99,25 @@ def _is_json(text: str) -> bool:
 
 
 def _gates(convo, tool, sink, customer, text, corrections, chat) -> tuple[str, list[str], bool]:
-    """Gate 1, did it search, runs only on the chat path: the offer, accept and decline tasks need no search. Gate 2, is the reply drawn from a DIRECT passage. A reply with no DIRECT passage behind it is grounded with no passages. Returns the reply, its sources and whether it offers a ticket."""
+    """Gate 1 runs only on the chat path, when nothing was searched: the grounding call with no passages asks whether the reply states product facts. If not (a greeting, thanks), it is kept with no nudge; if so, the nudge asks for a search, and a reply still unsearched becomes the no-answer wording. Gate 2, is the reply drawn from a DIRECT passage; a reply with no DIRECT passage behind it is grounded with no passages. Returns the reply, its sources and whether it offers a ticket."""
     if not sink and not chat:
         return text, [], False
     if not sink:
-        first = text
+        try:
+            grounding = _ground(customer, text, None)
+        except llm.ModelFailed as exc:
+            log.warning("respond_agent  grounding call failed: %s", str(exc)[:300])
+            corrections.append("grounding call failed")
+            return text, [], False
+        if not grounding.answered:
+            corrections.append("no search needed")
+            return text, [], grounding.offered
         convo.append(HumanMessage(content=NUDGE))
         corrections.append("nudged")
         text = _loop(convo, tool, corrections)
         if not sink:
-            text = first  # It answered the nudge without searching: the second reply adds nothing.
+            corrections.append("answer without searching")
+            return _no_answer(convo, tool), [], True
     for attempt in (1, 2):
         retrieval = merge(sink) if sink else None
         direct = list(dict.fromkeys(e.document for e in retrieval.direct)) if retrieval else []
@@ -120,10 +129,8 @@ def _gates(convo, tool, sink, customer, text, corrections, chat) -> tuple[str, l
             return text, direct, False
         if not direct:
             if grounding.answered:
-                corrections.append("answer without a DIRECT passage" if sink else "answer without searching")
+                corrections.append("answer without a DIRECT passage")
                 return _no_answer(convo, tool), [], True
-            if not sink:
-                corrections.append("replied without searching")
             return text, [], grounding.offered
         used = [d for d in direct if any(d in u for u in grounding.used)]
         log.info("respond_agent  grounding attempt=%d answered=%s offered=%s used=%s unsupported=%s", attempt,
