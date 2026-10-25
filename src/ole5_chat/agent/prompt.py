@@ -124,8 +124,9 @@ def _persona(config: products.ProductConfig, language: str) -> str:
     return "\n".join(lines)
 
 
-RESPOND_TASK = ("Answer the customer from what the search returns. If no passage answers the question, say you have "
-                "no answer for this and ask whether they would like a ticket opened.")
+RESPOND_TASK = ("If the message is only a greeting, thanks or small talk, reply as the persona's greeting rules say "
+                "and don't search. Otherwise: answer the customer from what the search returns. If no passage answers "
+                "the question, say you have no answer for this and ask whether they would like a ticket opened.")
 
 
 # What respond_agent is asked to do this turn, set by the handler. {issue} is pending[0].text, {new} the issue just queued.
