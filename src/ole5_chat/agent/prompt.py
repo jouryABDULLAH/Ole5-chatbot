@@ -142,14 +142,16 @@ TASKS = {
               "({issue}); say so in one line.",
     "accept": "The customer agreed to a ticket for: {issue}. Ask what the support team will need to act on it: work "
               "out the likely cause and ask what would confirm or rule it out, a few things at a time, skipping what "
-              "the customer already said.",
+              "the customer already said. Ask about what the customer sees and did. Don't name a screen, template, "
+              "setting or option unless a passage names it.",
     "decline": "The customer said no to opening a ticket; none was opened. Acknowledge it in one line without saying a "
                "ticket was cancelled or closed, and say they can contact support at any time. Stay available.",
     "decline_next": "The customer said no to opening a ticket; none was opened. Acknowledge it in one line without "
                     "saying a ticket was cancelled or closed, then offer a ticket for their other issue: {issue}.",
     "details": "Ask what else the support team needs to act on: {issue}. A few things at a time, skipping what the "
                "customer already said. If the team has enough, ask instead whether there is anything else they'd like "
-               "to add.",
+               "to add. Ask about what the customer sees and did. Don't name a screen, template, setting or option "
+               "unless a passage names it.",
     "open_question": "Ask whether there is anything else they'd like to add about: {issue}. Nothing else.",
     "confirm": "The ticket summary is ready and shown with a Submit button. Nothing has been created yet; the ticket is "
                "created only when they submit. Say the summary is ready in one line and ask whether to submit it. "
