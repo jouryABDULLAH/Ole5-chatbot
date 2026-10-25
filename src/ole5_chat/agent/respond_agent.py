@@ -137,7 +137,7 @@ def _ground(exchange: str, text: str, retrieval: Retrieval) -> Grounding:
 def _answer(convo, retrieval: Retrieval, exchange: str, language: str, corrections: list[str],
             question: bool) -> tuple[str, list[str], str]:
     """The reply from DIRECT passages, its sources and its status. A reply with statements no passage makes is retried
-    once, then becomes the no-answer wording; so is one that declines an answerable search. On a ticket turn the
+    once, then becomes the no-answer wording. On a ticket turn the
     passages are only for a question asked on the side: the reply need not use them, and one that still states
     unsupported facts is written again without product facts."""
     direct = list(dict.fromkeys(e.document for e in retrieval.direct))
@@ -151,12 +151,7 @@ def _answer(convo, retrieval: Retrieval, exchange: str, language: str, correctio
             corrections.append(f"language: {exc}")
         convo.append(AIMessage(content=answer.reply))
         if answer.status == "no_answer" and question:
-            if retrieval.verdict != Verdict.ANSWERABLE or attempt == 2:
-                return answer.reply, [], "no_answer"
-            convo.append(HumanMessage(content=NOTE + "A passage answers this directly. Write what it says, even if it "
-                                      "is one sentence, and nothing more."))
-            corrections.append("retried: declined")
-            continue
+            return answer.reply, [], "no_answer"
         try:
             grounding = _ground(exchange, answer.reply, retrieval)
         except llm.ModelFailed as exc:

@@ -229,18 +229,11 @@ def test_a_question_about_the_assistant_needs_no_search(model, respond_node):
     assert "This message needs no search" in sent(fake)[0].content
 
 
-def test_respond_agent_declining_a_direct_passage_twice_gives_the_no_answer(model, respond_node):
-    model.add(answer("no_answer", "Open a ticket?")[0], answer("no_answer", "I have no answer for that. Open a ticket?")[0])
+def test_a_declined_direct_passage_is_the_no_answer_without_a_retry(model, respond_node):
+    model.add(answer("no_answer", "I have no answer for that. Open a ticket?")[0])
     out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?")], [hit("Guide")])
     assert out["reply"].say.startswith("I have no answer") and out["reply"].sources == []
-    assert out["offered"] is True and out["corrections"] == ["retried: declined"] and grounding(model) == []
-
-
-def test_a_partial_search_declined_is_not_retried(model, respond_node):
-    model.add(answer("no_answer", "I have no answer for that. Open a ticket?")[0])
-    out, _ = respond_node("How long are drafts kept?", [searching("draft retention")],
-                          [hit("Guide", verdict=Verdict.PARTIAL)])
-    assert out["offered"] is True and out["corrections"] == []
+    assert out["offered"] is True and out["corrections"] == [] and grounding(model) == []
 
 
 def test_respond_agent_cites_every_direct_document_when_grounding_fails(model, respond_node):
