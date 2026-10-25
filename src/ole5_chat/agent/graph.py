@@ -6,9 +6,11 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.graph import END, START, StateGraph
 
 from ole5_chat import llm, products, values
-from ole5_chat.agent import prompt
+from ole5_chat.agent import lanes, prompt
 from ole5_chat.agent.contracts import Classification, Reply, RouterDecision, Step
+from ole5_chat.agent.lanes import _new_draft
 from ole5_chat.agent.respond_agent import respond_agent
+from ole5_chat.agent.router_v2 import router_v2
 from ole5_chat.agent.state import ChatState, TicketDraft
 from ole5_chat.agent.validate import NAMES, SORRY, check_ticket, language_of, language_problem
 from ole5_chat.config import get_settings
@@ -29,10 +31,6 @@ def _direct_documents(state: ChatState) -> list[str]:
     return list(dict.fromkeys(e.document for e in Retrieval.from_json(state["last_retrieval"]).direct))
 
 
-def _new_draft(state: ChatState) -> TicketDraft:
-    return TicketDraft(product=values.catalog(state["identity"].product).service)
-
-
 def _with_details(draft: TicketDraft, decision: RouterDecision) -> TicketDraft:
     unknown = list(dict.fromkeys([*draft.unknown, *decision.unknown]))
     return draft.model_copy(update={"collected": {**draft.collected, **decision.collected}, "unknown": unknown,
@@ -51,7 +49,7 @@ def _no_answer() -> Step:
 def route(state: ChatState) -> str:
     if not state["messages"]:
         return "greet"
-    return "respond_agent" if get_settings().respond_agent else "router"
+    return "router_v2" if get_settings().respond_agent else "router"
 
 
 def greet(state: ChatState) -> dict:
@@ -210,9 +208,10 @@ def respond(state: ChatState) -> dict:
 def validate(state: ChatState) -> dict:
     reply, step = state["reply"], state["step"]
     if step is None:
-        log.info("validate  respond_agent reply sources=%s", reply.sources)
+        log.info("validate  respond_agent reply phase=%s pending=%d sources=%s", state["chat_phase"],
+                 len(state["pending"]), reply.sources)
         return {"messages": [AIMessage(content=reply.say)], "sources": reply.sources, "last_retrieval": None,
-                "note": None}
+                "note": None, "task": None, "next": None, "offered": False}
     sources: list[str] = []
     if step == "answer":
         direct = _direct_documents(state)
@@ -230,9 +229,16 @@ def build(checkpointer):
     g.add_node("greet", greet)
     g.add_node("validate", validate)
     if get_settings().respond_agent:
-        g.add_node("respond_agent", respond_agent)
-        g.add_conditional_edges(START, route, ["greet", "respond_agent"])
-        g.add_edge("respond_agent", "validate")
+        for name, node in (("router_v2", router_v2), ("chat", lanes.chat), ("queue", lanes.queue),
+                           ("accept", lanes.accept), ("decline", lanes.decline), ("respond_agent", respond_agent),
+                           ("post_check", lanes.post_check)):
+            g.add_node(name, node)
+        g.add_conditional_edges(START, route, ["greet", "router_v2"])
+        g.add_conditional_edges("router_v2", lanes.lane, ["chat", "queue", "accept", "decline"])
+        for name in ("chat", "queue", "accept", "decline"):
+            g.add_edge(name, "respond_agent")
+        g.add_edge("respond_agent", "post_check")
+        g.add_edge("post_check", "validate")
     else:
         for name, node in (("router", router), ("search", search), ("classify", classify), ("respond", respond)):
             g.add_node(name, node)
