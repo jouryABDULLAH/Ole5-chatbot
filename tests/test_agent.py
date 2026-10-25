@@ -926,3 +926,12 @@ def test_post_check_does_not_queue_an_unsearched_message():
     out = handlers.post_check(state)
     assert out["pending"] == [] and out["phase"] == "none"
 
+
+
+def test_a_question_about_the_assistant_needs_no_search(model, respond_node):
+    from ole5_chat.agent.respond_agent import Grounding
+    model.add(Grounding(used=[], answered=False, offered=False, unsupported=[], needs_search=False))
+    intro = "أنا مساعد دعم Ole5، أجيب عن أسئلتك حول النظام وأفتح لك تذكرة دعم عند الحاجة."
+    out, fake = respond_node("من أنت", [AIMessage(content=intro)])
+    assert len(fake.calls) == 1 and out["reply"].say == intro and out["reply"].sources == []
+    assert out["corrections"] == ["no search needed"] and out["last_retrieval"] is None
