@@ -770,3 +770,150 @@ def test_initial_state_has_the_router_v2_fields():
     state = sessions.get(chat())
     assert (state["chat_phase"], state["pending"], state["next"], state["task"], state["language"]) == \
         ("none", [], None, None, None)
+
+
+@pytest.fixture
+def new_path(monkeypatch, model):
+    """The RESPOND_AGENT graph with a scripted router, tool model, searches and grounding calls. send() runs one turn
+    and returns the state and the system prompt respond_agent was given."""
+    from langgraph.checkpoint.memory import MemorySaver
+    from ole5_chat import llm
+    from ole5_chat.agent.contracts import route_schema
+    from ole5_chat.config import get_settings
+    from ole5_chat.knowledge import tool
+    monkeypatch.setenv("RESPOND_AGENT", "true")
+    get_settings.cache_clear()
+    monkeypatch.setattr(sessions, "_graph", graph.build(MemorySaver(serde=sessions._serde)))
+    found, fake = [], ToolModel()
+    monkeypatch.setattr(tool, "search", lambda question, product: found.pop(0))
+    monkeypatch.setattr(llm, "tool_client", fake)
+
+    def send(sid, message, next_, replies, retrievals=(), groundings=()):
+        model.add(route_schema(sessions.get(sid)["chat_phase"])(next=next_), *groundings)
+        fake.replies.extend(replies)
+        found.extend(retrievals)
+        first = len(fake.calls)
+        state = sessions.send(sid, message)
+        return state, fake.calls[first][1][0].content
+
+    return send
+
+
+def ground(answered, offered, used=()):
+    from ole5_chat.agent.respond_agent import Grounding
+    return Grounding(used=list(used), answered=answered, offered=offered, unsupported=[])
+
+
+def plain(text):
+    """A reply written without a search, and the same reply again after the nudge."""
+    return [AIMessage(content=text), AIMessage(content=text)]
+
+
+def offered_seen(sid):
+    return any(s.values.get("offered") for s in sessions._graph.get_state_history(sessions._config(sid)))
+
+
+def unanswered(new_path, sid, question, next_="chat"):
+    return new_path(sid, question, next_, [searching(question), AIMessage(content="I have no answer. Open a ticket?")],
+                    [miss()], [ground(False, True)])
+
+
+def test_new_path_answered_question_stays_in_none(new_path):
+    sid = chat()
+    state, _ = new_path(sid, "How do I save a draft?", "chat",
+                        [searching("How to save a draft?"), AIMessage(content="Press Save as draft.")],
+                        [hit("Guide")], [ground(True, False, ["Guide"])])
+    assert (state["chat_phase"], state["pending"], state["sources"]) == ("none", [], ["Guide"])
+
+
+def test_new_path_unanswered_question_is_queued_and_offered(new_path):
+    sid = chat()
+    state, prompt_text = unanswered(new_path, sid, "Does it run on Linux?")
+    assert state["messages"][-1].text == "I have no answer. Open a ticket?" and offered_seen(sid)
+    assert [p.text for p in state["pending"]] == ["Does it run on Linux?"] and state["pending"][0].source == "no_answer"
+    assert state["chat_phase"] == "offer_ticket" and state["offered"] is False and state["task"] is None
+
+
+def test_new_path_partial_answer_is_cited_and_queued(new_path):
+    sid = chat()
+    state, _ = new_path(sid, "How do I save a draft, and how long is it kept?", "chat",
+                        [searching("drafts"), AIMessage(content="Press Save as draft. Open a ticket for the rest?")],
+                        [hit("Guide")], [ground(True, True, ["Guide"])])
+    assert state["sources"] == ["Guide"] and state["chat_phase"] == "offer_ticket"
+    assert [p.text for p in state["pending"]] == ["How do I save a draft, and how long is it kept?"]
+
+
+def test_new_path_answer_without_a_direct_passage_is_replaced(new_path):
+    sid = chat()
+    state, _ = new_path(sid, "Does it run on Linux?", "chat",
+                        [searching("Linux"), AIMessage(content="Yes, Ole5 runs on Linux."),
+                         AIMessage(content="I have no answer. Open a ticket?")],
+                        [miss()], [ground(True, False)])
+    assert state["messages"][-1].text == "I have no answer. Open a ticket?" and offered_seen(sid)
+    assert "answer without a DIRECT passage" in state["corrections"]
+    assert len(state["pending"]) == 1 and state["chat_phase"] == "offer_ticket"
+
+
+def test_new_path_greeting_queues_nothing(new_path, searches):
+    sid = chat()
+    state, _ = new_path(sid, "مرحبا", "chat", plain("أهلاً بك"), groundings=[ground(False, False)])
+    assert (state["chat_phase"], state["pending"]) == ("none", []) and not offered_seen(sid)
+
+
+@pytest.mark.parametrize("next_", ["ticket", "urgent"])
+def test_new_path_router_ticket_or_urgent_is_queued_and_offered(new_path, next_):
+    sid = chat()
+    state, prompt_text = new_path(sid, "We need to migrate our data", next_, plain("Shall I open a ticket?"),
+                                  groundings=[ground(False, True)])
+    issue = state["pending"][0]
+    assert (issue.text, issue.source, issue.urgent) == ("We need to migrate our data", "always_ticket", next_ == "urgent")
+    assert state["chat_phase"] == "offer_ticket" and len(state["pending"]) == 1
+    offer = "This needs the support team: We need to migrate our data."
+    assert ("This sounds urgent. " + offer if next_ == "urgent" else offer) in prompt_text
+
+
+def test_new_path_accept_creates_the_draft(new_path):
+    sid = chat()
+    unanswered(new_path, sid, "Does it run on Linux?")
+    state, prompt_text = new_path(sid, "ايه", "accept", plain("أي إصدار تستخدم؟"), groundings=[ground(False, False)])
+    assert state["ticket_draft"] is not None and state["chat_phase"] == "collect"
+    assert [p.text for p in state["pending"]] == ["Does it run on Linux?"]
+    assert "The customer agreed to a ticket for: Does it run on Linux?" in prompt_text
+
+
+def test_new_path_decline_with_one_issue_empties_pending(new_path):
+    sid = chat()
+    unanswered(new_path, sid, "Does it run on Linux?")
+    state, prompt_text = new_path(sid, "لا شكراً", "decline", plain("تمام، تقدر تتواصل معنا في أي وقت."), groundings=[ground(False, False)])
+    assert (state["chat_phase"], state["pending"]) == ("none", [])
+    assert "The customer declined the ticket. Acknowledge it in one line and say they can contact" in prompt_text
+
+
+def test_new_path_decline_with_two_issues_offers_the_next(new_path):
+    sid = chat()
+    unanswered(new_path, sid, "Does it run on Linux?")
+    state, prompt_text = unanswered(new_path, sid, "Can I export to Excel?")
+    assert len(state["pending"]) == 2 and state["chat_phase"] == "offer_ticket"
+    assert "A ticket offer for this issue is still open: Does it run on Linux?" in prompt_text
+    state, prompt_text = new_path(sid, "لا", "decline", plain("تمام. تبغى تذكرة للتصدير؟"),
+                                  groundings=[ground(False, True)])
+    assert [p.text for p in state["pending"]] == ["Can I export to Excel?"] and state["chat_phase"] == "offer_ticket"
+    assert "offer a ticket for their other issue: Can I export to Excel?" in prompt_text
+
+
+def test_new_path_side_question_keeps_the_offer_open(new_path):
+    sid = chat()
+    unanswered(new_path, sid, "Does it run on Linux?")
+    state, prompt_text = new_path(sid, "How do I save a draft?", "chat",
+                                  [searching("drafts"), AIMessage(content="Press Save as draft. Still want the ticket?")],
+                                  [hit("Guide")], [ground(True, True, ["Guide"])])
+    assert [p.text for p in state["pending"]] == ["Does it run on Linux?"] and state["chat_phase"] == "offer_ticket"
+    assert state["sources"] == ["Guide"]
+    assert "A ticket offer for this issue is still open: Does it run on Linux?" in prompt_text
+
+
+def test_new_path_same_unanswered_question_is_queued_once(new_path):
+    sid = chat()
+    unanswered(new_path, sid, "Does it run on Linux?")
+    state, _ = unanswered(new_path, sid, "Does it run on Linux?")
+    assert len(state["pending"]) == 1 and state["chat_phase"] == "offer_ticket"
