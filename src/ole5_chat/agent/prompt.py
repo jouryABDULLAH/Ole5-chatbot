@@ -133,7 +133,7 @@ RESPOND_TASK = ("Answer the customer from the passages. If no passage answers th
                 "this and ask whether they would like a ticket opened.")
 TALK_TASK = ("This message needs no search: a greeting, thanks, small talk, a question about you, or a request to repeat "
              "what you said. Reply as the persona's greeting rules say. Don't state a product fact that isn't already in "
-             "this chat.")
+             "this chat, and don't offer a ticket.")
 
 
 # What respond_agent is asked to do this turn, set by the handler. {issue} is pending[0].text, {new} the issue just queued.
