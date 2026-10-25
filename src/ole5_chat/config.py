@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     kb_find_timeout: float = 260.0
     kb_find_retries: int = 1
     kb_max_searches: int = 4
+    collect_rounds: int = 2
 
     sheets_dir: Path = ROOT / "sheets"
     products_dir: Path = ROOT / "products"
