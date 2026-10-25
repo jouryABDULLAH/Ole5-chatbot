@@ -64,7 +64,9 @@ def decline(state: ChatState) -> dict:
 
 
 def post_check(state: ChatState) -> dict:
-    """Queues the customer's message when the reply offered a ticket for it. In offer_ticket the chat task makes every reply ask about the open offer again, so there a reply with sources is a reminder, not an offer."""
+    """Queues the customer's message when the reply offered a ticket for it. 
+    In offer_ticket the chat task makes every reply ask about the open offer again, 
+    so there a reply with sources is a reminder, not an offer."""
     text, before, pending = state["messages"][-1].text, state["chat_phase"], list(state["pending"])
     offered = state["offered"] and state["next"] not in OWN_ISSUE
     if before == "offer_ticket":

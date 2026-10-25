@@ -83,14 +83,32 @@ def test_submit_links_the_files_in_the_note_and_the_sheet():
     assert view["attachments"] == []
 
 
-def test_message_carries_its_attachments(model):
-    from ole5_chat.agent.contracts import Reply, RouterDecision
+class GotIt:
+    """Stands in for llm.tool_client: every respond_agent call replies "Got it." without searching."""
+
+    def __call__(self, temperature):
+        return self
+
+    def bind_tools(self, tools, tool_choice=None):
+        return self
+
+    def invoke(self, convo):
+        from langchain_core.messages import AIMessage
+        return AIMessage(content="Got it.")
+
+
+def test_message_carries_its_attachments(model, monkeypatch):
+    from ole5_chat import llm
+    from ole5_chat.agent.contracts import route_schema
+    from ole5_chat.agent.respond_agent import Grounding
+    monkeypatch.setattr(llm, "tool_client", GotIt())
+    no_facts = Grounding(used=[], answered=False, offered=False, unsupported=[])
     sid = session()
     att = send_file(sid, "screen.png").json()
-    model.add(RouterDecision(intent="other", language="en"), Reply(say="Got it."))
+    model.add(route_schema("none")(next="chat"), no_facts)
     view = client.post(f"/chat/sessions/{sid}/messages", json={"text": "here it is", "attachment_ids": [att["id"]]}).json()
     assert view["messages"][-2]["text"] == "here it is\n[attached: screen.png]"
-    model.add(RouterDecision(intent="other", language="en"), Reply(say="Got it."))
+    model.add(route_schema("none")(next="chat"), no_facts)
     view = client.post(f"/chat/sessions/{sid}/messages", json={"text": "", "attachment_ids": [att["id"]]}).json()
     assert view["messages"][-2]["text"] == "[attached: screen.png]"
     assert client.post(f"/chat/sessions/{sid}/messages", json={"text": "", "attachment_ids": []}).status_code == 422
