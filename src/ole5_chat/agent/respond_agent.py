@@ -169,6 +169,9 @@ def respond_agent(state: ChatState) -> dict:
     if state["messages"][-1].type != "human":
         # A button turn adds no message; without this the model would continue the assistant's last reply.
         convo.append(HumanMessage(content=NOTE + "the customer pressed Submit."))
+    if state.get("task") and not (chat and state["phase"] == "none"):
+        # The task last, where the model weighs it most; only an ordinary chat turn goes by the general rules alone.
+        convo.append(HumanMessage(content=NOTE + state["task"]))
     
     try:
         text = _loop(convo, tool, corrections)

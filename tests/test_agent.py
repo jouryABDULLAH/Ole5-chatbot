@@ -691,7 +691,8 @@ def test_submit_button_skips_the_router(new_path, model):
     state = sessions.submit(sid)
     assert [c for c in model.calls if c[0].__name__ == "RouteDecision"] == routed
     assert state["created_tickets"] and state["phase"] == "none" and state["ticket_draft"] is None
-    assert llm.tool_client.calls[-1][1][-1].content.endswith("the customer pressed Submit.")
+    sent_last = llm.tool_client.calls[-1][1]
+    assert sent_last[-2].content.endswith("the customer pressed Submit.") and "was created" in sent_last[-1].content
 
 
 def test_a_stale_next_does_not_skip_the_router(new_path, model):
@@ -737,3 +738,41 @@ def test_done_moves_what_is_missing_to_unknown(new_path):
     state, _ = confirming(new_path, sid, missing=["app version"])
     assert state["ticket_draft"].missing == [] and "app version" in state["ticket_draft"].unknown
 
+
+def task_sent(new_path, *args, **kwargs):
+    """Runs one turn and returns the last message of its first tool-model call."""
+    from ole5_chat import llm
+    first = len(llm.tool_client.calls)
+    new_path(*args, **kwargs)
+    return llm.tool_client.calls[first][1][-1].content
+
+
+def test_the_task_is_the_last_message_off_the_plain_chat_turn(new_path):
+    from ole5_chat.agent.respond_agent import NOTE
+    sid = chat()
+    plain = task_sent(new_path, sid, "How do I save a draft?", "chat",
+                      [searching("drafts"), AIMessage(content="Press Save.")], [hit("Guide")], [ground(True, False, ["Guide"])])
+    assert plain == "How do I save a draft?"
+    unanswered(new_path, sid, "Does it run on Linux?")
+    turns = [
+        (("We need to migrate our data", "ticket", [AIMessage(content="After this one.")]), {}, "Answer the customer's message as usual. Their new issue"),
+        (("How do I save a draft?", "chat", [searching("drafts"), AIMessage(content="Press Save. Still want it?")], [hit("Guide")],
+          [ground(True, False, ["Guide"])]), {}, "Answer the customer's message as usual. A ticket offer"),
+        (("yes", "accept", [AIMessage(content="Which version?")]), {}, "The customer agreed to a ticket"),
+        (("version 17", "details", [AIMessage(content="Anything else?")]), {}, "Ask what else the support team needs"),
+        (("how long do replies take?", "chat", [searching("replies"), AIMessage(content="No answer.")], [miss()],
+          [ground(False, False)]), {}, "Answer the customer's message as usual. A ticket is being"),
+        (("nothing else", "done", [AIMessage(content="Submit it?")]), {"groundings": [GOOD]}, "The ticket summary is ready"),
+        (("high priority", "change", [AIMessage(content="Changed. Submit?")]), {"groundings": [GOOD]}, "The ticket summary was updated"),
+        (("submit", "yes", [AIMessage(content="Created.")]), {}, "The ticket T-MOCK-"),
+    ]
+    for args, kwargs, task in turns:
+        assert task_sent(new_path, sid, *args, **kwargs).startswith(NOTE + task), task
+
+
+def test_the_cancel_task_is_the_last_message(new_path):
+    from ole5_chat.agent.respond_agent import NOTE
+    sid = chat()
+    collecting(new_path, sid)
+    assert task_sent(new_path, sid, "cancel it", "cancel", [AIMessage(content="Cancelled.")]).startswith(
+        NOTE + "The customer cancelled the ticket.")
