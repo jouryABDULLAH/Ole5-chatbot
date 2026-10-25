@@ -1,4 +1,4 @@
-"""Three ticket conversations through the graph, printing the reply, phase, pending, the draft and the tickets created after each turn."""
+"""Three urgent-ticket conversations through the graph, printing the reply, phase, pending, the draft and the tickets created after each turn."""
 import os, sys
 from pathlib import Path
 
@@ -11,12 +11,11 @@ EMAIL = next(str(r["email"]) for r in sheets.customers()
              if str(r.get("product") or "").upper() == "OLE5" and str(r.get("active") or "").lower() == "yes")
 
 # TICKET_API_URL unset in .env: ticket_client() is the mock, so nothing reaches the real ticket system.
-FIRST = ["تطبيق التواقيع يطلع لي شاشة سوداء على الآيباد", "نعم", "النسخة 17، بدأت أمس"]
+URGENT = "ولا موظف يقدر يسجل دخول"
 CONVERSATIONS = [
-    FIRST + ["لا شيء غير هذا", "ارسلها"],
-    FIRST + ["خل الأولوية عالية", "لا، ألغها"],
-    ["هل يمكن جدولة إرسال مراسلة في وقت لاحق؟", "هل يتكامل النظام مع Microsoft Teams؟", "ايه", "النسخة 17",
-     "هذا كل شيء", "ارسلها"],
+    ["ولا موظف عندنا يقدر يسجل دخول من الصبح", "ارسلها"],
+    ["هل يمكن جدولة إرسال مراسلة في وقت لاحق؟", "ايه", "النسخة 17", f"بعد {URGENT}", "ألغ التذكرة الأولى", "ارسلها"],
+    ["هل يمكن جدولة إرسال مراسلة في وقت لاحق؟", "ايه", "هذا كل شيء", URGENT, "ارسلها", "ارسلها"],
 ]
 
 for n, turns in enumerate(CONVERSATIONS, 1):
@@ -29,4 +28,5 @@ for n, turns in enumerate(CONVERSATIONS, 1):
         draft = state.get("ticket_draft")
         print(f"  phase={state['phase']}  pending={[p.text for p in state['pending']]}  "
               f"draft={'no' if draft is None else 'classified' if draft.classified else 'yes'}  "
+              f"urgent={draft.urgent if draft else '-'}  missing={draft.missing if draft else '-'}  "
               f"tickets={[t['ticket_number'] for t in state['created_tickets']]}")
