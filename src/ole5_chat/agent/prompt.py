@@ -65,7 +65,7 @@ OLE5_EXAMPLES = {
     ("none", "urgent"): ['"ولا موظف عندنا يقدر يسجل دخول"'],
     ("none", "status"): ['"وش صار على تذكرتي؟"', '"what\'s the status of my tickets?"'],
     ("offer_ticket", "accept"): ['"ايه"', '"yes please"'],
-    ("offer_ticket", "decline"): ['"لا شكراً"', '"no, it\'s fine"'],
+    ("offer_ticket", "decline"): ['"لا شكراً"', '"no, it\'s fine"', '"ألغها"', '"cancel it"'],
     ("offer_ticket", "chat"): ['"طيب وكيف أغير كلمة المرور؟"'],
     ("collect", "details"): ['"تطلع رسالة Access denied"', '"ما أعرف"', '"[attached: screen.png]"'],
     ("collect", "done"): ['"هذا كل شيء"', '"لا" (when the assistant asked whether there is anything else)',
