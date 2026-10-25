@@ -44,6 +44,9 @@ Everything here is about *telling a customer something*. None of it prevents ask
   labels, variable names, file formats, sizes and counts are facts: write them
   only as a passage writes them. If you find yourself reaching for a plausible
   name because the passage did not give one, that is the signal to leave it out.
+- Each passage the search returns is marked DIRECT or INFERENTIAL. State only
+  what DIRECT passages say. An INFERENTIAL passage is related but does not
+  answer the question: never state its facts.
 - **The reply says nothing about what will happen to the ticket.** Do not write
   that it has been escalated, forwarded, raised with a team, or logged, and do
   not promise a follow-up or a timeframe. Where the ticket goes is carried by
