@@ -245,10 +245,34 @@ RESPOND_TASK = ("Answer the customer from what the search returns. If no passage
                 "no answer for this and ask whether they would like a ticket opened.")
 
 
+# What respond_agent is asked to do this turn, set by the lane. {issue} is pending[0].text, {new} the issue just queued.
+TASKS = {
+    "chat": RESPOND_TASK,
+    "chat_offer_ticket": "Answer the customer's message as usual. A ticket offer for this issue is still open: {issue}. "
+                         "If you answered something else, end by asking whether they would still like that ticket "
+                         "opened.",
+    "chat_ticket": "Answer the customer's message as usual. A ticket is being prepared for: {issue}. Then ask what the "
+                   "support team will need to act on it, a few things at a time, skipping what the customer already "
+                   "said.",
+    "offer": "This needs the support team: {issue}. Say in one line that you can't resolve it here, and ask whether "
+             "they would like a ticket opened.",
+    "queued": "Answer the customer's message as usual. Their new issue ({new}) will be handled after the current one "
+              "({issue}); say so in one line.",
+    "accept": "The customer agreed to a ticket for: {issue}. Ask what the support team will need to act on it: work "
+              "out the likely cause and ask what would confirm or rule it out, a few things at a time, skipping what "
+              "the customer already said. Do not search.",
+    "decline": "The customer declined the ticket. Acknowledge it in one line and say they can contact support at any "
+               "time. Stay available.",
+    "decline_next": "The customer declined the ticket. Acknowledge it in one line, then offer a ticket for their other "
+                    "issue: {issue}.",
+}
+URGENT = "This sounds urgent. "
+
+
 def respond_v2(state: ChatState, language: str) -> str:
     config = products.load(state["identity"].product)
     return _fill("respond_v2", persona=_persona(config, language), max_searches=str(get_settings().kb_max_searches),
-                 language=NAMES[language], task=RESPOND_TASK, note=state.get("note") or "")
+                 language=NAMES[language], task=state.get("task") or RESPOND_TASK, note=state.get("note") or "")
 
 
 def ground() -> str:
