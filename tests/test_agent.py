@@ -564,7 +564,7 @@ def test_respond_agent_declining_a_direct_passage_twice_gives_the_no_answer(mode
                                                         AIMessage(content="Open a ticket?"),
                                                         AIMessage(content="I have no answer for that. Open a ticket?")],
                              [hit("Guide")])
-    assert "a passage answers this directly" in sent(fake, 2)[-1].content
+    assert "Write what it says, even if it is one sentence, and nothing more." in sent(fake, 2)[-1].content
     assert len(grounding(model)) == 2
     assert out["reply"].say.startswith("I have no answer") and out["reply"].sources == []
     assert out["corrections"] == ["gate 2 retried: declined", "respond declined a DIRECT passage"]

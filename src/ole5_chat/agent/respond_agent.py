@@ -130,7 +130,8 @@ def _gates(convo, tool, sink, customer, text, corrections) -> tuple[str, list[st
             text = _loop(convo, tool, corrections)
             continue
         if attempt == 1:
-            convo.append(HumanMessage(content=NOTE + "a passage answers this directly; answer from it."))
+            convo.append(HumanMessage(content=NOTE + "A passage answers this directly. Write what it says, even if it is one sentence, "
+                                      "and nothing more."))
             corrections.append("gate 2 retried: declined")
             text = _loop(convo, tool, corrections)
     corrections.append("respond declined a DIRECT passage")
