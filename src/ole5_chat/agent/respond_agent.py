@@ -30,6 +30,8 @@ NUDGE = ("You have not searched the knowledge base. If this message needs no sea
          "question about the customer's own account or ticket that no knowledge base could answer), reply as you "
          "did. Otherwise search now.")
 LANGUAGE_RETRIES = 2
+# Ticket turns where the customer may also ask a question; the search is there if they do.
+SEARCHES = ("accept", "details", "change")
 CHINESE = re.compile(r"[一-鿿㐀-䶿]")
 
 
@@ -162,8 +164,9 @@ def respond_agent(state: ChatState) -> dict:
     identity = state["identity"]
     customer = next((m.text for m in reversed(state["messages"]) if m.type == "human"), "")
     chat = state.get("next") not in OWN_ISSUE
+    search = chat or state.get("next") in SEARCHES
     sink: list[Retrieval] = []
-    tool = make_search_tool(identity.product, sink) if chat else None
+    tool = make_search_tool(identity.product, sink) if search else None
     corrections: list[str] = []
     language = language_of(customer) or identity.language
     convo: list[BaseMessage] = [SystemMessage(content=prompt.respond(state, language)), *state["messages"]]

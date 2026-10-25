@@ -144,7 +144,8 @@ TASKS = {
     "accept": "The customer agreed to a ticket for: {issue}. Ask what the support team will need to act on it: work "
               "out the likely cause and ask what would confirm or rule it out, a few things at a time, skipping what "
               "the customer already said. Ask about what the customer sees and did. Don't name a screen, template, "
-              "setting or option unless a passage names it.",
+              "setting or option unless a passage names it. If the customer also asked a question in this message, "
+              "search for it and answer it first, then continue. Otherwise don't search.",
     "decline": "The customer said no to opening a ticket; none was opened. Acknowledge it in one line without saying a "
                "ticket was cancelled or closed, and say they can contact support at any time. Stay available.",
     "decline_next": "The customer said no to opening a ticket; none was opened. Acknowledge it in one line without "
@@ -152,13 +153,15 @@ TASKS = {
     "details": "Ask what else the support team needs to act on: {issue}. A few things at a time, skipping what the "
                "customer already said. If the team has enough, ask instead whether there is anything else they'd like "
                "to add. Ask about what the customer sees and did. Don't name a screen, template, setting or option "
-               "unless a passage names it.",
+               "unless a passage names it. If the customer also asked a question in this message, search for it and "
+               "answer it first, then continue. Otherwise don't search.",
     "open_question": "Ask whether there is anything else they'd like to add about: {issue}. Nothing else.",
     "confirm": "The ticket summary is ready and shown with a Submit button. Nothing has been created yet; the ticket is "
                "created only when they submit. Say the summary is ready in one line and ask whether to submit it. "
                "Don't say the ticket is created, opened or being opened. Don't repeat the summary.",
     "changed": "The ticket summary was updated as the customer asked and is shown again. Say what changed in one line "
-               "and ask whether to submit it.",
+               "and ask whether to submit it. If the customer also asked a question in this message, search for it and "
+               "answer it first, then continue. Otherwise don't search.",
     "created": "The ticket {number} was created. Tell the customer its number and that the support team will reply by "
                "email. Nothing more.",
     "cancelled": "The customer cancelled the ticket. Acknowledge it in one line and say they can contact support at any "

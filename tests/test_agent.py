@@ -725,7 +725,7 @@ def test_post_check_leaves_ticket_turns_alone(next_):
     assert [p.text for p in handlers.post_check(state)["pending"]] == ["Linux"]
 
 
-def test_ticket_turns_bind_no_tools_and_send_no_nudge(new_path):
+def test_only_done_binds_no_tools_and_no_ticket_turn_is_nudged(new_path):
     from ole5_chat import llm
     sid = chat()
     unanswered(new_path, sid, "Does it run on Linux?")
@@ -733,7 +733,8 @@ def test_ticket_turns_bind_no_tools_and_send_no_nudge(new_path):
     new_path(sid, "yes", "accept", [AIMessage(content="Which version do you use?")])
     new_path(sid, "version 17", "details", [AIMessage(content="Anything else?")])
     state, _ = new_path(sid, "nothing else", "done", [AIMessage(content="Submit it?")], groundings=[GOOD])
-    assert llm.tool_client.bound[start:] == [None, None, None]
+    accept, details, done = llm.tool_client.bound[start:]
+    assert accept and details and done is None
     assert "nudged" not in state["corrections"]
 
 
@@ -788,3 +789,24 @@ def test_the_cancel_task_is_the_last_message(new_path):
     collecting(new_path, sid)
     assert task_sent(new_path, sid, "cancel it", "cancel", [AIMessage(content="Cancelled.")]).startswith(
         NOTE + "The customer cancelled the ticket.")
+
+
+def test_a_question_in_a_details_turn_is_searched_and_answered(new_path):
+    sid = chat()
+    collecting(new_path, sid)
+    state, _ = new_path(sid, "version 17. also, how do I save a draft?", "details",
+                        [searching("How to save a draft?"), AIMessage(content="Press Save as draft. When did it start?")],
+                        [hit("Guide")], [ground(True, False, ["Guide"])])
+    assert state["sources"] == ["Guide"] and state["messages"][-1].text.startswith("Press Save as draft.")
+    assert "nudged" not in state["corrections"] and state["phase"] == "collect"
+
+
+def test_a_details_turn_without_a_question_does_not_search(new_path):
+    from ole5_chat import llm
+    sid = chat()
+    collecting(new_path, sid)
+    first = len(llm.tool_client.calls)
+    state, _ = new_path(sid, "version 17", "details", [AIMessage(content="When did it start?")])
+    assert len(llm.tool_client.calls) == first + 1 and state["sources"] == []
+    assert "nudged" not in state["corrections"]
+
