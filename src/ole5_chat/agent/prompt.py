@@ -66,17 +66,18 @@ PHASES = {
 
 MEANINGS = {
     "chat": "none of the others: a question, a greeting, thanks, a side remark, a request to explain again. A request "
-            "to open a ticket about an ordinary topic is chat too: the agent searches first and offers a ticket only "
-            "when it has no answer.",
+            "to open a ticket about an ordinary topic is chat too: the assistant searches first and offers a ticket "
+            "only when it has no answer.",
     "ticket": "the message reports a topic from this list: {always_ticket}.",
     "urgent": "the message describes a situation from this list: {urgent_when}. Judge it from the impact described, "
               "not the tone.",
     "status": "the customer asks about their own tickets: status, whether one was received, its number.",
-    "accept": "agrees to the ticket the agent just offered.",
+    "accept": "agrees to the ticket the assistant just offered.",
     "decline": "turns the offer down.",
-    "details": "answers the agent's questions about the problem, including \"I don't know\", a file sent (a line "
-               "\"[attached: name]\"), or more description.",
-    "done": "says there is nothing more to add, typically after the agent asked whether there is anything else.",
+    "details": "answers the assistant's questions about the problem, including \"I don't know\", a file sent (a "
+               "line \"[attached: name]\"), or more description.",
+    "done": "says there is nothing more to add, typically after the assistant asked whether there is anything else. "
+            "A message that gives a last detail and says it is all they have is done.",
     "cancel": "drops the ticket being prepared or the summary shown.",
     "yes": "agrees to submit the summary shown.",
     "change": "asks to change something on the summary (priority, title, details).",
