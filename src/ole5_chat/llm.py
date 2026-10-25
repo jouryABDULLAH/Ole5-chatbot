@@ -63,33 +63,39 @@ def structured(system: str, messages: list[BaseMessage], schema: type[T], node: 
                check: Callable[[T], str | None] | None = None) -> T:
     convo: list[BaseMessage] = [SystemMessage(content=system), *messages]
     error, last = "no attempt made", None
-    for attempt in range(1, RETRIES + 2):
-        started = time.perf_counter()
-        with _attempt_span(schema.__name__) as span:
+    begun, attempt = time.perf_counter(), 0
+    try:
+        for attempt in range(1, RETRIES + 2):
+            started = time.perf_counter()
+            with _attempt_span(schema.__name__) as span:
+                try:
+                    reply = _client(0 if attempt == 1 else 0.3).invoke(convo, config={"run_name": node})
+                except BadRequestError as exc:
+                    error = str(exc)[:400]
+                    log.warning("%s  llm schema=%s attempt=%d rejected by Groq: %s", node, schema.__name__, attempt, error)
+                    continue
+                if reasoning := reply.additional_kwargs.get("reasoning_content"):
+                    span.set_attribute("output.value", reasoning)
+            ms = int((time.perf_counter() - started) * 1000)
             try:
-                reply = _client(0 if attempt == 1 else 0.3).invoke(convo, config={"run_name": node})
-            except BadRequestError as exc:
+                result = schema.model_validate_json(_clean(reply.text))
+            except ValidationError as exc:
                 error = str(exc)[:400]
-                log.warning("%s  llm schema=%s attempt=%d rejected by Groq: %s", node, schema.__name__, attempt, error)
+                log.warning("%s  llm schema=%s attempt=%d ms=%d invalid: %s", node, schema.__name__, attempt, ms, error)
+                convo += [AIMessage(content=reply.text),
+                          HumanMessage(content=f"That was not valid: {error}. Reply with JSON only, matching the schema.")]
                 continue
-            if reasoning := reply.additional_kwargs.get("reasoning_content"):
-                span.set_attribute("output.value", reasoning)
-        ms = int((time.perf_counter() - started) * 1000)
-        try:
-            result = schema.model_validate_json(_clean(reply.text))
-        except ValidationError as exc:
-            error = str(exc)[:400]
-            log.warning("%s  llm schema=%s attempt=%d ms=%d invalid: %s", node, schema.__name__, attempt, ms, error)
-            convo += [AIMessage(content=reply.text),
-                      HumanMessage(content=f"That was not valid: {error}. Reply with JSON only, matching the schema.")]
-            continue
-        problem = check(result) if check else None
-        if problem is None:
-            log.info("%s  llm schema=%s attempt=%d ms=%d", node, schema.__name__, attempt, ms)
-            return result
-        error, last = problem, result
-        log.warning("%s  llm schema=%s attempt=%d ms=%d guardrail: %s", node, schema.__name__, attempt, ms, problem)
-        convo += [AIMessage(content=reply.text), HumanMessage(content=f"Note from the system, not the customer: {problem}")]
-    if last is not None:
-        raise GuardrailFailed(error, last)
-    raise ModelFailed(error)
+            problem = check(result) if check else None
+            if problem is None:
+                log.info("%s  llm schema=%s attempt=%d ms=%d", node, schema.__name__, attempt, ms)
+                return result
+            error, last = problem, result
+            log.warning("%s  llm schema=%s attempt=%d ms=%d guardrail: %s", node, schema.__name__, attempt, ms, problem)
+            convo += [AIMessage(content=reply.text), HumanMessage(content=f"Note from the system, not the customer: {problem}")]
+        if last is not None:
+            raise GuardrailFailed(error, last)
+        raise ModelFailed(error)
+    finally:
+        total = int((time.perf_counter() - begun) * 1000)
+        if attempt > 1 or total > 5000:
+            log.warning("%s  llm slow call: attempts=%d total_ms=%d", node, attempt, total)
