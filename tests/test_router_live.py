@@ -57,6 +57,32 @@ CASES = [
     ("confirm", DENIED, SUMMARY, "تمام", "yes"),
 ]
 
+# Messages that appear nowhere in the router prompt.
+HELD_OUT = [
+    ("offer_ticket", ARCHIVE, OFFER, "أبي أفتح تذكرة", "accept"),
+    ("offer_ticket", ARCHIVE, OFFER, "go ahead", "accept"),
+    ("offer_ticket", ARCHIVE, OFFER, "ok sure, افتحها", "accept"),
+    ("offer_ticket", ARCHIVE, OFFER, "مو لازم، بشوف بنفسي", "decline"),
+    ("offer_ticket", ARCHIVE, OFFER, "لا ما يحتاج thanks", "decline"),
+    ("none", None, GREETING, "my ticket number is T-123, any update?", "status"),
+    ("none", None, GREETING, "رفعت تذكرة أمس، وصلتكم؟", "status"),
+    ("none", None, GREETING, "كل المستخدمين عندنا طالعين من النظام وما أحد يقدر يدخل", "urgent"),
+    ("none", None, GREETING, "nobody in our ministry can log in since 8am, شغلنا واقف", "urgent"),
+    ("none", None, GREETING, "أبي أرحّل الأرشيف القديم حقنا للنظام", "ticket"),
+    ("none", None, GREETING, "how do I forward a correspondence? أبي الخطوات", "chat"),
+    ("none", None, GREETING, "شكراً على المساعدة", "chat"),
+    ("none", None, GREETING, "I can't log in to my account", "chat"),
+    ("collect", DENIED, ERROR, "تطلع Access denied، بس هل هذا يعني ما عندي صلاحية؟", "details"),
+    ("collect", DENIED, ERROR, "it says error 403 forbidden", "details"),
+    ("collect", DENIED, ERROR, "مدري والله", "details"),
+    ("collect", DENIED, ERROR, "ما أبي التذكرة خلاص، انحلت", "cancel"),
+    ("collect", DENIED, ANYTHING_ELSE, "no that's all", "done"),
+    ("confirm", DENIED, SUMMARY, "the title is wrong", "change"),
+    ("confirm", DENIED, SUMMARY, "يب تمام أرسل", "yes"),
+    ("confirm", DENIED, SUMMARY, "غيرت رأيي، لا ترسلها", "cancel"),
+    ("confirm", DENIED, SUMMARY, "وش يعني الأولوية متوسطة؟", "chat"),
+]
+
 
 @pytest.mark.live
 @pytest.mark.skipif(os.getenv("RUN_LIVE") != "1", reason="set RUN_LIVE=1 to call the real model")
@@ -65,7 +91,7 @@ def test_router_v2_live(monkeypatch):
     identity = Identity(customer_id="live", email="ole5@example.com", name="Sara Omar", organization="Test Org",
                         product="OLE5", language="ar")
     rows, latencies = [], []
-    for phase, issue, assistant, customer, expected in CASES:
+    for phase, issue, assistant, customer, expected in CASES + HELD_OUT:
         state = initial_state(identity)
         state["chat_phase"] = phase
         state["pending"] = [PendingIssue(text=issue, source="no_answer")] if issue else []
@@ -74,9 +100,11 @@ def test_router_v2_live(monkeypatch):
         out = router_v2(state)
         latencies.append(time.perf_counter() - started)
         rows.append((phase, customer, expected, out["next"], out.get("corrections", [])))
-    hits = sum(expected == got for _, _, expected, got, _ in rows)
     print()
     for phase, customer, expected, got, corrections in rows:
         print(f"{'ok  ' if expected == got else 'MISS'} {phase:<12} {expected:<8} {got:<8} {customer} {corrections}")
-    print(f"accuracy {hits}/{len(rows)} = {hits / len(rows):.0%}, median latency {statistics.median(latencies):.2f}s")
+    for name, part in (("examples", rows[:len(CASES)]), ("held out", rows[len(CASES):])):
+        hits = sum(expected == got for _, _, expected, got, _ in part)
+        print(f"{name}: accuracy {hits}/{len(part)} = {hits / len(part):.0%}")
+    print(f"median latency {statistics.median(latencies):.2f}s")
     assert not any(corrections for *_, corrections in rows), "a router call failed"
