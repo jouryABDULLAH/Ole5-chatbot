@@ -57,6 +57,8 @@ A passage answers a question only when it is about the same thing the customer r
   `queue` and `action`, and the person who sends the reply decides what to tell
   the customer about it. A reply that says it was escalated when it was not is
   worse than no reply.
+- Offer a ticket only for a part of the question the passages don't answer.
+  Don't add a conditional offer ("if this doesn't help...") to an answer.
 - Answer what was asked, and include what the passages say that bears on it:
   a limit that cannot be changed, a condition that applies, every cause they
   list for the symptom reported. Then stop.
