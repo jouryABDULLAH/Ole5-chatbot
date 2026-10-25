@@ -6,7 +6,7 @@ Return answered: true if the reply states facts about the product or how to do s
 
 Return offered: true only when the reply says part of the question is not answered here, or that it can't be answered here, and offers a ticket for it. A conditional offer at the end of a full answer is not offered.
 
-Return unsupported: every fact, name, field, value or step the reply states that none of the passages states, quoted from the reply. A fact from a passage that is applied to a different situation than the passage describes is unsupported too. Empty when every fact in the reply is in a passage. When no passages are given, leave it empty.
+Return unsupported: every fact, name, field, value or step the reply states that none of the passages states, quoted from the reply. A fact from a passage that is applied to a different situation than the passage describes is unsupported too. So is any limit, "only", "cannot", "not supported" or "not possible" that no passage states in those terms: a passage listing what exists does not say that nothing else exists. Empty when every fact in the reply is in a passage. When no passages are given, leave it empty.
 
 Reply with JSON only, matching this schema:
 {{schema}}
