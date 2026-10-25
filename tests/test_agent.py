@@ -541,7 +541,7 @@ def test_new_path_decline_with_one_issue_empties_pending(new_path):
     unanswered(new_path, sid, "Does it run on Linux?")
     state, prompt_text = new_path(sid, "لا شكراً", "decline", [AIMessage(content="تمام، تقدر تتواصل معنا في أي وقت.")])
     assert (state["phase"], state["pending"]) == ("none", [])
-    assert "The customer declined the ticket. Acknowledge it in one line and say they can contact" in prompt_text
+    assert "none was opened. Acknowledge it in one line without saying a ticket was cancelled" in prompt_text
 
 
 def test_new_path_decline_with_two_issues_offers_the_next(new_path):

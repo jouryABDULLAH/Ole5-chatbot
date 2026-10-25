@@ -146,10 +146,10 @@ TASKS = {
     "accept": "The customer agreed to a ticket for: {issue}. Ask what the support team will need to act on it: work "
               "out the likely cause and ask what would confirm or rule it out, a few things at a time, skipping what "
               "the customer already said. Do not search.",
-    "decline": "The customer declined the ticket. Acknowledge it in one line and say they can contact support at any "
-               "time. Stay available.",
-    "decline_next": "The customer declined the ticket. Acknowledge it in one line, then offer a ticket for their other "
-                    "issue: {issue}.",
+    "decline": "The customer said no to opening a ticket; none was opened. Acknowledge it in one line without saying a "
+               "ticket was cancelled or closed, and say they can contact support at any time. Stay available.",
+    "decline_next": "The customer said no to opening a ticket; none was opened. Acknowledge it in one line without "
+                    "saying a ticket was cancelled or closed, then offer a ticket for their other issue: {issue}.",
 }
 URGENT = "This sounds urgent. "
 
