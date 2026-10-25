@@ -1,6 +1,5 @@
 """Builds each LLM node's system prompt from prompts/chat/*.md and the conversation's own data: chat.yaml, the value lists and the search results."""
 
-import json
 from functools import lru_cache
 
 from ole5_chat import products, values
@@ -24,10 +23,6 @@ def _fill(name: str, **parts: str) -> str:
 
 def _list(items: list[str]) -> str:
     return "; ".join(items) if items else "none"
-
-
-def _json(value) -> str:
-    return json.dumps(value, ensure_ascii=False)
 
 
 PHASES = {
@@ -184,11 +179,11 @@ def classify(state: ChatState) -> str:
     who = state["identity"]
     config = products.load(who.product)
     catalog = values.catalog(who.product)
-    draft = state.get("ticket_draft")
+    pending = state.get("pending") or []
     reason_rule = ("leave it empty: it is the catalog text of the chosen subtype and is filled in for you."
                    if catalog.has_reason_catalog else
                    "free text in English, up to 500 characters: a category, a dash, then a description.")
     scopes = f"## Team scopes\n\n{config.team_scopes}\n" if config.team_scopes else ""
     return _fill("classify", product_name=config.name, reason_rule=reason_rule,
-                 collected=_json(draft.collected if draft else {}), values=_values_block(catalog),
+                 issue=pending[0].text if pending else "none", values=_values_block(catalog),
                  team_scopes=scopes, schema=schema_text(Classification))
