@@ -52,9 +52,11 @@ def drafting():
 
 def test_classify_retries_a_refused_value_then_classifies(model):
     from ole5_chat.agent.classify import classify
-    model.add(GOOD.model_copy(update={"queue": "Ole5 Helpdesk"}), GOOD)
+    found = GOOD.model_copy(update={"collected": {"screen": "Inbox"}, "missing": ["app version"], "unknown": ["device"]})
+    model.add(GOOD.model_copy(update={"queue": "Ole5 Helpdesk"}), found)
     draft = classify(drafting())["ticket_draft"]
-    assert draft.classified and draft.queue == "Ole5 Technical" and draft.collected == {"screen": "Inbox"}
+    assert draft.classified and draft.queue == "Ole5 Technical"
+    assert (draft.collected, draft.missing, draft.unknown) == ({"screen": "Inbox"}, ["app version"], ["device"])
 
 
 def test_classify_failure_keeps_the_draft_unclassified(model):
