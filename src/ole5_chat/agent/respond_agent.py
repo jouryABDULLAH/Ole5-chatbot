@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from ole5_chat import llm
 from ole5_chat.agent import prompt
 from ole5_chat.agent.contracts import Reply
-from ole5_chat.agent.lanes import OWN_ISSUE
+from ole5_chat.agent.handlers import OWN_ISSUE
 from ole5_chat.agent.state import ChatState
 from ole5_chat.agent.validate import NAMES, SORRY, language_of, language_problem
 from ole5_chat.config import get_settings
@@ -142,7 +142,7 @@ def respond_agent(state: ChatState) -> dict:
     corrections: list[str] = []
     language = language_of(customer) or identity.language
     chat = state.get("next") not in OWN_ISSUE
-    convo: list[BaseMessage] = [SystemMessage(content=prompt.respond_v2(state, language)), *state["messages"]]
+    convo: list[BaseMessage] = [SystemMessage(content=prompt.respond(state, language)), *state["messages"]]
     
     try:
         text = _loop(convo, tool, corrections)

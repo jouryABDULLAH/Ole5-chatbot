@@ -11,7 +11,7 @@ from openinference.instrumentation import using_session
 
 from ole5_chat import attachments
 from ole5_chat.agent.graph import build
-from ole5_chat.agent.lanes import advance
+from ole5_chat.agent.handlers import advance
 from ole5_chat.agent.contracts import PendingIssue, Reply
 from ole5_chat.agent.state import ChatState, TicketDraft, initial_state
 from ole5_chat.identity import Identity, lookup

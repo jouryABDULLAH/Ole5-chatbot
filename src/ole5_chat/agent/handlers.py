@@ -1,4 +1,4 @@
-"""The lanes of the new graph. Each applies the router's next to the state and sets the task respond_agent carries out this turn. post_check runs after respond_agent and queues a question the reply offered a ticket for. pending[0] is always the issue being handled; a new issue waits behind it."""
+"""The handlers: the nodes that apply the router's next. Each applies the router's next to the state and sets the task respond_agent carries out this turn. post_check runs after respond_agent and queues a question the reply offered a ticket for. pending[0] is always the issue being handled; a new issue waits behind it."""
 
 import logging
 
@@ -9,7 +9,7 @@ from ole5_chat.agent.state import ChatState, TicketDraft
 
 log = logging.getLogger(__name__)
 
-# Lanes that queue, accept or decline an issue themselves; post_check leaves their turns alone.
+# Handlers that queue, accept or decline an issue themselves; post_check leaves their turns alone.
 OWN_ISSUE = ("ticket", "urgent", "accept", "decline")
 
 
@@ -25,13 +25,13 @@ def _offer(issue: PendingIssue) -> str:
     return (URGENT if issue.urgent else "") + TASKS["offer"].format(issue=issue.text)
 
 
-def lane(state: ChatState) -> str:
+def handler(state: ChatState) -> str:
     next_ = state["next"]
     if next_ in ("ticket", "urgent"):
         return "queue"
     if next_ in ("chat", "accept", "decline"):
         return next_
-    log.info("lanes  lane not built yet: %s", next_)
+    log.info("handlers  handler not built yet: %s", next_)
     return "chat"
 
 

@@ -98,12 +98,12 @@ def _option(config: products.ProductConfig, phase: str, option: str) -> str:
     return f"{option}: {meaning}\n  {lead}: {', '.join(said)}"
 
 
-def router_v2(state: ChatState) -> str:
+def router(state: ChatState) -> str:
     config = products.load(state["identity"].product)
     phase = state["phase"]
     pending = state.get("pending") or []
     last = next((m.text for m in reversed(state["messages"]) if m.type == "ai"), "none")
-    return _fill("router_v2", product_name=config.name, phase_description=PHASES[phase],
+    return _fill("router", product_name=config.name, phase_description=PHASES[phase],
                  issue=pending[0].text if pending else "none", last_assistant=last,
                  options="\n\n".join(_option(config, phase, o) for o in OPTIONS[phase]),
                  schema=schema_text(route_schema(phase)))
@@ -128,7 +128,7 @@ RESPOND_TASK = ("Answer the customer from what the search returns. If no passage
                 "no answer for this and ask whether they would like a ticket opened.")
 
 
-# What respond_agent is asked to do this turn, set by the lane. {issue} is pending[0].text, {new} the issue just queued.
+# What respond_agent is asked to do this turn, set by the handler. {issue} is pending[0].text, {new} the issue just queued.
 TASKS = {
     "chat": RESPOND_TASK,
     "chat_offer_ticket": "Answer the customer's message as usual. A ticket offer for this issue is still open: {issue}. "
@@ -152,9 +152,9 @@ TASKS = {
 URGENT = "This sounds urgent. "
 
 
-def respond_v2(state: ChatState, language: str) -> str:
+def respond(state: ChatState, language: str) -> str:
     config = products.load(state["identity"].product)
-    return _fill("respond_v2", persona=_persona(config, language), max_searches=str(get_settings().kb_max_searches),
+    return _fill("respond", persona=_persona(config, language), max_searches=str(get_settings().kb_max_searches),
                  language=NAMES[language], task=state.get("task") or RESPOND_TASK, note=state.get("note") or "")
 
 

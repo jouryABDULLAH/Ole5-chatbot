@@ -1,4 +1,4 @@
-"""router_v2 against the real model on fixed cases: prints what it chose for each, the accuracy and the median latency of one call. Runs only with RUN_LIVE=1."""
+"""router against the real model on fixed cases: prints what it chose for each, the accuracy and the median latency of one call. Runs only with RUN_LIVE=1."""
 
 import logging
 import os
@@ -11,7 +11,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from ole5_chat import llm
 from ole5_chat.agent.contracts import PendingIssue
-from ole5_chat.agent.router_v2 import router_v2
+from ole5_chat.agent.router import router
 from ole5_chat.agent.state import initial_state
 from ole5_chat.identity import Identity
 
@@ -92,7 +92,7 @@ HELD_OUT = [
 
 @pytest.mark.live
 @pytest.mark.skipif(os.getenv("RUN_LIVE") != "1", reason="set RUN_LIVE=1 to call the real model")
-def test_router_v2_live(monkeypatch, caplog):
+def test_router_live(monkeypatch, caplog):
     monkeypatch.setattr(llm, "structured", REAL)
     identity = Identity(customer_id="live", email="ole5@example.com", name="Sara Omar", organization="Test Org",
                         product="OLE5", language="ar")
@@ -105,7 +105,7 @@ def test_router_v2_live(monkeypatch, caplog):
         caplog.clear()
         started = time.perf_counter()
         with caplog.at_level(logging.WARNING, logger=llm.__name__):
-            out = router_v2(state)
+            out = router(state)
         latencies.append(time.perf_counter() - started)
         slow = [int(m.group(1)) for r in caplog.records if (m := re.search(r"attempts=(\d+)", r.getMessage()))]
         calls.append((latencies[-1], slow[0] if slow else 1, phase, customer))

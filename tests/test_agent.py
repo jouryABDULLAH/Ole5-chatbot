@@ -1,4 +1,4 @@
-"""The agent with scripted models and searches: the greeting, classify and its value checks, respond_agent's gates, the router's options and prompt, and the graph's lanes, post_check and pending issues."""
+"""The agent with scripted models and searches: the greeting, classify and its value checks, respond_agent's gates, the router's options and prompt, and the graph's handlers, post_check and pending issues."""
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
@@ -44,7 +44,7 @@ def test_rich_reason_comes_from_the_catalog_not_the_model():
 
 def drafting():
     """A conversation with a ticket draft that has the screen collected, ready for classify."""
-    from ole5_chat.agent.lanes import _new_draft
+    from ole5_chat.agent.handlers import _new_draft
     state = sessions.get(chat())
     draft = _new_draft(state).model_copy(update={"collected": {"screen": "Inbox"}})
     return {**state, "messages": [*state["messages"], HumanMessage(content="the Inbox screen")], "ticket_draft": draft}
@@ -379,18 +379,18 @@ def test_route_schema_takes_only_the_options_of_its_phase(phase):
         schema(next=other)
 
 
-def test_router_v2_writes_only_next(model):
+def test_router_writes_only_next(model):
     from ole5_chat.agent.contracts import route_schema
-    from ole5_chat.agent.router_v2 import router_v2
+    from ole5_chat.agent.router import router
     model.add(route_schema("offer_ticket")(next="accept"))
-    assert router_v2(router_state(phase="offer_ticket", messages=["yes please"])) == {"next": "accept"}
+    assert router(router_state(phase="offer_ticket", messages=["yes please"])) == {"next": "accept"}
 
 
 @pytest.mark.parametrize("phase", ["none", "offer_ticket", "collect", "confirm"])
-def test_router_v2_prompt_defines_only_the_options_of_its_phase(phase):
+def test_router_prompt_defines_only_the_options_of_its_phase(phase):
     from ole5_chat.agent import prompt
     from ole5_chat.agent.contracts import OPTIONS
-    text = prompt.router_v2(router_state(phase=phase))
+    text = prompt.router(router_state(phase=phase))
     for option in ("chat", "ticket", "urgent", "status", "accept", "decline", "details", "done", "cancel", "yes",
                    "change"):
         assert (f"\n{option}: " in text) == (option in OPTIONS[phase])
@@ -398,23 +398,23 @@ def test_router_v2_prompt_defines_only_the_options_of_its_phase(phase):
     assert phase != "confirm" or "\ndetails" not in text
 
 
-def test_router_v2_prompt_carries_each_products_lists():
+def test_router_prompt_carries_each_products_lists():
     from ole5_chat.agent import prompt
-    ole5, rich = prompt.router_v2(router_state()), prompt.router_v2(router_state("rich@example.com"))
+    ole5, rich = prompt.router(router_state()), prompt.router(router_state("rich@example.com"))
     assert "data migration requests" in ole5 and "no user in the organization can sign in" in ole5
     assert "whitelisting an IP or a user" in rich and "the portal or the API is down" in rich
     assert "data migration requests" not in rich and "whitelisting an IP or a user" not in ole5
 
 
-def test_router_v2_failure_gives_chat_and_a_correction(model):
-    from ole5_chat.agent.router_v2 import router_v2
-    out = router_v2(router_state())
+def test_router_failure_gives_chat_and_a_correction(model):
+    from ole5_chat.agent.router import router
+    out = router(router_state())
     assert out["next"] == "chat" and out["corrections"][-1].startswith("router failed: nothing scripted")
 
 
-def test_router_v2_sends_the_whole_transcript(monkeypatch):
+def test_router_sends_the_whole_transcript(monkeypatch):
     from ole5_chat import llm
-    from ole5_chat.agent.router_v2 import router_v2
+    from ole5_chat.agent.router import router
     seen = []
 
     def fake(system, messages, schema, node=None, check=None):
@@ -423,11 +423,11 @@ def test_router_v2_sends_the_whole_transcript(monkeypatch):
 
     monkeypatch.setattr(llm, "structured", fake)
     state = router_state(phase="collect", messages=["it fails", "on the Inbox"])
-    assert router_v2(state) == {"next": "details"}
+    assert router(state) == {"next": "details"}
     assert [m.text for m in seen[0]] == [m.text for m in state["messages"]] and len(seen[0]) == 3
 
 
-def test_initial_state_has_the_router_v2_fields():
+def test_initial_state_has_the_router_fields():
     state = sessions.get(chat())
     assert (state["phase"], state["pending"], state["next"], state["task"], state["language"]) == \
         ("none", [], None, None, None)
