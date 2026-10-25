@@ -610,7 +610,7 @@ def test_done_classifies_once_and_shows_the_summary(new_path, model):
                                     unknown=["since when"])
     draft = state["ticket_draft"]
     assert state["phase"] == "confirm" and draft.classified and draft.queue == "Ole5 Technical"
-    assert (draft.collected, draft.missing, draft.unknown) == ({"version": "17"}, ["device"], ["since when"])
+    assert (draft.collected, draft.missing, draft.unknown) == ({"version": "17"}, [], ["since when", "device"])
     assert "The ticket summary is ready" in prompt_text
     assert [c[0] for c in model.calls].count(Classification) == 1
 
@@ -730,4 +730,10 @@ def test_a_json_reply_is_retried_as_a_chat_message(new_path):
     state, _ = new_path(sid, "yes", "accept", [AIMessage(content='{"queue": "Ole5 Support", "action": "CreateTicket"}'),
                                                AIMessage(content="Which version do you use?")])
     assert state["messages"][-1].text == "Which version do you use?" and "reply was JSON" in state["corrections"]
+
+
+def test_done_moves_what_is_missing_to_unknown(new_path):
+    sid = chat()
+    state, _ = confirming(new_path, sid, missing=["app version"])
+    assert state["ticket_draft"].missing == [] and "app version" in state["ticket_draft"].unknown
 

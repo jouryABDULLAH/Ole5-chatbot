@@ -84,16 +84,23 @@ def details(state: ChatState) -> dict:
             "task": TASKS[key].format(issue=state["pending"][0].text)}
 
 
+def _nothing_missing(draft: TicketDraft) -> TicketDraft:
+    """done means the customer has nothing more to give: what is still missing is what they don't know."""
+    return draft.model_copy(update={"unknown": list(dict.fromkeys([*draft.unknown, *draft.missing])), "missing": []})
+
+
 def done(state: ChatState) -> dict:
     out = classifier.classify(state)
     if "ticket_draft" in out:
-        return {**out, "phase": "confirm", "task": TASKS["confirm"]}
+        return {"ticket_draft": _nothing_missing(out["ticket_draft"]), "phase": "confirm", "task": TASKS["confirm"]}
     return {**out, "task": TASKS["open_question"].format(issue=state["pending"][0].text)}
 
 
 def change(state: ChatState) -> dict:
     out = classifier.classify(state)
-    return {**out, "task": TASKS["changed"] if "ticket_draft" in out else TASKS["confirm"]}
+    if "ticket_draft" in out:
+        return {"ticket_draft": _nothing_missing(out["ticket_draft"]), "task": TASKS["changed"]}
+    return {**out, "task": TASKS["confirm"]}
 
 
 def cancel(state: ChatState) -> dict:
