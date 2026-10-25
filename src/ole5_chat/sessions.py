@@ -11,7 +11,7 @@ from openinference.instrumentation import using_session
 
 from ole5_chat import attachments
 from ole5_chat.agent.graph import build
-from ole5_chat.agent.contracts import Reply, RouterDecision
+from ole5_chat.agent.contracts import PendingIssue, Reply, RouterDecision
 from ole5_chat.agent.state import ChatState, TicketDraft, initial_state
 from ole5_chat.identity import Identity, lookup
 from ole5_chat.tickets import client as ticket_api
@@ -19,7 +19,7 @@ from ole5_chat.tickets.submit import submit as submit_ticket
 
 log = logging.getLogger(__name__)
 
-CHECKPOINTED = (Identity, RouterDecision, Reply, TicketDraft)
+CHECKPOINTED = (Identity, RouterDecision, Reply, TicketDraft, PendingIssue)
 _serde = JsonPlusSerializer(allowed_msgpack_modules=[(c.__module__, c.__name__) for c in CHECKPOINTED])
 _graph = build(MemorySaver(serde=_serde))
 
