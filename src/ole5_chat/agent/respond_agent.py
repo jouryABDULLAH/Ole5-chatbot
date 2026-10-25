@@ -148,6 +148,9 @@ def respond_agent(state: ChatState) -> dict:
     corrections: list[str] = []
     language = language_of(customer) or identity.language
     convo: list[BaseMessage] = [SystemMessage(content=prompt.respond(state, language)), *state["messages"]]
+    if state["messages"][-1].type != "human":
+        # A button turn adds no message; without this the model would continue the assistant's last reply.
+        convo.append(HumanMessage(content=NOTE + "the customer pressed Submit."))
     
     try:
         text = _loop(convo, tool, corrections)
