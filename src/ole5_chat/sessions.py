@@ -11,7 +11,8 @@ from openinference.instrumentation import using_session
 
 from ole5_chat import attachments
 from ole5_chat.agent.graph import build
-from ole5_chat.agent.contracts import PendingIssue, Reply, RouterDecision
+from ole5_chat.agent.lanes import advance
+from ole5_chat.agent.contracts import PendingIssue, Reply
 from ole5_chat.agent.state import ChatState, TicketDraft, initial_state
 from ole5_chat.identity import Identity, lookup
 from ole5_chat.tickets import client as ticket_api
@@ -19,7 +20,7 @@ from ole5_chat.tickets.submit import submit as submit_ticket
 
 log = logging.getLogger(__name__)
 
-CHECKPOINTED = (Identity, RouterDecision, Reply, TicketDraft, PendingIssue)
+CHECKPOINTED = (Identity, Reply, TicketDraft, PendingIssue)
 _serde = JsonPlusSerializer(allowed_msgpack_modules=[(c.__module__, c.__name__) for c in CHECKPOINTED])
 _graph = build(MemorySaver(serde=_serde))
 
@@ -95,8 +96,9 @@ def submit(session_id: str) -> ChatState:
     with _submit_lock, using_session(session_id):
         state = get(session_id)
         ticket, closing, corrections = submit_ticket(state, ticket_api.ticket_client())
+        rest = state["pending"][1:]
         _graph.update_state(_config(session_id), {
-            "messages": [AIMessage(content=closing)], "phase": "created", "step": None, "sources": [],
+            "messages": [AIMessage(content=closing)], "pending": rest, "phase": advance(rest), "sources": [],
             "ticket_draft": None, "created_tickets": [*state["created_tickets"], ticket], "attachments": [],
             "corrections": state["corrections"] + corrections,
         }, as_node="validate")

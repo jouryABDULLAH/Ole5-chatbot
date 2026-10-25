@@ -44,7 +44,7 @@ def internal_note(draft, corrections: list[str], files: list[dict] = ()) -> str:
 
 def check(state: ChatState) -> None:
     draft = state.get("ticket_draft")
-    if draft is None or not draft.classified:
+    if state["phase"] != "confirm" or draft is None or not draft.classified:
         raise SubmitRefused("there is no ticket summary to submit")
     empty = [f for f in REQUIRED if not getattr(draft, f)]
     if empty:
@@ -83,7 +83,7 @@ def submit(state: ChatState, api: TicketApi) -> tuple[dict, str, list[str]]:
     for f in state["attachments"]:
         sheets.add_attachment({"ticket_number": created["TicketNumber"], "file_name": f["file_name"],
                                "link": attachments.link(f["id"]), "uploaded_at": f["uploaded_at"]})
-    language = state["decision"].language if state.get("decision") else who.language
+    language = state.get("language") or who.language
     log.info("tickets  created number=%s product=%s queue=%s", created["TicketNumber"], who.product, draft.queue)
     ticket = {"ticket_id": created["TicketID"], "ticket_number": created["TicketNumber"]}
     return ticket, CLOSING[language].format(number=created["TicketNumber"]), corrections

@@ -36,7 +36,7 @@ def lane(state: ChatState) -> str:
 
 
 def chat(state: ChatState) -> dict:
-    phase, pending = state["chat_phase"], state["pending"]
+    phase, pending = state["phase"], state["pending"]
     if phase == "none":
         return {"task": TASKS["chat"]}
     key = "chat_offer_ticket" if phase == "offer_ticket" else "chat_ticket"
@@ -47,27 +47,27 @@ def queue(state: ChatState) -> dict:
     text, pending = state["messages"][-1].text, list(state["pending"])
     if not any(p.text == text for p in pending):
         pending.append(PendingIssue(text=text, urgent=state["next"] == "urgent", source="always_ticket"))
-    if state["chat_phase"] == "none":
-        return {"pending": pending, "chat_phase": advance(pending), "task": _offer(pending[0])}
+    if state["phase"] == "none":
+        return {"pending": pending, "phase": advance(pending), "task": _offer(pending[0])}
     return {"pending": pending, "task": TASKS["queued"].format(new=text, issue=pending[0].text)}
 
 
 def accept(state: ChatState) -> dict:
-    return {"ticket_draft": _new_draft(state), "chat_phase": "collect",
+    return {"ticket_draft": _new_draft(state), "phase": "collect",
             "task": TASKS["accept"].format(issue=state["pending"][0].text)}
 
 
 def decline(state: ChatState) -> dict:
     pending = state["pending"][1:]
     task = TASKS["decline_next"].format(issue=pending[0].text) if pending else TASKS["decline"]
-    return {"pending": pending, "chat_phase": advance(pending), "task": task}
+    return {"pending": pending, "phase": advance(pending), "task": task}
 
 
 def post_check(state: ChatState) -> dict:
     """Queues the customer's message when the reply offered a ticket for it. 
     In offer_ticket the chat task makes every reply ask about the open offer again, 
     so there a reply with sources is a reminder, not an offer."""
-    text, before, pending = state["messages"][-1].text, state["chat_phase"], list(state["pending"])
+    text, before, pending = state["messages"][-1].text, state["phase"], list(state["pending"])
     offered = state["offered"] and state["next"] not in OWN_ISSUE
     if before == "offer_ticket":
         offered = offered and not state["reply"].sources
@@ -75,4 +75,4 @@ def post_check(state: ChatState) -> dict:
         pending.append(PendingIssue(text=text, source="no_answer"))
     after = advance(pending) if before == "none" else before
     log.info("post_check  phase %s -> %s pending=%d", before, after, len(pending))
-    return {"pending": pending, "chat_phase": after}
+    return {"pending": pending, "phase": after}

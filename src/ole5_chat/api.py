@@ -10,7 +10,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from ole5_chat import attachments, products, sessions, sheets
 from ole5_chat.attachments import AttachmentRefused
 from ole5_chat.config import get_settings
-from ole5_chat.agent.state import ChatState, Step, TicketDraft
+from ole5_chat.agent.contracts import Phase
+from ole5_chat.agent.state import ChatState, TicketDraft
 from ole5_chat.identity import NotRegistered
 from ole5_chat.tickets import client as ticket_api
 from ole5_chat.tickets.client import TicketApiError
@@ -54,7 +55,7 @@ class SessionView(BaseModel):
     product: str
     product_name: str
     language: str
-    phase: Step
+    phase: Phase
     messages: list[Line]
     sources: list[str]
     ticket_draft: TicketDraft | None = None
@@ -88,7 +89,7 @@ def _view(session_id: str, state: ChatState) -> SessionView:
     return SessionView(session_id=session_id, product=who.product, product_name=products.load(who.product).name,
                        language=who.language,
                        phase=state["phase"], messages=[_line(m) for m in state["messages"]],
-                       sources=state["sources"], ticket_draft=draft, draft_ready=bool(draft and draft.classified),
+                       sources=state["sources"], ticket_draft=draft, draft_ready=state["phase"] == "confirm",
                        ticket_number=numbers[-1] if numbers else None, ticket_numbers=numbers,
                        attachments=[_attachment(f) for f in state.get("attachments") or []])
 

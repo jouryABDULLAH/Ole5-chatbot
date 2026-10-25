@@ -11,7 +11,7 @@ log = logging.getLogger(__name__)
 
 
 def router_v2(state: ChatState) -> dict:
-    phase = state["chat_phase"]
+    phase = state["phase"]
     try:
         decision = llm.structured(prompt.router_v2(state), state["messages"], route_schema(phase), node="router")
     except llm.ModelFailed as exc:

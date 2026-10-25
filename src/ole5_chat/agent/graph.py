@@ -22,12 +22,12 @@ def greet(state: ChatState) -> dict:
     who = state["identity"]
     log.info("greet  product=%s language=%s", who.product, who.language)
     return {"messages": [AIMessage(content=products.load(who.product).greet(who.language))],
-            "phase": "greet", "step": None, "sources": [], "reply": None}
+            "sources": [], "reply": None}
 
 
 def validate(state: ChatState) -> dict:
     reply = state["reply"]
-    log.info("validate  phase=%s pending=%d sources=%s", state["chat_phase"], len(state["pending"]), reply.sources)
+    log.info("validate  phase=%s pending=%d sources=%s", state["phase"], len(state["pending"]), reply.sources)
     return {"messages": [AIMessage(content=reply.say)], "sources": reply.sources, "last_retrieval": None,
             "note": None, "task": None, "next": None, "offered": False}
 

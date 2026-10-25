@@ -100,7 +100,7 @@ def _option(config: products.ProductConfig, phase: str, option: str) -> str:
 
 def router_v2(state: ChatState) -> str:
     config = products.load(state["identity"].product)
-    phase = state["chat_phase"]
+    phase = state["phase"]
     pending = state.get("pending") or []
     last = next((m.text for m in reversed(state["messages"]) if m.type == "ai"), "none")
     return _fill("router_v2", product_name=config.name, phase_description=PHASES[phase],

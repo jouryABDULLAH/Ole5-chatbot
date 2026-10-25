@@ -24,22 +24,22 @@ def _evidence(sid: str, state) -> str:
 
 
 def _phase(state) -> str:
-    """The old step name, so the current datasets still grade the new path. This mapping goes in step 8."""
-    if state["chat_phase"] == "none":
+    """The old step name, so the current datasets still grade the new path. Removed in step 8."""
+    if state["phase"] == "none":
         return "answer" if state["sources"] else "ask"
-    return state["chat_phase"]
+    return state["phase"]
 
 
 def _turn(sid: str, state) -> dict:
-    draft, decision = state.get("ticket_draft"), state.get("decision")
+    draft = state.get("ticket_draft")
     return {
-        "chat_phase": state["chat_phase"],
+        "state_phase": state["phase"],
         "pending": [p.text for p in state["pending"]],
         "answer": state["messages"][-1].text,
         "phase": _phase(state),
         "sources": list(state["sources"]),
         "evidence": _evidence(sid, state),
-        "language": decision.language if decision else None,
+        "language": state["language"],
         "draft": None if draft is None else {"ready": draft.classified, "missing": list(draft.missing),
                                              "unknown": list(draft.unknown), "urgent": draft.urgent},
         "corrections": list(state["corrections"]),

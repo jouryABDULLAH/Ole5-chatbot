@@ -3,7 +3,6 @@
 from fastapi.testclient import TestClient
 
 from ole5_chat import sessions, sheets
-from ole5_chat.agent.contracts import RouterDecision
 from ole5_chat.agent.state import TicketDraft
 from ole5_chat.api import app
 from ole5_chat.config import get_settings
@@ -63,8 +62,7 @@ def test_submit_links_the_files_in_the_note_and_the_sheet():
     sid = session()
     att = send_file(sid).json()
     sessions._graph.update_state(sessions._config(sid), {
-        "phase": "confirm", "ticket_draft": TicketDraft(**DRAFT),
-        "decision": RouterDecision(intent="ticket_reply", language="en"),
+        "phase": "confirm", "ticket_draft": TicketDraft(**DRAFT), "language": "en",
     }, as_node="validate")
     view = client.post(f"/chat/sessions/{sid}/submit").json()
     link = f"https://chat.example.com/chat/attachments/{att['id']}"

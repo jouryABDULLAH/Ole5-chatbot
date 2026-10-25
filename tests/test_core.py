@@ -66,14 +66,20 @@ def test_ticket_row_is_appended():
     assert sheets.tickets()[-1]["ticket_number"] == "T-1"
 
 
-def test_session_api_flow():
+def test_session_api_flow(monkeypatch):
+    from ole5_chat import llm
+
+    def no_model(temperature):
+        raise llm.ModelFailed("no model in tests")
+
+    monkeypatch.setattr(llm, "tool_client", no_model)
     client = TestClient(app)
     refused = client.post("/chat/sessions", json={"email": "gone@example.com"})
     assert refused.status_code == 403
     assert refused.json()["detail"] == "This email is not registered for support chat"
 
     start = client.post("/chat/sessions", json={"email": "ole5@example.com"}).json()
-    assert start["phase"] == "greet"
+    assert start["phase"] == "none"
     assert start["messages"] == [{"author": "bot", "text": products.load("OLE5").greet("ar")}]
 
     sid = start["session_id"]

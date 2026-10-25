@@ -1,11 +1,9 @@
-"""What each LLM node must return. The router reports facts about the message, code picks the step from them, respond writes the text for that step, and code checks it before anything reaches the customer or a ticket."""
+"""What each LLM node must return, and the phases and router options they work with. The router picks next from the options of the phase, respond_agent writes the reply, and classify fills the ticket's values."""
 
 from functools import lru_cache
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, create_model
-
-Step = Literal["greet", "answer", "ask", "offer_ticket", "collect", "confirm", "created"]
 
 Phase = Literal["none", "offer_ticket", "collect", "confirm"]
 Next = Literal["chat", "ticket", "urgent", "status", "accept", "decline", "details", "done", "cancel", "yes", "change"]
@@ -28,20 +26,6 @@ class PendingIssue(BaseModel):
 def route_schema(phase: Phase) -> type[BaseModel]:
     """The router's reply for one phase: next may only take that phase's options."""
     return create_model("RouteDecision", __config__=ConfigDict(extra="forbid"), next=(Literal[OPTIONS[phase]], ...))
-
-
-class RouterDecision(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    intent: Literal["greeting", "question", "ticket_reply", "other"]
-    queries: list[str] = []
-    always_ticket: bool = False
-    urgent: bool = False
-    language: Literal["ar", "en"]
-    collected: dict[str, str] = {}
-    missing: list[str] = []
-    unknown: list[str] = []
-    cancel_ticket: bool = False
 
 
 class Reply(BaseModel):

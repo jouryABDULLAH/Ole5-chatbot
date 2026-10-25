@@ -5,7 +5,7 @@ from typing import Literal
 from langgraph.graph import MessagesState
 from pydantic import BaseModel, ConfigDict
 
-from ole5_chat.agent.contracts import Next, PendingIssue, Phase, Reply, RouterDecision, Step
+from ole5_chat.agent.contracts import Next, PendingIssue, Phase, Reply
 from ole5_chat.identity import Identity
 
 
@@ -32,10 +32,7 @@ class TicketDraft(BaseModel):
 
 class ChatState(MessagesState):
     identity: Identity
-    phase: Step
-    step: Step | None
     sources: list[str]
-    decision: RouterDecision | None
     last_retrieval: dict | None
     reply: Reply | None
     note: str | None
@@ -43,7 +40,7 @@ class ChatState(MessagesState):
     corrections: list[str]
     created_tickets: list[dict]
     attachments: list[dict]
-    chat_phase: Phase  # Temporary name; step 4 renames it to phase.
+    phase: Phase
     pending: list[PendingIssue]
     next: Next | None
     task: str | None
@@ -52,7 +49,7 @@ class ChatState(MessagesState):
 
 
 def initial_state(identity: Identity) -> ChatState:
-    return ChatState(messages=[], identity=identity, phase="greet", step=None, sources=[], decision=None,
+    return ChatState(messages=[], identity=identity, sources=[],
                      last_retrieval=None, reply=None, note=None, ticket_draft=None, corrections=[], created_tickets=[],
-                     attachments=[], chat_phase="none", pending=[], next=None, task=None, language=None,
+                     attachments=[], phase="none", pending=[], next=None, task=None, language=None,
                      offered=False)
