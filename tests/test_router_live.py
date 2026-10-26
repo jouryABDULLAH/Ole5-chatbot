@@ -96,6 +96,8 @@ HELD_OUT = [
     ("none", None, ANSWER, "ممكن تعيد الخطوات؟", "talk"),
     ("none", None, GREETING, "وش تقدر تسوي؟", "talk"),
     ("none", None, GREETING, "who are you?", "talk"),
+    ("none", None, GREETING, "عندي استفسار", "talk"),
+    ("none", None, GREETING, "something is wrong", "talk"),
     ("offer_ticket", ARCHIVE, OFFER, "انت روبوت؟", "talk"),
     ("collect", DENIED, ERROR, "وين ألقى رقم الخطأ؟", "question"),
     ("confirm", DENIED, SUMMARY, "how do I attach a file to a ticket?", "question"),
