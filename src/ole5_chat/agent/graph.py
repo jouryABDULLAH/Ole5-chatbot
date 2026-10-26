@@ -23,6 +23,11 @@ def route(state: ChatState) -> str:
     return handlers.handler(state) if state.get("next") else "router"
 
 
+def after_router(state: ChatState) -> str:
+    """A failed route has no next and goes straight to validate with the try-again reply."""
+    return handlers.handler(state) if state.get("next") else "validate"
+
+
 def greet(state: ChatState) -> dict:
     who = state["identity"]
     log.info("greet  product=%s language=%s", who.product, who.language)
@@ -46,7 +51,7 @@ def build(checkpointer):
         g.add_node(name, getattr(handlers, name))
         g.add_edge(name, "search")
     g.add_conditional_edges(START, route, ["greet", "router", *HANDLER_NODES])
-    g.add_conditional_edges("router", handlers.handler, list(HANDLER_NODES))
+    g.add_conditional_edges("router", after_router, [*HANDLER_NODES, "validate"])
     g.add_edge("search", "respond_agent")
     g.add_edge("respond_agent", "post_check")
     g.add_edge("post_check", "validate")
