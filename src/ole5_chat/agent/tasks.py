@@ -52,7 +52,7 @@ TASKS = {
     "changed": "The ticket summary was updated as the customer asked and is shown again. Say what changed in one line "
                "and ask whether to submit the ticket for: {issue}.",
     "created": "The ticket {number} was created. Tell the customer its number and that the support team will reply by "
-               "email. Nothing more.",
+               "email. Nothing more about this ticket.",
     "cancelled": "The customer cancelled the ticket. Acknowledge it in one line and say they can contact support at any "
                  "time.",
     "status": "The customer asked about their tickets. Today: {today}. These are the tickets on their account, newest "
