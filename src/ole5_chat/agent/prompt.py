@@ -205,9 +205,10 @@ def respond(state: ChatState, language: str) -> str:
 
 SEARCH_RULES = {
     "question": "The message asks something or reports a problem: search for it.",
-    "own_issue": "The customer is answering the assistant about a ticket. Search only if the message itself asks a new "
-                 "question about the product. A yes, an answer, a detail, a file or a request to change the summary is "
-                 "not a question: reply without a tool call.",
+    "own_issue": "The customer is answering the assistant about a ticket. The ticket's problem was already searched: "
+                 "never search it again. Search only if this message asks a new product question in its own words. "
+                 "\"I don't know\", \"no\", \"nothing else\", a detail, a file or a change to the summary are answers: "
+                 "reply without a tool call.",
 }
 
 
