@@ -10,25 +10,40 @@ respond_agent: writes the reply, with no tool.
 - Anything else: a plain reply.
 Code, not the model, decides whether the reply offers a ticket: on a question turn whose status is not answered."""
 
+import contextvars
 import json
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
 from typing import Literal
 
-from groq import BadRequestError
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from groq import APIError, BadRequestError
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
+from langgraph.config import get_stream_writer
 from pydantic import BaseModel
 
 from ole5_chat import llm
 from ole5_chat.agent import prompt
 from ole5_chat.agent.contracts import Reply
 from ole5_chat.agent.state import ChatState
-from ole5_chat.agent.validate import NAMES, SORRY, language_of, language_problem
+from ole5_chat.agent.validate import NAMES, SORRY, language_of, language_problem, script_problem
 from ole5_chat.config import get_settings
 from ole5_chat.knowledge.contracts import Retrieval, Verdict, merge
 from ole5_chat.knowledge.tool import make_search_tool
 
 log = logging.getLogger(__name__)
+# Voice turns run a search here so it can be cut off at voice_search_timeout; RAGent2 itself cannot be cancelled.
+_voice_searches = ThreadPoolExecutor(max_workers=4, thread_name_prefix="voice-search")
+
+
+def _emit(event: dict) -> None:
+    """A progress event for a caller streaming the graph (the voice channel). A no-op under invoke or outside a graph."""
+    try:
+        writer = get_stream_writer()
+    except RuntimeError:
+        return
+    writer(event)
 
 NOTE = "Note from the system, not the customer: "
 LANGUAGE_RETRIES = 2
@@ -61,20 +76,42 @@ def _invoke(convo: list[BaseMessage], tool=None, tool_choice: str | None = None)
     for temperature in (0, 0.3):
         try:
             client = llm.tool_client(temperature)
-            return (client.bind_tools([tool], tool_choice=tool_choice) if tool else client).invoke(convo)
+            return (client.bind_tools([tool], tool_choice=tool_choice) if tool else client).invoke(llm.prepare(convo))
         except BadRequestError as exc:
             error = str(exc)[:400]
             log.warning("respond_agent  rejected by Groq at temperature %s: %s", temperature, error)
+        except APIError as exc:
+            # A timeout, connection error, rate limit or Groq 5xx: no warmer retry, the caller's fallback answers.
+            raise llm.ModelFailed(f"Groq unavailable: {str(exc)[:300]}") from exc
     raise llm.ModelFailed(error)
+
+
+def _search_within(tool, call: dict, sink: list[Retrieval], seconds: float):
+    """Runs one search, giving up after seconds. A search still running then is one that has found nothing direct
+    (measured 2026-10-26: answerable questions came back in 20-28 s, the rest ran 33-84 s), so it is recorded as not
+    found and the reply offers a ticket (D28). The search runs in the turn's context: it reads the voice flag."""
+    future = _voice_searches.submit(contextvars.copy_context().run, tool.invoke, call)
+    try:
+        return future.result(timeout=seconds)
+    except FutureTimeout:
+        log.warning("search  voice search cut off after %.0f s, answered as not found", seconds)
+        sink.append(Retrieval(query=call["args"].get("question", ""), verdict=Verdict.NOT_IN_KB,
+                              elapsed_ms=int(seconds * 1000), warnings=[f"no passage within {seconds:.0f} s"]))
+        return ToolMessage(content=json.dumps({"status": "no_result", "detail": "nothing found in time"}),
+                           tool_call_id=call["id"])
 
 
 def search(state: ChatState) -> dict:
     if state.get("next") not in QUESTIONS:
         return {}
+    voice = state.get("channel") == "voice"
+    settings = get_settings()
+    _emit({"type": "search_started"})
     sink: list[Retrieval] = []
     tool = make_search_tool(state["identity"].product, sink)
     convo = [SystemMessage(content=prompt.search(state)), *state["messages"]]
-    cap = get_settings().kb_max_searches
+    # A voice turn searches once and within a time limit: every RAGent2 search takes 17-20 s while the customer waits.
+    cap = settings.voice_kb_max_searches if voice else settings.kb_max_searches
     # The model makes one tool call per reply, so it sees each result and searches again until it stops or hits the cap.
     while len(sink) < cap:
         try:
@@ -84,12 +121,16 @@ def search(state: ChatState) -> dict:
             if sink:
                 break
             failed = Retrieval(query="", verdict=Verdict.NOT_IN_KB, error=f"search call failed: {exc}")
+            _emit({"type": "search_done", "searches": 0})
             return {"last_retrieval": failed.as_json()}
         calls = [c for c in reply.tool_calls if c["name"] == tool.name][:cap - len(sink)]
         if not calls:
             break
         convo.append(reply)
         for call in calls:
+            if voice:
+                convo.append(_search_within(tool, call, sink, settings.voice_search_timeout))
+                continue
             result = tool.invoke(call)
             if sink[-1].error:
                 # RAGent2's own model call sometimes fails; one more try usually gets through.
@@ -97,6 +138,7 @@ def search(state: ChatState) -> dict:
                 result = tool.invoke(call)
             convo.append(result)
     log.info("search  next=%s searches=%d", state.get("next"), len(sink))
+    _emit({"type": "search_done", "searches": len(sink)})
     return {"last_retrieval": merge(sink).as_json() if sink else None}
 
 
@@ -113,8 +155,9 @@ def _is_json(text: str) -> bool:
 
 
 def _problem(text: str, language: str) -> str | None:
-    """What is wrong with the reply's language, or None."""
-    return language_problem(text, language) or (
+    """What is wrong with the reply's language, or None. A voice turn checks the script instead of making a model call."""
+    found = script_problem(text, language) if llm.voice_active() else language_problem(text, language)
+    return found or (
         CHINESE.search(text) and f"The reply contains Chinese characters; rewrite it in {NAMES[language]}.") or None
 
 
@@ -225,7 +268,11 @@ def respond_agent(state: ChatState) -> dict:
     question = state.get("next") in QUESTIONS
     retrieval = Retrieval.from_json(state["last_retrieval"]) if state.get("last_retrieval") else None
     customer = next((m.text for m in reversed(state["messages"]) if m.type == "human"), "")
-    language = language_of(customer) or state["identity"].language
+    heard = state.get("heard_language")
+    if state.get("channel") == "voice" and heard in NAMES:
+        language = heard  # speech-to-text already knows; saves a model call per turn
+    else:
+        language = language_of(customer) or state["identity"].language
     convo = _convo(state, language, retrieval)
     corrections: list[str] = []
     sources, status = [], "answered"

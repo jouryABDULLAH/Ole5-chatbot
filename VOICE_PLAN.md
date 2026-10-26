@@ -11,7 +11,7 @@ In the existing web widget, a signed-in customer turns on the microphone and tal
 English:
 
 - The assistant answers aloud from the real knowledge base (RAGent2), in the language the customer spoke: Arabic by
-  Groq's Saudi voice `noura`, English by the Orpheus voice `autumn`.
+  Groq's Saudi voice `abdullah`, English by the Orpheus voice `troy` (male voices, D29).
 - No dead air: an acknowledgement as soon as the question is understood, "let me check" when a search starts, progress
   lines while it runs, and a spoken apology on any error or timeout.
 - The customer can interrupt. A "تمام" or "ok" said over the assistant is ignored; real words stop it.
@@ -39,8 +39,9 @@ Browser (t2-chat widget)
   utterance → 16 kHz PCM16 WAV ──── WebSocket /chat/sessions/{id}/voice ────┐
                                                                            │
 Server, per socket (src/ole5_chat/voice/)                                  ▼
-  1. STT (AsyncGroq whisper-large-v3-turbo, hint "نظام Ole5 ودعم RiCH", verbose_json)
-       short clips (< 1 s) get the session language forced; language = transcript script
+  1. STT (AsyncGroq whisper-large-v3-turbo, verbose_json), two calls at once (D24):
+       Arabic + "نظام Ole5 ودعم RiCH", English + "Ole5, RiCH"; same script → that one,
+       else the more confident (+0.3 for the conversation's language); no hint under 1.8 s
   2. Filters: empty / punctuation / self-echo (matches what the assistant just said)
        / known hallucinations, only on short or over-the-assistant clips
   3. Turn manager: at most ONE Ole5 turn in flight
@@ -217,7 +218,7 @@ unless one of his fixes is needed, and then section 10 is re-run in full (D18).
 | CP | What | Exit criteria | Until |
 |---|---|---|---|
 | 0 | Plan agreed; mic lab (echo test, recordings); Groq limits; open decisions; baseline re-run | Audio setup decided; recordings in the fixture folder | ~15:30 |
-| 1 | Push-to-talk end to end on MicVAD: STT, TTS (segments), speakable v1, socket, speaker queue, turn manager (single turn + deadline + apology), `sessions.send` hook, one cached "let me check" on `search_started`, the widget's mic control and player; demo questions timed 3× each on real RAGent2 | Hold to talk, ask the demo questions in Arabic and English, hear the answers; tests green; tag `voice-cp1` | ~19:00 |
+| 1 | Hands-free half-duplex end to end on MicVAD (D23; was push-to-talk): STT, TTS (segments), speakable v1, socket, speaker queue, turn manager (single turn + deadline + apology), `sessions.send` hook, one cached "let me check" on `search_started`, the widget's mic control and player; demo questions timed 3× each on real RAGent2 | Hold to talk, ask the demo questions in Arabic and English, hear the answers; tests green; tag `voice-cp1` | ~19:00 |
 | 2 | Ole5 voice mode: channel flag, overlays with draft fields, yes guard and confirm table, language from STT, transport errors and voice timeouts, 1-search cap and 30 s search cap, Submit over the socket, ticket number | A full ticket by voice; chat-vs-voice grounding comparison passes; tests green; tag `voice-cp2`; your 10-minute real-mic pass | ~22:00 |
 | 3 | No dead air: filler policy (first acknowledgement, search started/done, rotating progress lines, a long-wait line), fixed-line disk cache, per-stage latency report | No silence over ~1.5 s after the customer stops, in the demo scenarios | ~23:30 |
 | 4 | Hands-free: VAD gating, ducking, barge-in with backchannel ignore and self-echo filter, rules, silence prompt, held utterances, mute hotkey; push-to-talk kept | Hands-free conversation with working interruptions on your recordings | ~02:00 |
@@ -268,7 +269,7 @@ throughout. The targets are reset from the CP1 measurements.
 | Real Saudi speech (VAD drops one-word answers, Whisper mishears) | Your recordings drive tuning and tests; short clips get the language forced; the text box stays for emails and codes |
 | The confirm step derails | Confirm table with a test per row, the graph-side guard, read-back from the draft |
 | Groq quota or a 429 on demo morning | Limits checked now; fixed-line audio cached on disk, including the apology; overnight runs budgeted |
-| English replies with Arabic screen names, read by `autumn` | Tested in CP1; if garbled, those spans are spoken by `noura` or replaced with "the option on your screen" |
+| English replies with Arabic screen names, read by `troy` | To test; if garbled, those spans are spoken by `abdullah` or replaced with "the option on your screen" |
 | Joori's changes | Frozen demo commit; merge after the demo |
 | Environment traps (Excel holding `tickets.xlsx`, `TRACING` without Phoenix, Edge, LAN IP, CDN) | Demo runbook in the log; demo runs on a copy of `sheets/`; VAD assets vendored |
 

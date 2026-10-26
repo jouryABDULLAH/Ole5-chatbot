@@ -1,0 +1,234 @@
+/* voice.js: the voice side of <t2-chat>, loaded only when the customer turns the microphone on. Plain JavaScript, no
+   build step; exposes window.T2Voice.
+
+   The microphone stays open while voice is on, with the browser's echo cancellation. A speech detector (Silero VAD,
+   vad-web 0.0.31) cuts each utterance; it is sent as a 16 kHz WAV over the session's WebSocket. The assistant's speech
+   comes back as 40 ms frames of 24 kHz PCM between tts_start and tts_end and is played without gaps. Speech that starts
+   while the assistant is talking (and not in its last 0.6 s) is "over the assistant": in half-duplex mode (the default
+   until barge-in is tuned) it is dropped when the assistant is still talking as it ends, and sent marked over_bot when
+   it went on past the assistant's last word (an answer to its question). The server is told when speech starts, so it
+   can join a sentence split by a pause. Protocol: VOICE_PLAN.md section 5. */
+(() => {
+  const VAD_CDN = "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.31/dist/";
+  const ORT_CDN = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/";  // must match vad-web 0.0.31
+  // Tuned on the user's recordings (VOICE_LOG.md, CP0): every one-word answer was caught.
+  const VAD = { model: "v5", positiveSpeechThreshold: 0.5, negativeSpeechThreshold: 0.35, redemptionMs: 850,
+                preSpeechPadMs: 300, minSpeechMs: 160 };
+  const TAIL_S = 0.6;          // speech starting in the assistant's last 0.6 s is an answer, not an interruption
+  const BARGE_IN_MS = 1200;    // speech over the assistant this long stops it (barge-in mode only)
+
+  const scripts = {};
+  function loadScript(src) {
+    scripts[src] ||= new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = src; s.onload = resolve; s.onerror = () => { delete scripts[src]; reject(new Error(`could not load ${src}`)); };
+      document.head.append(s);
+    });
+    return scripts[src];
+  }
+
+  /** Float32 samples (-1..1) to WAV file bytes, mono PCM16. */
+  function encodeWav(samples, rate = 16000) {
+    const buf = new ArrayBuffer(44 + samples.length * 2), v = new DataView(buf);
+    const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    str(0, "RIFF"); v.setUint32(4, 36 + samples.length * 2, true); str(8, "WAVE"); str(12, "fmt ");
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true);
+    v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    str(36, "data"); v.setUint32(40, samples.length * 2, true);
+    for (let i = 0, o = 44; i < samples.length; i++, o += 2) {
+      const s = Math.max(-1, Math.min(1, samples[i]));
+      v.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    }
+    return buf;
+  }
+
+  /** Gapless player for streamed PCM16 mono frames. */
+  class Player {
+    constructor(sampleRate = 24000, leadSec = 0.12) {
+      this.ctx = new AudioContext({ sampleRate, latencyHint: "interactive" });
+      this.gain = this.ctx.createGain(); this.gain.connect(this.ctx.destination);
+      this.rate = sampleRate; this.lead = leadSec;
+      this.nextTime = 0; this.sources = new Set(); this.carry = null; this.timers = new Set();
+      this.onIdle = null;
+    }
+    get playing() { return this.sources.size > 0; }
+    /** Seconds of audio still to play. */
+    remaining() { return this.playing ? Math.max(0, this.nextTime - this.ctx.currentTime) : 0; }
+    async resume() { if (this.ctx.state !== "running") await this.ctx.resume(); }
+
+    push(arrayBuffer) {
+      let bytes = new Uint8Array(arrayBuffer);
+      if (this.carry) { const m = new Uint8Array(this.carry.length + bytes.length); m.set(this.carry); m.set(bytes, this.carry.length); bytes = m; this.carry = null; }
+      if (bytes.length % 2) { this.carry = bytes.slice(-1); bytes = bytes.subarray(0, bytes.length - 1); }
+      if (!bytes.length) return;
+      const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.length), n = bytes.length / 2;
+      const buf = this.ctx.createBuffer(1, n, this.rate), ch = buf.getChannelData(0);
+      for (let i = 0; i < n; i++) ch[i] = dv.getInt16(i * 2, true) / 32768;
+      const src = this.ctx.createBufferSource(); src.buffer = buf; src.connect(this.gain);
+      const now = this.ctx.currentTime;
+      if (this.nextTime < now + 0.005) this.nextTime = now + this.lead;   // first frame, or fell behind: re-prime
+      src.start(this.nextTime); this.nextTime += buf.duration;
+      this.sources.add(src);
+      src.onended = () => { this.sources.delete(src); if (!this.sources.size && this.onIdle) this.onIdle(); };
+    }
+    /** Calls back when everything pushed so far has played. */
+    whenPlayed(callback) {
+      const wait = Math.max(0, this.nextTime - this.ctx.currentTime) * 1000 + 30;
+      const t = setTimeout(() => { this.timers.delete(t); callback(); }, this.playing ? wait : 0);
+      this.timers.add(t);
+    }
+    /** Silence now, with a 5 ms fade so there is no click. */
+    stop() {
+      const now = this.ctx.currentTime, g = this.gain.gain;
+      g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(0, now + 0.005);
+      for (const s of this.sources) { s.onended = null; try { s.stop(now + 0.006); } catch {} }
+      this.sources.clear(); this.nextTime = 0; this.carry = null;
+      for (const t of this.timers) clearTimeout(t); this.timers.clear();
+      g.setValueAtTime(1, now + 0.01);
+      if (this.onIdle) this.onIdle();
+    }
+    duck(level = 0.25) { const g = this.gain.gain; g.cancelScheduledValues(this.ctx.currentTime); g.setTargetAtTime(level, this.ctx.currentTime, 0.03); }
+    unduck() { const g = this.gain.gain; g.cancelScheduledValues(this.ctx.currentTime); g.setTargetAtTime(1, this.ctx.currentTime, 0.08); }
+    close() { this.stop(); this.ctx.close().catch(() => {}); }
+  }
+
+  /** One voice connection for one chat session. `on` receives: event(message) for the server's JSON events, stage(name)
+      for what the assistant is doing (listening, thinking, searching, speaking), speech(bool) while the customer
+      talks, closed(reason) when the connection ends without being stopped. */
+  class VoiceLink {
+    constructor({ api, sessionId, on, bargeIn = false }) {
+      this.api = api; this.sessionId = sessionId; this.on = on; this.bargeIn = bargeIn;
+      this.item = null; this.stage = "listening"; this.stopped = false; this.overBot = false; this.bargeTimer = null;
+      this.hush = false;   // after a local stop: drop the assistant's audio until the server's stop_audio
+    }
+
+    /** Must be called from a click: the audio output can only start in a user gesture. */
+    async start() {
+      this.player = new Player();
+      await this.player.resume();
+      this.player.onIdle = () => this.showStage();
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      await loadScript(VAD_CDN + "bundle.min.js");
+      this.vad = await window.vad.MicVAD.new({
+        ...VAD, startOnLoad: false, baseAssetPath: VAD_CDN, onnxWASMBasePath: ORT_CDN,
+        getStream: async () => this.stream, pauseStream: async () => {}, resumeStream: async () => this.stream,
+        onSpeechStart: () => this.speechStart(),
+        onVADMisfire: () => this.misfire(),
+        onSpeechEnd: (audio) => this.speechEnd(audio),
+      });
+      await this.connect();
+      if (this.stopped) return;
+      await this.vad.start();
+    }
+
+    connect() {
+      const url = new URL(`${this.api || location.origin}/chat/sessions/${encodeURIComponent(this.sessionId)}/voice`, location.href);
+      url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+      const ws = this.ws = new WebSocket(url);
+      ws.binaryType = "arraybuffer";
+      ws.onmessage = (e) => (typeof e.data === "string" ? this.event(JSON.parse(e.data)) : this.frame(e.data));
+      return new Promise((resolve, reject) => {
+        ws.onopen = () => resolve();
+        ws.onerror = () => reject(new Error("voice connection failed"));
+        ws.onclose = (e) => {
+          reject(new Error("voice connection closed"));
+          if (!this.stopped) { this.stop(); this.on.closed?.(e.code); }
+        };
+      });
+    }
+
+    send(data) { if (this.ws && this.ws.readyState === WebSocket.OPEN) this.ws.send(typeof data === "string" ? data : data instanceof ArrayBuffer ? data : JSON.stringify(data)); }
+
+    // ---- the customer's speech ----
+
+    speechStart() {
+      this.overBot = this.player.remaining() > TAIL_S;
+      this.send({ type: "speech", on: true });
+      this.on.speech?.(true);
+      if (this.overBot && this.bargeIn) {
+        this.player.duck();
+        this.bargeTimer = setTimeout(() => { this.bargeTimer = null; this.interrupt("barge_in"); }, BARGE_IN_MS);
+      }
+    }
+
+    speechDone() {
+      clearTimeout(this.bargeTimer); this.bargeTimer = null;
+      this.player.unduck();
+      this.on.speech?.(false);
+    }
+
+    /** The detector heard a sound too short to be speech. */
+    misfire() {
+      this.overBot = false;
+      this.speechDone();
+      this.send({ type: "speech", on: false });
+    }
+
+    speechEnd(audio) {
+      const overBot = this.overBot;
+      this.overBot = false;
+      this.speechDone();
+      if (overBot && !this.bargeIn && this.player.playing) {   // half-duplex: all of it was over the assistant
+        this.send({ type: "speech", on: false });
+        return;
+      }
+      this.send({ type: "utterance", over_bot: overBot, ms: Math.round(audio.length / 16) });
+      this.send(encodeWav(audio));
+    }
+
+    // ---- the assistant's speech ----
+
+    event(m) {
+      if (m.type === "tts_start") {
+        this.item = { id: m.id, kind: m.kind, dropped: this.hush };
+        if (!this.hush) this.showStage("speaking");
+      } else if (m.type === "tts_end") {
+        const item = this.item;
+        if (item && item.id === m.id) {
+          this.item = null;
+          if (!m.cancelled && !item.dropped) this.player.whenPlayed(() => this.send({ type: "played", id: m.id }));
+        }
+      } else if (m.type === "stop_audio") {
+        this.silence();
+        this.hush = false;
+      } else if (m.type === "status") {
+        this.stage = m.stage;
+        this.showStage();
+      }
+      this.on.event?.(m);
+    }
+
+    frame(buffer) { if (this.item && !this.item.dropped) this.player.push(buffer); }
+
+    showStage(forced) { this.on.stage?.(forced || (this.player && this.player.playing ? "speaking" : this.stage)); }
+
+    silence() {
+      if (this.item) this.item.dropped = true;
+      this.player.stop();
+    }
+
+    /** The Stop button: silence at once, and the server drops what it was about to say. Audio already on its way is
+        dropped until the server answers with stop_audio. */
+    interrupt(kind = "stop") {
+      this.silence();
+      this.hush = true;
+      this.send({ type: kind });
+    }
+
+    submit() { this.send({ type: "submit" }); }
+    text(text) { this.send({ type: "text", text }); }
+
+    stop() {
+      if (this.stopped) return;
+      this.stopped = true;
+      clearTimeout(this.bargeTimer);
+      try { this.vad && this.vad.destroy(); } catch {}
+      if (this.stream) for (const t of this.stream.getTracks()) t.stop();
+      if (this.player) this.player.close();
+      if (this.ws && this.ws.readyState <= WebSocket.OPEN) this.ws.close();
+    }
+  }
+
+  window.T2Voice = { VoiceLink, encodeWav, Player };
+})();

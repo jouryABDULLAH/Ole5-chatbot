@@ -36,8 +36,10 @@ class NoRerank:
         return list(candidates)
 
 
-@lru_cache(maxsize=1)
-def ragent() -> Any:
+@lru_cache(maxsize=2)
+def ragent(voice: bool = False) -> Any:
+    """The RAGent2 instance; voice=True is the lighter profile for voice turns (fewer passages graded more at once,
+    fewer rounds, D28), sharing the text chat instance's Qdrant client and embedder (the slow part to load)."""
     s = get_settings()
     if not s.groq_api_key or not s.groq_api_key.get_secret_value():
         raise KnowledgeUnavailable("GROQ_API_KEY is not set")
@@ -47,7 +49,7 @@ def ragent() -> Any:
     except ImportError as exc:
         raise KnowledgeUnavailable("ragent2 is not installed in this environment") from exc
     qdrant_key = s.qdrant_api_key.get_secret_value() if s.qdrant_api_key else ""
-    return Ragent(client=qdrant_client(), reranker=NoRerank(), settings=RagSettings(
+    options = dict(
         groq_api_key=s.groq_api_key.get_secret_value(),
         groq_api_base=s.groq_api_base,
         answer_model=s.groq_model,
@@ -61,20 +63,29 @@ def ragent() -> Any:
         tool_call_repair_attempts=s.kb_tool_repair_attempts,
         max_search_rounds=s.kb_max_rounds,
         find_timeout_seconds=s.kb_find_timeout,
-    ))
+    )
+    if not voice:
+        return Ragent(client=qdrant_client(), reranker=NoRerank(), settings=RagSettings(**options))
+    options.update(top_k=s.voice_kb_top_k, max_search_rounds=s.voice_kb_max_rounds,
+                   grading_max_concurrency=s.voice_kb_grading_concurrency, find_timeout_seconds=s.voice_kb_find_timeout)
+    chat = ragent()
+    return Ragent(client=chat.client, embedder=chat.embedder, reranker=NoRerank(), settings=RagSettings(**options))
 
 
-@lru_cache(maxsize=8)
-def tenant(name: str) -> Any:
-    return ragent().tenant(name)
+@lru_cache(maxsize=16)
+def tenant(name: str, voice: bool = False) -> Any:
+    # ragent() and ragent(False) would be two cache entries, so the text chat instance is always ragent().
+    return ragent(True).tenant(name) if voice else ragent().tenant(name)
 
 
 def warm(tenants: list[str]) -> None:
-    rag = ragent()
-    for part in ("client", "embedder", "retriever", "find_model"):
-        getattr(rag, part)
-    for name in tenants:
-        tenant(name)
+    profiles = (False, True) if get_settings().voice_enabled else (False,)
+    for voice in profiles:
+        rag = ragent(True) if voice else ragent()
+        for part in ("client", "embedder", "retriever", "find_model"):
+            getattr(rag, part)
+        for name in tenants:
+            tenant(name, voice=True) if voice else tenant(name)
 
 
 def _to_evidence(chunk: Any) -> Evidence:
@@ -104,13 +115,13 @@ def _short(text: str, limit: int = 160) -> str:
     return text if len(text) <= limit else text[:limit - 1] + "…"
 
 
-def _find(name: str, question: str):
+def _find(name: str, question: str, voice: bool = False):
     """One find() call, repeated once on two transient failures: Groq rejecting the search agent's tool call (the model sometimes puts several queries as a list in one call), and the embedding gateway timing out."""
     retries = get_settings().kb_find_retries
     for attempt in range(retries + 1):
         try:
             with suppress_tracing():
-                return tenant(name).find(question, use_reranker=False)
+                return (tenant(name, voice=True) if voice else tenant(name)).find(question, use_reranker=False)
         except Exception as exc:
             if attempt == retries or not any(mark in str(exc) for mark in TRANSIENT):
                 raise
@@ -118,10 +129,10 @@ def _find(name: str, question: str):
                         _short(str(exc)))
 
 
-def retrieve(question: str, tenant_name: str) -> Retrieval:
+def retrieve(question: str, tenant_name: str, voice: bool = False) -> Retrieval:
     started = time.perf_counter()
     try:
-        result = _find(tenant_name, question)
+        result = _find(tenant_name, question, voice)
     except Exception as exc:
         elapsed = int((time.perf_counter() - started) * 1000)
         log.exception("kb  tenant=%s failed after ms=%d", tenant_name, elapsed)

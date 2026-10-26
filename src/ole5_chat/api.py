@@ -203,3 +203,9 @@ def my_tickets(session_id: str) -> list[TicketView]:
                                 product=str(r.get("product") or ""), created_at=str(r.get("created_at") or ""),
                                 state=state))
     return views
+
+
+# The voice channel's routes, registered here so they come before main.py mounts web/ at "/".
+from ole5_chat.voice.api import router as voice_router  # noqa: E402
+
+app.include_router(voice_router)

@@ -29,13 +29,28 @@ Newest entries at the bottom of each section. Times are Riyadh time (AST).
 | D21 | 2026-10-26 | Groq limits are not a constraint (enterprise plan); the limits check is dropped from CP0. | User | User |
 | D22 | 2026-10-26 | D13 confirmed: the full answer is spoken. | User | User |
 | D20 | 2026-10-26 | Voice turns: at most 1 knowledge search, capped at 30 s; 45 s turn deadline; a late result is shown, never spoken | RAGent2 takes 17–20 s per search and the turn holds the session lock | Proposed by Claude (from review) |
+| D23 | 2026-10-26 | CP1 is hands-free half-duplex instead of push-to-talk: the speech detector is always on, speech that starts while the assistant talks is not sent, and a Stop button interrupts. Barge-in is built but off (`?barge` in the page URL) until CP4. The voice timeout, the nonce and the search cap moved from CP2 into CP1. | The echo test showed Chrome cancels the assistant's voice on this laptop and the detector caught every take; half-duplex keeps phones and speakers safe until barge-in is tuned | Proposed by Claude |
+| D24 | 2026-10-26 | Speech to text: each segment is transcribed twice at once, as Arabic with the hint "نظام Ole5 ودعم RiCH" and as English with "Ole5, RiCH". When both come back in the same script, that call is kept; otherwise the more confident one, with +0.3 for the conversation's language. No hint under 1.8 s; a transcript of hint words only is dropped. Replaces "auto-detect with the Arabic hint". | On the user's 35 segments: auto 23/35, auto + Arabic hint 31/35, forced language + its own hint 32/35; the Arabic hint turned English into Arabic ("Yes, submit" → "نعم، اشتركوا في القناة") and leaked into TTS clips ("نظام Ole5" for "Yes, I'm here"). The live check after the change: 31/35, the misses being a pause split in two (×2), "500" written as digits, and one "وقف" heard as "One gift" (now a stop variant). Median 242 ms | Proposed by Claude, from the data |
+| D25 | 2026-10-26 | Speech audio is trimmed: 40 ms kept before speech, pauses inside cut to 400 ms, 80 ms after. Every cached fixed line is heard back by Whisper and synthesized again (up to 4 times) until it matches; "Still checking, thank you for waiting" never came out right in English and was rephrased to "I am still checking. Thank you for your patience." | Orpheus left 0.4–0.7 s of silence before speech (added to every first sound), up to 2 s pauses inside short lines, and produced unintelligible audio for 3 short English lines | Proposed by Claude, from the data |
+| D26 | 2026-10-26 | Arabic speech says "Ole5" as "أولي فايف" (the screen text is unchanged). | The Saudi voice read it "ولا خمسة"; the user says "أولي فايف" in the mic-lab recording | Proposed by Claude, from the user's recording |
+| D28 | 2026-10-26 | Voice searches use a lighter RAGent2 profile (8 passages, 8 graded at once, 2 rounds, its own 60 s limit; sharing the chat instance's Qdrant client and embedder) and a 35 s cap; past the cap the turn answers as for a question with no answer and offers a ticket, instead of the apology. Turn deadline 55 s; up to three progress lines. Text chat keeps its settings. | Measured today: answerable searches 20–28 s light vs 20–45 s plain; no-answer searches 33–84 s in both. With the 30 s cap and the apology, 8 of 15 voice turns apologized (chat: 0) | User, from measurements |
+| D29 | 2026-10-26 | Male voices: `abdullah` for Arabic, `troy` for English (replacing noura and autumn, D14). | User's choice from samples; both heard back 0.97–1.00; all 30 fixed lines verified | User |
+| D27 | 2026-10-26 | Rule exchanges (stop, wait, repeat, are you there, "I'll come to that") are shown as a caption in the voice bar, not in the transcript; the "just to confirm" exchange is written into the conversation history. A message typed while voice is on goes over the socket and is answered aloud. The language switches only on an utterance of 3+ words in the other script. | Keeps the transcript equal to Ole5's history; a product name said alone ("Outlook") must not switch the reply language | Proposed by Claude |
+
+## Open items
+
+| ID | Since | Item | Status |
+|---|---|---|---|
+| O1 | 2026-10-26 17:10 | A voice search past the 30 s cap answered with the apology. | Closed by D28 |
+| O2 | 2026-10-26 15:30 | A sentence with a pause arrives as two utterances (mic lab `p_pause`). | Joined since CP1 (the browser reports speech start; the server waits for the rest). Open part: with the fake microphone (no noise suppression) the pause stayed inside one segment and Whisper dropped the first half; shortening the pause did not fix it reliably, so it was not kept. Check on the real microphone at the CP2 pass |
+| O3 | 2026-10-26 17:40 | Groq occasionally returns speech cut short (seen while it was also returning 500s). Fixed lines are checked and re-made; live reply segments are only logged ("speech looks cut short"). | CP3: re-synthesize a cut segment |
 
 ## Checkpoints
 
 | CP | Status | Finished | Notes |
 |---|---|---|---|
-| 0 Setup | in progress | | branch created; plan drafted; spikes running |
-| 1 Push-to-talk end to end | not started | | |
+| 0 Setup | done | 15:30 | plan, spikes, mic lab |
+| 1 Hands-free half-duplex end to end | done | 17:55 | tag `voice-cp1`; 311 tests; real-KB browser check passed |
 | 2 Ole5 voice mode | not started | | |
 | 3 No dead air | not started | | |
 | 4 Hands-free + barge-in | not started | | |
@@ -83,3 +98,47 @@ Newest entries at the bottom of each section. Times are Riyadh time (AST).
     hallucination phrases rather than dropping the whole text; command and acknowledgement matching uses the observed
     variants; the read-back asks for "نعم أرسلها" (recognized correctly in 4 of 4 trimmed takes); on-screen Stop and
     Repeat buttons as the reliable path for those two commands. The recordings become test fixtures.
+- 2026-10-26 17:10 — **CP1 built** (not yet tagged).
+  - **Inside Ole5** (guarded hooks; text chat unchanged): `channel`/`heard_language` in the state; `sessions.send`
+    streams the graph to a listener; `sessions.submit` takes the customer's words (D15) and the heard language;
+    `sessions.note` writes a voice-only exchange into the history; search progress events; one search capped at 30 s
+    on voice; language from speech and a script check instead of two model calls; Groq transport errors become the
+    apology (D11); voice model calls get a 15 s timeout, no retries and a fresh first prompt line (D9).
+  - **Voice package** `src/ole5_chat/voice/`: rules, speech to text (D24), speech (streamed WAV, 40 ms frames,
+    trimmed, D25), the spoken form of replies (markdown, menu arrows, ticket number D12, Ole5 D26), fixed-line audio
+    cached and checked on disk, the per-socket turn manager and speaker, the WebSocket route.
+  - **Browser**: `web/voice.js` (speech detector from the CDN, WAV, socket, gapless player) and a mic button and
+    voice bar in `t2-chat.js`.
+  - **Tests**: 274 passed, 1 skipped (baseline 134 + 140 new: rules and the confirm table, speech helpers, the
+    graph hooks, the turn manager with fake speech, the WebSocket end to end).
+  - **Live checks** (`scripts/try_voice.py`): speech to text 31/35 on the user's recordings, median 242 ms; long
+    replies spoken and heard back 0.99–1.00, first sound 220–310 ms; all 24 fixed lines heard back right.
+  - **Browser check** (built-in browser, the user's recordings played into a fake microphone, stub knowledge base):
+    mic on in 1.7 s; cached greeting; Arabic question heard right → "let me check" on the search → answer spoken in two
+    segments with the source on screen; "عيد" (heard "ريت") repeats; "تمام" over the assistant is not sent; the Stop
+    button silences at once; an English question switches the conversation to English and the English voice. No
+    console errors, no server errors.
+  - **Real knowledge base, demo questions ×2 so far** (`.voice_cache/kb_timings.json`): voice turns 27–32 s; chat
+    45–206 s. **5 of 10 voice turns hit the 30 s search cap and answered with the apology**, every English question
+    among them; chat answered or offered a ticket for the same questions after 77–171 s. RAGent2 is also failing
+    intermittently today ("Failed to parse tool call arguments as JSON", 3 failed finds after 35–76 s). Open: O1.
+- 2026-10-26 17:15 — **Independent review of CP1** (one reviewer, code only): 5 major and 11 minor findings, all fixed
+  the same hour, each with a test: half-duplex dropped an answer that began just before the assistant finished (now
+  sent when it outlasts the assistant, and counted as an answer after a question; a yes over the confirm read-back is
+  asked again, D4); a sentence split by a pause is now joined, and utterances held during a turn are joined instead of
+  replaced; the ticket number removal no longer drops the noun ("Ticket {N} was created" → "the ticket was created");
+  multi-word acknowledgements and repeated or polite commands now match ("all right", "ok thanks", "نعم من فضلك",
+  "وقف وقف", "Okay, stop"; "خلاص" stops only while the assistant talks); Stop now wins over a turn finishing during it;
+  no window for two turns at once; only this turn's reply is spoken; the deadline says "this is taking longer" and
+  mutes the late turn; one failed Whisper call keeps the other take; a reply that cannot be spoken says it is on the
+  screen; per-writer temp files for the line cache; consistent RAGent2 cache keys; the browser drops audio after a
+  local Stop until the server confirms; "Hi", "بس", "اه" are no longer "didn't catch that".
+- 2026-10-26 17:30 — Decisions D28 (light search profile, 35 s cap, ticket offer) and D29 (male voices abdullah and
+  troy) taken with the user. Speech-to-text live check after the changes: 32/36 (new spelling "تامام" added).
+  All 30 fixed lines rebuilt in the new voices and heard back right. Tests: 311 passed, 1 skipped.
+- 2026-10-26 17:55 — **CP1 done**, tagged `voice-cp1`. Browser check on the real knowledge base (fake microphone with
+  the user's recordings): the English no-answer question → "let me check" at 1.4 s, progress lines at 11, 21, 31 s,
+  then "I'm sorry, I don't have an answer for this. Would you like me to open a support ticket?" at 37.6 s, phase
+  offer_ticket; the Arabic password question answered at 20.7 s with its source on screen.
+  Next: CP2 (voice overlays with the draft fields, graph-side yes guard, read-back, ticket number), then the user's
+  10-minute real-microphone pass.

@@ -57,6 +57,27 @@ class Settings(BaseSettings):
     ticket_api_user: str | None = None
     ticket_api_password: SecretStr | None = None
 
+    # Voice channel (src/ole5_chat/voice). Speech goes to Groq with the same key as the model.
+    voice_enabled: bool = True
+    voice_stt_model: str = "whisper-large-v3-turbo"
+    voice_short_clip_s: float = 1.8  # shorter clips (one word, with the detector's padding: 1.3-1.7 s): no hint, session language forced
+    voice_tts_model_ar: str = "canopylabs/orpheus-arabic-saudi"
+    voice_tts_voice_ar: str = "abdullah"  # male voices chosen by the user (D29)
+    voice_tts_model_en: str = "canopylabs/orpheus-v1-english"
+    voice_tts_voice_en: str = "troy"
+    voice_model_timeout: float = 15.0
+    voice_kb_max_searches: int = 1
+    # A lighter RAGent2 profile for voice (D28): answerable questions came back in 20-28 s instead of 20-45 s.
+    voice_kb_top_k: int = 8
+    voice_kb_max_rounds: int = 2
+    voice_kb_grading_concurrency: int = 8
+    voice_kb_find_timeout: float = 60.0  # RAGent2's own limit: a search the voice turn gave up on stops soon after
+    voice_search_timeout: float = 35.0  # past this the turn answers as for a question with no answer and offers a ticket
+    voice_turn_deadline: float = 55.0
+    voice_progress_every: float = 10.0  # a "still checking" line after this long without speech, twice at most
+    voice_max_utterance_s: float = 60.0
+    voice_cache_dir: Path = ROOT / ".voice_cache"
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

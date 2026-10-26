@@ -47,10 +47,12 @@ class ChatState(MessagesState):
     task: str | None
     language: str | None
     offered: bool  # Set by respond_agent on a question turn it had no answer for; read by post_check.
+    channel: str  # "chat" or "voice": how this turn's message arrived. Passed on every turn; LangGraph keeps the last value.
+    heard_language: str | None  # On a voice turn, the language speech-to-text heard ("ar" or "en").
 
 
 def initial_state(identity: Identity) -> ChatState:
     return ChatState(messages=[], identity=identity, sources=[],
                      last_retrieval=None, reply=None, note=None, ticket_draft=None, corrections=[], created_tickets=[],
                      attachments=[], phase="none", pending=[], next=None, task=None, language=None,
-                     offered=False)
+                     offered=False, channel="chat", heard_language=None)

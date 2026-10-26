@@ -3,9 +3,12 @@
 import json
 import logging
 import time
+import uuid
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Callable, TypeVar
 
-from groq import BadRequestError
+from groq import APIError, BadRequestError
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 from openinference.instrumentation.langchain import get_current_span
@@ -31,12 +34,38 @@ class GuardrailFailed(ModelFailed):
         self.result = result
 
 
+_VOICE: ContextVar[bool] = ContextVar("ole5_voice_turn", default=False)
+
+
+@contextmanager
+def voice_turn(on: bool = True):
+    """Marks the model calls of one voice turn: a short timeout, no transport retries, and a fresh first prompt line."""
+    token = _VOICE.set(on)
+    try:
+        yield
+    finally:
+        _VOICE.reset(token)
+
+
+def voice_active() -> bool:
+    return _VOICE.get()
+
+
+def prepare(convo: list[BaseMessage]) -> list[BaseMessage]:
+    """The conversation as sent. On a voice turn the system prompt starts with a random line: requests whose start
+    matches Groq's prompt cache were often seconds slower on gpt-oss-120b (measured 2026-10-25 and 2026-10-26)."""
+    if not voice_active() or not convo or convo[0].type != "system":
+        return convo
+    return [SystemMessage(content=f"request {uuid.uuid4().hex}\n\n{convo[0].content}"), *convo[1:]]
+
+
 def tool_client(temperature: float) -> ChatGroq:
     """The model without JSON mode, for a node that binds tools."""
     s = get_settings()
     if not s.groq_api_key:
         raise ModelFailed("GROQ_API_KEY is not set")
-    return ChatGroq(model=s.groq_model, api_key=s.groq_api_key.get_secret_value(), temperature=temperature)
+    limits = {"timeout": s.voice_model_timeout, "max_retries": 0} if voice_active() else {}
+    return ChatGroq(model=s.groq_model, api_key=s.groq_api_key.get_secret_value(), temperature=temperature, **limits)
 
 
 def _client(temperature: float):
@@ -69,11 +98,14 @@ def structured(system: str, messages: list[BaseMessage], schema: type[T], node: 
             started = time.perf_counter()
             with _attempt_span(schema.__name__) as span:
                 try:
-                    reply = _client(0 if attempt == 1 else 0.3).invoke(convo, config={"run_name": node})
+                    reply = _client(0 if attempt == 1 else 0.3).invoke(prepare(convo), config={"run_name": node})
                 except BadRequestError as exc:
                     error = str(exc)[:400]
                     log.warning("%s  llm schema=%s attempt=%d rejected by Groq: %s", node, schema.__name__, attempt, error)
                     continue
+                except APIError as exc:
+                    # A timeout, connection error, rate limit or Groq 5xx: no retry here, the caller's fallback answers.
+                    raise ModelFailed(f"Groq unavailable: {str(exc)[:300]}") from exc
                 if reasoning := reply.additional_kwargs.get("reasoning_content"):
                     span.set_attribute("output.value", reasoning)
             ms = int((time.perf_counter() - started) * 1000)
