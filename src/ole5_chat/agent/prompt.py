@@ -38,7 +38,7 @@ MEANINGS = {
                 "offers a ticket only when it has no answer.",
     "talk": "nothing to look up: a greeting, thanks, a question about the assistant itself (who it is, what it can do), "
             "an acknowledgement with nothing open to agree to, a side remark, a request to repeat what the assistant "
-            "just said.",
+            "just said, a problem or need with nothing specific in it yet (\"عندي مشكلة\", \"I need help\").",
     "ticket": "the message reports a topic from this list: {always_ticket}.",
     "urgent": "the message describes a situation from this list: {urgent_when}. Judge it from the impact described, "
               "not the tone.",
@@ -65,7 +65,7 @@ AFTER = {
 OLE5_EXAMPLES = {
     ("none", "question"): ['"كيف أضيف علامة مائية؟"', '"open a ticket for me about the archive button"',
                            '"وعلى الآيباد؟" (after an answer)'],
-    ("none", "talk"): ['"مرحبا"', '"what can you do?"', '"تمام" (after an answer)'],
+    ("none", "talk"): ['"مرحبا"', '"what can you do?"', '"تمام" (after an answer)', '"عندي مشكلة"'],
     ("none", "ticket"): ['"نبي ننقل بياناتنا من النظام القديم"'],
     ("none", "urgent"): ['"ولا موظف عندنا يقدر يسجل دخول"'],
     ("none", "status"): ['"وش صار على تذكرتي؟"', '"what\'s the status of my tickets?"'],
@@ -131,9 +131,12 @@ def _persona(config: products.ProductConfig, language: str) -> str:
 
 RESPOND_TASK = ("Answer the customer from the passages. If no passage answers the question, say you have no answer for "
                 "this and ask whether they would like a ticket opened.")
-TALK_TASK = ("This message needs no search: a greeting, thanks, small talk, a question about you, or a request to repeat "
-             "what you said. Reply as the persona's greeting rules say. Don't state a product fact that isn't already in "
-             "this chat, and don't offer a ticket.")
+TALK_TASK = ("This message needs no search. Reply to what the customer actually said, in one or two short lines. A "
+             "greeting gets the persona's greeting and thanks gets its thanks line; anything else gets a plain reply to "
+             "it, never a greeting or thanks line. If the customer says they have a problem but not what it is, ask what "
+             "it is in one short open question, with no acknowledgement before it: \"يسعدني مساعدتك، ما المشكلة التي "
+             "تواجهها؟\" If they say there is no problem or nothing to add, don't ask again: say you're here if they need "
+             "anything. Don't state a product fact that isn't already in this chat, and don't offer a ticket.")
 
 
 # What respond_agent is asked to do this turn, set by the handler. {issue} is pending[0].text, {new} the issue just queued.

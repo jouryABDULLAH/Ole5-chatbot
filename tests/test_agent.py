@@ -415,10 +415,10 @@ def test_router_prompt_carries_each_products_lists():
     assert "data migration requests" not in rich and "whitelisting an IP or a user" not in ole5
 
 
-def test_router_failure_gives_question_and_a_correction(model):
+def test_router_failure_gives_talk_and_a_correction(model):
     from ole5_chat.agent.router import router
     out = router(router_state())
-    assert out["next"] == "question" and out["corrections"][-1].startswith("router failed: nothing scripted")
+    assert out["next"] == "talk" and out["corrections"][-1].startswith("router failed: nothing scripted")
 
 
 def test_router_sends_the_whole_transcript(monkeypatch):
