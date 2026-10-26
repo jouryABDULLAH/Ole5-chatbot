@@ -226,8 +226,9 @@ unless one of his fixes is needed, and then section 10 is re-run in full (D18).
 
 1. **Arabic question answered from the KB** (chosen from the questions timed in CP1 that RAGent2 answers outright):
    acknowledgement, "let me check", progress, the spoken answer, and the text and sources on screen.
-2. **English question with no answer → ticket:** offer, details, summary read back, a bare "ok" re-confirmed, then "yes,
-   submit", and the number spoken.
+2. **English question with no answer → ticket** ("Every email notification from the system arrives twice since this
+   morning.", never answered from the knowledge base): offer, details, summary read back, a bare "ok" re-confirmed, then
+   "yes, submit", and the number spoken.
 3. **Urgent problem in Arabic** ("ولا موظف عندنا يقدر يسجل دخول"): the summary read back at once, then "نعم أرسلها".
 4. **Interruptions:** "تمام" over the assistant is ignored; "stop" stops it; "repeat that" repeats it; a question asked
    while it is still searching is held and answered next.

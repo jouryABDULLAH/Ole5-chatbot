@@ -73,7 +73,7 @@ Newest entries at the bottom of each section. Times are Riyadh time (AST).
 | 2 Ole5 voice mode | done | 21:55 | tag `voice-cp2`; 413 tests; both demo scenarios pass live; grounding gate passes |
 | 3 No dead air | done | 00:50 | tag `voice-cp3`; first sound median 1.6 s, max 1.8 s (was 3.9 / 7.2); see Progress |
 | 4 Hands-free + barge-in | done | 00:50 | most of it came early (D23, D30, CP2); added the silence prompt (D44) and mute (D45); in the `voice-cp3` commit |
-| 5 Quality pass + rehearsal | not started | | |
+| 5 Quality pass + rehearsal | done | 01:50 | tag `voice-demo`; section 10 passed twice; VAD assets not yet vendored (needs the user's OK) |
 
 ## Demo runbook
 
@@ -97,7 +97,8 @@ Newest entries at the bottom of each section. Times are Riyadh time (AST).
 
 **During:**
 - The five scenarios are VOICE_PLAN.md section 10. Phrases that work: «كيف أؤرشف مراسلة في النظام؟»,
-  «نسيت كلمة المرور كيف أستعيدها؟»; "The mobile app closes by itself when I open the inbox." → "Yes." → details →
+  «نسيت كلمة المرور كيف أستعيدها؟»; "Every email notification from the system arrives twice since this morning." (the
+  knowledge base never answered it in 3 tries; "The mobile app closes by itself…" it sometimes does) → "Yes." → details →
   "That's all I know." → "Okay." (it asks again) → "Yes, submit"; «ولا موظف عندنا يقدر يسجل دخول من الصبح» → «نعم أرسلها».
 - **M** (or the Mute button) mutes the microphone while you talk to the audience; the assistant can still be stopped.
 - Stop: say «وقف» / "stop", or press Stop. Typing in the box always works, also in voice mode.
@@ -262,4 +263,14 @@ to the last tagged build: `git checkout voice-cp3` (or `voice-cp2`). The log's `
   ended (the browser's own report), "let me check" 0.9 s later, progress lines, the reply; longest silence before it
   6.0 s. The replayed clip came back from Whisper as gibberish → D46. Rehearsal 1 of the six flows (scenarios 1-5) on
   0bacd17: all pass.
+- 2026-10-27 01:45 — **Rehearsals on 85f210e** (`voice-lab/rehearsal_final.txt`): run 1, all six flows pass (first
+  sound median 1.7 s; longest silence 8.2 s, always just before an answer, where the 3 s hold after the search keeps a
+  progress line from delaying it). Run 2: five pass; en_ticket went another way because the knowledge base answered
+  "The mobile app closes by itself when I open the inbox." (delete, reinstall, sign in again) — it does so 2 times in 3.
+  Scenario 2 now uses "Every email notification from the system arrives twice since this morning." (no answer 3 of 3,
+  10-16 s), as a synthetic clip in the harness (voice-lab/synthetic/en_notify.wav).
+- 2026-10-27 01:50 — **Scenario 2 on the new question, twice** (`voice-lab/en_ticket_notify.txt`): both pass, offer →
+  details → read-back → "Okay." asked again → "Yes, submit" → ticket. With the rehearsals above, the five demo scenarios
+  have passed twice on the app code of 85f210e. **Tag `voice-demo`.** Not done: the VAD files are still loaded from the
+  jsdelivr CDN (vendoring them needs the user's go-ahead to download four files, ~4.1 MB); O4.
 

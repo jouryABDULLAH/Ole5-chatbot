@@ -144,7 +144,9 @@ async def check_tts() -> None:
 # "over": said over the reply, 1.5 s into it. "kb": the knowledge base switched "down" or "up" (scenario 5).
 FLOWS = {
     "ar_kb": [("rec", "s1_kb_password", None)],
-    "en_ticket": [("rec", "s2_en_crash", "offer_ticket"), ("rec", "w_yes", "collect"), ("rec", "s2_en_detail", "collect"),
+    # "The mobile app closes by itself…" is sometimes answered from the knowledge base (2 of 3 on 2026-10-27), so the
+    # no-answer question is a synthetic clip (troy) of one it never answered (3 of 3): voice-lab/synthetic/.
+    "en_ticket": [("rec", "syn_en_notify", "offer_ticket"), ("rec", "w_yes", "collect"), ("rec", "s2_en_detail", "collect"),
                   ("typed", "That's all I know.", "confirm"), ("rec", "w_ok", "confirm"),
                   ("rec", "s2_en_yes", "none")],
     "ar_urgent": [("rec", "s3_urgent", "confirm"), ("rec", "s3_send", "none")],
@@ -251,6 +253,8 @@ async def run_flow(name: str, steps: list, folder: Path, email: str) -> dict:
     for e in entries:
         if e["kind"].startswith("vad"):
             files.setdefault(e["phrase"], folder / e["file"])
+    for clip in (folder.parent / "synthetic").glob("*.wav"):  # stand-ins for phrases with no recording
+        files.setdefault(f"syn_{clip.stem}", clip)
     from ole5_chat.voice import stt, tts
     stt._client = tts._client = None  # each flow runs in its own event loop; a client (and its pool) belongs to one
     await fillers.warm()  # new fixed lines are made and heard back before the flow needs them
