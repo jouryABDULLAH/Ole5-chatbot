@@ -213,10 +213,79 @@ def test_a_failed_search_call_sends_the_apology_not_an_offer(respond_node):
     assert len(fake.calls) == 2
 
 
-def test_a_status_question_is_a_question_turn(new_path):
+def sheet_tickets(monkeypatch, rows, states=None):
+    """tickets.xlsx holds these rows; the Ticket API gives these states by ticket id, or fails when states is None."""
+    from ole5_chat import sheets
+    from ole5_chat.tickets import client
+    from ole5_chat.tickets.client import TicketApiError
+
+    class Api:
+        def get(self, ticket_id):
+            if states is None:
+                raise TicketApiError("TicketGet: HTTP 500")
+            return {"state": states.get(ticket_id)}
+
+    monkeypatch.setattr(sheets, "tickets", lambda: tuple(rows))
+    monkeypatch.setattr(client, "ticket_client", lambda: Api())
+
+
+def ticket_row(email, number="T-1", ticket_id="7"):
+    return {"customer_email": email, "ticket_id": ticket_id, "ticket_number": number, "title": "Archive button",
+            "product": "OLE5", "created_at": "2026-10-01"}
+
+
+def test_status_with_no_tickets_says_so_without_a_search_or_an_offer(new_path, monkeypatch):
+    from ole5_chat import llm
+    sheet_tickets(monkeypatch, [ticket_row("someone@else.com")], {"7": "open"})
     sid = chat()
-    state, prompt_text = unanswered(new_path, sid, "what's the status of my tickets?", next_="status")
-    assert "Answer the customer from the passages" in prompt_text and state["messages"][-1].text.startswith("I have")
+    state, prompt_text = new_path(sid, "what's the status of my tickets?", "status",
+                                  [AIMessage(content="There are no tickets on your account from this chat.")])
+    assert "There are no tickets on their account" in prompt_text and llm.tool_client.bound == [None]
+    assert state["phase"] == "none" and state["pending"] == [] and state["sources"] == []
+
+
+def test_status_in_collect_lists_the_tickets_and_goes_back_to_the_draft(new_path, monkeypatch):
+    sid = chat()
+    before = collecting(new_path, sid)[0]
+    email = before["identity"].email
+    sheet_tickets(monkeypatch, [ticket_row(email.upper()), ticket_row("someone@else.com", "T-2", "8")], {"7": "open"})
+    state, prompt_text = new_path(sid, "وش صار على تذكرتي؟", "status", [AIMessage(content="T-1 مفتوحة.")])
+    assert "- T-1, Archive button, 2026-10-01, open" in prompt_text and "T-2" not in prompt_text
+    assert "Then continue the current ticket: ask what else the support team needs for" in prompt_text
+    assert state["phase"] == "collect" and state["pending"] == before["pending"]
+    assert state["ticket_draft"] == before["ticket_draft"]
+
+
+def test_status_lists_the_five_newest_tickets_newest_first_with_dates_only(new_path, monkeypatch):
+    sid = chat()
+    email = sessions.get(sid)["identity"].email
+    rows = [{**ticket_row(email, f"T-{n}", str(n)), "created_at": f"2026-10-0{n}T09:00:00+00:00"} for n in range(1, 7)]
+    sheet_tickets(monkeypatch, rows, {str(n): "open" for n in range(1, 7)})
+    _, prompt_text = new_path(sid, "what's the status of my tickets?", "status", [AIMessage(content="Your tickets.")])
+    listed = [line.split(",")[0][2:] for line in prompt_text.splitlines() if line.startswith("- T-")]
+    assert listed == ["T-6", "T-5", "T-4", "T-3", "T-2"] and "- T-6, Archive button, 2026-10-06, open" in prompt_text
+    assert "Today: " in prompt_text and "Titles and states stay as written" in prompt_text
+
+
+def test_a_ticket_whose_state_cannot_be_read_shows_unknown(new_path, monkeypatch):
+    sid = chat()
+    sheet_tickets(monkeypatch, [ticket_row(sessions.get(sid)["identity"].email)])
+    _, prompt_text = new_path(sid, "what's the status of my tickets?", "status", [AIMessage(content="T-1, unknown.")])
+    assert "- T-1, Archive button, 2026-10-01, unknown" in prompt_text
+
+
+def test_status_when_the_sheet_cannot_be_read_says_try_again(new_path, monkeypatch):
+    from ole5_chat import sheets
+
+    def locked():
+        raise PermissionError("tickets.xlsx is open in another program")
+
+    monkeypatch.setattr(sheets, "tickets", locked)
+    sid = chat()
+    state, prompt_text = new_path(sid, "what's the status of my tickets?", "status",
+                                  [AIMessage(content="I can't read your tickets right now.")])
+    assert "could not be read right now" in prompt_text and state["phase"] == "none"
+    assert state["corrections"][-1].startswith("status lookup failed:")
 
 
 def test_a_talk_turn_has_no_search_and_never_offers(model, respond_node):

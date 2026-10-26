@@ -1,6 +1,7 @@
 """The handlers: the nodes that apply the router's next. Each applies the router's next to the state and sets the task respond_agent carries out this turn. post_check runs after respond_agent and queues a question the reply offered a ticket for. pending[0] is always the issue being handled; a new issue waits behind it."""
 
 import logging
+from datetime import datetime, timezone
 
 from ole5_chat import values
 from ole5_chat.agent import classify as classifier
@@ -9,14 +10,19 @@ from ole5_chat.agent.prompt import CURRENT, QUEUED_URGENT, TASKS, URGENT
 from ole5_chat.agent.state import ChatState, TicketDraft
 from ole5_chat.config import get_settings
 from ole5_chat.tickets import client as ticket_api
+from ole5_chat.tickets import status as ticket_status
 from ole5_chat.tickets import submit as tickets
 from ole5_chat.tickets.client import TicketApiError
 
 log = logging.getLogger(__name__)
 
 HANDLERS = {"ticket": "queue", "urgent": "queue", "question": "chat", "talk": "chat", "accept": "accept", "decline": "decline",
-            "details": "details", "done": "done", "change": "change", "cancel": "cancel", "yes": "submit"}
+            "details": "details", "done": "done", "change": "change", "cancel": "cancel", "yes": "submit",
+            "status": "status"}
 NOT_CREATED = "The ticket could not be created. Say so in one line and ask them to try again."
+NOT_READ = "The list of their tickets could not be read right now. Say so in one line and ask them to try again later."
+# How many tickets a status reply lists: the most recent ones.
+STATUS_TICKETS = 5
 
 
 def advance(pending: list[PendingIssue]) -> Phase:
@@ -143,6 +149,26 @@ def submit(state: ChatState) -> dict:
     return {"created_tickets": [*state["created_tickets"], ticket], "ticket_draft": None, "attachments": [],
             "corrections": done_state["corrections"], **update,
             "task": _then(TASKS["created"].format(number=ticket["ticket_number"]), fragment)}
+
+
+def status(state: ChatState) -> dict:
+    """The customer's tickets from tickets.xlsx with their states. Phase, pending and draft stay as they are; in a ticket
+    phase the reply then goes back to the open ticket."""
+    phase = state["phase"]
+    back = "" if phase == "none" else \
+        "Then continue the current ticket: " + CURRENT[phase].format(issue=state["pending"][0].text)
+    try:
+        found = ticket_status.my_tickets(state["identity"].email, ticket_api.ticket_client())
+    except Exception as exc:  # A missing, locked or corrupt sheet: the only thing to do is say try again.
+        log.warning("handlers  tickets not read: %s", exc)
+        return {"task": _then(NOT_READ, back), "corrections": state["corrections"] + [f"status lookup failed: {exc}"]}
+    recent = sorted(found, key=lambda t: t["created_at"], reverse=True)[:STATUS_TICKETS]
+    lines = "\n".join(f"- {t['ticket_number']}, {t['title']}, {t['created_at'][:10]}, {t['state'] or 'unknown'}"
+                      for t in recent)
+    today = datetime.now(timezone.utc).date().isoformat()
+    task = TASKS["status"].format(tickets=lines, today=today) if found else TASKS["status_none"]
+    log.info("handlers  status tickets=%d phase=%s", len(found), phase)
+    return {"task": _then(task, back)}
 
 
 def post_check(state: ChatState) -> dict:

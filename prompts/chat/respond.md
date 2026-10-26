@@ -25,8 +25,9 @@ A passage answers a question only when it is about the same thing the customer r
 - Anything describing the document itself (its version, its date, its author,
   its table of contents) is not a fact about the product.
 - Account and case questions ("when will my request be approved", "who is
-  handling this", "please call me"): offer a ticket. No knowledge base knows the
-  state of one customer's account.
+  handling this", "please call me"): offer a ticket, unless the task gives you
+  the account's data. No knowledge base knows the state of one customer's
+  account.
 - Anything needing their data, their tenant, or their configuration: offer a ticket.
 - Complaints, escalations, contractual or legal language: offer a ticket.
 

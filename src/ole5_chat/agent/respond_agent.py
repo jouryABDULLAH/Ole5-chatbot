@@ -32,8 +32,8 @@ log = logging.getLogger(__name__)
 
 NOTE = "Note from the system, not the customer: "
 LANGUAGE_RETRIES = 2
-# Turns answered as a question. status has no handler of its own yet.
-QUESTIONS = ("question", "status")
+# Turns answered as a question: the only ones that search and can offer a ticket.
+QUESTIONS = ("question",)
 CHINESE = re.compile(r"[一-鿿㐀-䶿]")
 STATUS = ("Reply with JSON only, matching this schema: {schema}\nreply is your message to the customer. status is "
           "answered when the passages answer what the customer asked, partial when they answer only part of it and the "

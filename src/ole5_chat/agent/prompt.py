@@ -183,6 +183,14 @@ TASKS = {
                "email. Nothing more.",
     "cancelled": "The customer cancelled the ticket. Acknowledge it in one line and say they can contact support at any "
                  "time.",
+    "status": "The customer asked about their tickets. Today: {today}. These are the most recent tickets on their "
+              "account, newest first, from the ticket system:\n{tickets}\nList them as given: number, title, state, "
+              "date. Titles and states stay as written; your own words follow the customer's language. State nothing "
+              "that isn't in the list, no timeframes, no promises. If the customer asked about one ticket in "
+              "particular, give that one.",
+    "status_none": "The customer asked about their tickets. There are no tickets on their account from this chat. Say "
+                   "so in one line, and that they can describe a problem here to get help or open one. Don't ask "
+                   "whether to open a ticket.",
 }
 URGENT = "This sounds urgent. "
 # Appended to queued when the new issue is urgent.

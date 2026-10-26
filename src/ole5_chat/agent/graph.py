@@ -13,7 +13,7 @@ from ole5_chat.agent.state import ChatState
 
 log = logging.getLogger(__name__)
 
-HANDLER_NODES = ("chat", "queue", "accept", "decline", "details", "done", "change", "cancel", "submit")
+HANDLER_NODES = ("chat", "queue", "accept", "decline", "details", "done", "change", "cancel", "submit", "status")
 
 
 def route(state: ChatState) -> str:
