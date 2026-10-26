@@ -254,7 +254,9 @@ def respond_agent(state: ChatState) -> dict:
         text, sources, status = SORRY[language], [], "answered"
         corrections.append(f"respond failed: {exc}")
     
-    log.info("respond_agent  next=%s status=%s sources=%s say=%r", state.get("next"), status, sources, text[:90])
+    # status only means something on a question turn; elsewhere it is the default and decides nothing.
+    log.info("respond_agent  next=%s status=%s sources=%s say=%r", state.get("next"), status if question else "-",
+             sources, text[:90])
     
     return {"reply": Reply(say=text, sources=sources), "corrections": state["corrections"] + corrections,
             "offered": question and status != "answered", "language": language}
