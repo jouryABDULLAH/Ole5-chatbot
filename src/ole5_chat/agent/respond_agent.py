@@ -1,7 +1,7 @@
 """The search node and the respond node.
 
-search: on a question turn one model call writes the searches and code runs them. On details and change it searches
-only if the customer also asked something. Every other turn passes through.
+search: on a question turn the model writes the searches, one per reply, and code runs them. On `details` and `change` it
+searches only if the customer also asked something. Every other turn passes through.
 
 respond_agent: writes the reply, with no tool.
 - DIRECT passages: answer from them with a status. A grounding call names the documents the reply uses (the sources)
@@ -79,20 +79,28 @@ def search(state: ChatState) -> dict:
     sink: list[Retrieval] = []
     tool = make_search_tool(state["identity"].product, sink)
     convo = [SystemMessage(content=prompt.search(state, question)), *state["messages"]]
-    try:
-        reply = _invoke(convo, tool, "required" if question else "auto")
-    except llm.ModelFailed as exc:
-        log.warning("search  model failed: %s", str(exc)[:300])
-        failed = Retrieval(query="", verdict=Verdict.NOT_IN_KB, error=f"search call failed: {exc}")
-        return {"last_retrieval": failed.as_json()}
-    for call in reply.tool_calls[:get_settings().kb_max_searches]:
-        if call["name"] != tool.name:
-            continue
-        tool.invoke(call["args"])
-        if sink[-1].error:
-            # RAGent2's own model call sometimes fails; one more try usually gets through.
-            sink.pop()
-            tool.invoke(call["args"])
+    cap = get_settings().kb_max_searches
+    # The model makes one tool call per reply, so it sees each result and searches again until it stops or hits the cap.
+    while len(sink) < cap:
+        try:
+            reply = _invoke(convo, tool, "required" if question and not sink else "auto")
+        except llm.ModelFailed as exc:
+            log.warning("search  model failed: %s", str(exc)[:300])
+            if sink:
+                break
+            failed = Retrieval(query="", verdict=Verdict.NOT_IN_KB, error=f"search call failed: {exc}")
+            return {"last_retrieval": failed.as_json()}
+        calls = [c for c in reply.tool_calls if c["name"] == tool.name][:cap - len(sink)]
+        if not calls:
+            break
+        convo.append(reply)
+        for call in calls:
+            result = tool.invoke(call)
+            if sink[-1].error:
+                # RAGent2's own model call sometimes fails; one more try usually gets through.
+                sink.pop()
+                result = tool.invoke(call)
+            convo.append(result)
     log.info("search  next=%s searches=%d", state.get("next"), len(sink))
     return {"last_retrieval": merge(sink).as_json() if sink else None}
 

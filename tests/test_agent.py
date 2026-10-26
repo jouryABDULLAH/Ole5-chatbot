@@ -126,6 +126,10 @@ def respond_node(monkeypatch):
     return run
 
 
+# What the search model says once it has its results and searches no more.
+DONE = AIMessage(content="")
+
+
 def searching(*questions):
     return AIMessage(content="", tool_calls=[{"name": "search_knowledge_base", "args": {"question": q}, "id": f"c{i}"}
                                              for i, q in enumerate(questions)])
@@ -163,16 +167,16 @@ def rejected():
 
 def test_a_question_forces_the_search_and_respond_has_no_tool(model, respond_node):
     model.add(*answer("answered", "Press Save as draft.", ["Guide"]))
-    out, fake = respond_node("How do I save a draft?", [searching("How to save a draft?")], [hit("Guide")])
-    assert fake.choices == ["required"] and fake.bound[0] and len(fake.calls) == 1
-    assert "You read a support chat" in sent(fake, 0)[0].content
+    out, fake = respond_node("How do I save a draft?", [searching("How to save a draft?"), DONE], [hit("Guide")])
+    assert fake.choices == ["required", "auto"] and fake.bound[0] and fake.bound[1] and len(fake.calls) == 2
+    assert "You read a support chat" in sent(fake, 0)[0].content and sent(fake, 1)[-1].type == "tool"
     assert out["reply"].say == "Press Save as draft." and out["last_retrieval"] is not None
 
 
 def test_respond_agent_keeps_a_partial_answer_that_offers_a_ticket(model, respond_node):
     model.add(*answer("partial", "Save it as a draft from the message screen. Should I open a ticket for how long it is "
                       "kept?", ["Guide"]))
-    out, _ = respond_node("How do I save a draft, and how long is it kept?", [searching("How to save a draft?")],
+    out, _ = respond_node("How do I save a draft, and how long is it kept?", [searching("How to save a draft?"), DONE],
                           [hit("Guide", verdict=Verdict.PARTIAL)])
     assert out["reply"].say.startswith("Save it as a draft") and out["reply"].sources == ["Guide"]
     assert out["offered"] is True and out["corrections"] == []
@@ -180,20 +184,20 @@ def test_respond_agent_keeps_a_partial_answer_that_offers_a_ticket(model, respon
 
 def test_respond_agent_cites_the_document_the_grounding_names(model, respond_node):
     model.add(*answer("answered", "Press Save as draft.", ["Guide"]))
-    out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?")], [hit("Guide", "Manual")])
+    out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?"), DONE], [hit("Guide", "Manual")])
     assert out["reply"].say == "Press Save as draft." and out["reply"].sources == ["Guide"]
     assert out["offered"] is False and out["corrections"] == []
 
 
 def test_a_question_without_a_direct_passage_gets_the_no_answer(model, respond_node):
-    out, fake = respond_node("Does it run on Linux?", [searching("Does Ole5 run on Linux?"),
+    out, fake = respond_node("Does it run on Linux?", [searching("Does Ole5 run on Linux?"), DONE,
                                                        AIMessage(content="I have no answer for that. Open a ticket?")],
                              [miss()])
     assert out["reply"].say.startswith("I have no answer") and out["reply"].sources == []
     assert out["offered"] is True and out["corrections"] == ["no DIRECT passage"] and grounding(model) == []
     assert "You have no answer for this" in sent(fake)[-1].content
     assert "The search for this message returned:" in sent(fake)[-2].content and "(inferential)" in sent(fake)[-2].content
-    assert fake.bound[1] is None
+    assert fake.bound[2] is None
 
 
 def test_respond_agent_sends_the_apology_when_the_model_fails(respond_node):
@@ -231,41 +235,41 @@ def test_a_question_about_the_assistant_needs_no_search(model, respond_node):
 
 def test_a_declined_direct_passage_is_the_no_answer_without_a_retry(model, respond_node):
     model.add(answer("no_answer", "I have no answer for that. Open a ticket?")[0])
-    out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?")], [hit("Guide")])
+    out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?"), DONE], [hit("Guide")])
     assert out["reply"].say.startswith("I have no answer") and out["reply"].sources == []
     assert out["offered"] is True and out["corrections"] == [] and grounding(model) == []
 
 
 def test_respond_agent_cites_every_direct_document_when_grounding_fails(model, respond_node):
     model.add(answer("answered", "Press Save as draft.")[0])
-    out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?")], [hit("Guide", "Manual")])
+    out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?"), DONE], [hit("Guide", "Manual")])
     assert out["reply"].say == "Press Save as draft." and out["reply"].sources == ["Guide", "Manual"]
     assert out["corrections"] == ["grounding call failed"] and out["offered"] is False
 
 
 def test_respond_agent_rewrites_an_answer_in_the_wrong_language(model, respond_node):
     model.add(answer("answered", "Press Save as draft.")[0], *answer("answered", "اضغط حفظ كمسودة.", ["Guide"]))
-    out, _ = respond_node("كيف أحفظ مسودة؟", [searching("How to save a draft?")], [hit("Guide")])
+    out, _ = respond_node("كيف أحفظ مسودة؟", [searching("How to save a draft?"), DONE], [hit("Guide")])
     assert out["reply"].say == "اضغط حفظ كمسودة." and any("Arabic" in p for p in model.problems)
 
 
 def test_respond_agent_keeps_an_answer_still_in_the_wrong_language(model, respond_node):
     model.add(*answer("answered", "Press Save as draft.", ["Guide"]))
-    out, _ = respond_node("كيف أحفظ مسودة؟", [searching("How to save a draft?")], [hit("Guide")])
+    out, _ = respond_node("كيف أحفظ مسودة؟", [searching("How to save a draft?"), DONE], [hit("Guide")])
     assert out["reply"].say == "Press Save as draft." and out["corrections"][0].startswith("language:")
 
 
 def test_respond_agent_rewrites_a_reply_in_the_wrong_language(respond_node):
-    out, fake = respond_node("كيف أحفظ مسودة؟", [searching("drafts"), AIMessage(content="I have no answer."),
+    out, fake = respond_node("كيف أحفظ مسودة؟", [searching("drafts"), DONE, AIMessage(content="I have no answer."),
                                                AIMessage(content="ليس لدي إجابة.")], [miss()])
     assert "The customer wrote in Arabic" in sent(fake)[-1].content
     assert out["reply"].say == "ليس لدي إجابة." and out["corrections"] == ["no DIRECT passage", "language retried"]
 
 
 def test_respond_agent_sends_the_last_reply_after_two_language_retries(respond_node):
-    out, fake = respond_node("كيف أحفظ مسودة؟", [searching("drafts"), *[AIMessage(content="I have no answer.")] * 3],
+    out, fake = respond_node("كيف أحفظ مسودة؟", [searching("drafts"), DONE, *[AIMessage(content="I have no answer.")] * 3],
                              [miss()])
-    assert len(fake.calls) == 4 and out["reply"].say == "I have no answer."
+    assert len(fake.calls) == 5 and out["reply"].say == "I have no answer."
     assert out["corrections"][1:3] == ["language retried", "language retried"]
     assert out["corrections"][3].startswith("language:")
 
@@ -278,22 +282,31 @@ def test_respond_agent_rewrites_a_reply_with_chinese_characters(respond_node):
 
 def test_a_failed_search_sends_the_apology_not_an_offer(respond_node):
     failed = Retrieval(query="q", verdict=Verdict.NOT_IN_KB, error="ReadTimeout")
-    out, fake = respond_node("How do I save a draft?", [searching("How to save a draft?")], [failed, failed])
+    out, fake = respond_node("How do I save a draft?", [searching("How to save a draft?"), DONE], [failed, failed])
     assert out["reply"].say.startswith("Sorry") and out["offered"] is False and out["corrections"] == ["search failed"]
-    assert len(fake.calls) == 1
+    assert len(fake.calls) == 2
+
+
+def test_the_search_model_searches_again_after_each_result(model, respond_node):
+    model.add(*answer("answered", "Press Save as draft. Drafts are kept 30 days.", ["Guide", "Manual"]))
+    out, fake = respond_node("How do I save a draft, and how long is it kept?",
+                             [searching("How to save a draft?"), searching("How long are drafts kept?"), DONE],
+                             [hit("Guide"), hit("Manual")])
+    assert fake.choices == ["required", "auto", "auto"] and sent(fake, 2)[-1].type == "tool"
+    assert out["reply"].sources == ["Guide", "Manual"]
 
 
 def test_a_failed_search_is_tried_once_more(model, respond_node):
     model.add(*answer("answered", "Press Save as draft.", ["Guide"]))
     failed = Retrieval(query="q", verdict=Verdict.NOT_IN_KB, error="tool_use_failed")
-    out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?")], [failed, hit("Guide")])
+    out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?"), DONE], [failed, hit("Guide")])
     assert out["reply"].say == "Press Save as draft." and out["reply"].sources == ["Guide"]
 
 
 def test_the_search_call_is_retried_warmer(model, respond_node):
     model.add(*answer("answered", "Press Save as draft.", ["Guide"]))
-    out, fake = respond_node("How do I save a draft?", [rejected(), searching("How to save a draft?")], [hit("Guide")])
-    assert [t for t, _ in fake.calls] == [0, 0.3]
+    out, fake = respond_node("How do I save a draft?", [rejected(), searching("How to save a draft?"), DONE], [hit("Guide")])
+    assert [t for t, _ in fake.calls] == [0, 0.3, 0]
     assert out["reply"].say == "Press Save as draft." and out["corrections"] == []
 
 
@@ -308,14 +321,14 @@ def test_the_search_node_runs_at_most_the_cap(respond_node, monkeypatch):
 
 def test_respond_agent_finds_the_title_inside_what_the_grounding_returns(model, respond_node):
     model.add(*answer("answered", "Press Save as draft.", ["[Guide] Saving drafts"]))
-    out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?")], [hit("Guide", "Manual")])
+    out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?"), DONE], [hit("Guide", "Manual")])
     assert out["reply"].sources == ["Guide"] and out["corrections"] == []
 
 
 def test_respond_agent_removes_unsupported_facts_on_retry(model, respond_node):
     model.add(*answer("answered", "Fill the form with your Tenant ID.", ["Guide"], ["Tenant ID"]),
               *answer("answered", "Fill the requirements form and send it to support.", ["Guide"]))
-    out, _ = respond_node("How do I set up SSO?", [searching("How to set up SSO?")], [hit("Guide")])
+    out, _ = respond_node("How do I set up SSO?", [searching("How to set up SSO?"), DONE], [hit("Guide")])
     assert out["reply"].say == "Fill the requirements form and send it to support."
     assert out["reply"].sources == ["Guide"] and out["corrections"] == ["retried: unsupported"]
 
@@ -323,7 +336,7 @@ def test_respond_agent_removes_unsupported_facts_on_retry(model, respond_node):
 def test_respond_agent_unsupported_facts_twice_give_the_no_answer(model, respond_node):
     model.add(*answer("answered", "Fill the form with your Tenant ID.", ["Guide"], ["Tenant ID"]),
               *answer("answered", "Enter your Tenant ID in the form.", ["Guide"], ["Tenant ID"]))
-    out, fake = respond_node("How do I set up SSO?", [searching("How to set up SSO?"),
+    out, fake = respond_node("How do I set up SSO?", [searching("How to set up SSO?"), DONE,
                                                       AIMessage(content="I have no answer for that. Open a ticket?")],
                              [hit("Guide")])
     assert "You have no answer for this" in sent(fake)[-1].content
@@ -333,15 +346,15 @@ def test_respond_agent_unsupported_facts_twice_give_the_no_answer(model, respond
 
 def test_an_answer_on_a_ticket_turn_never_offers(model, respond_node):
     model.add(*answer("partial", "Press Save as draft. Which version do you use?", ["Guide"]))
-    out, fake = respond_node("version 17, and how do I save a draft?", [searching("How to save a draft?")],
+    out, fake = respond_node("version 17, and how do I save a draft?", [searching("How to save a draft?"), DONE],
                              [hit("Guide")], next_="details")
-    assert fake.choices == ["auto"] and out["offered"] is False and out["reply"].sources == ["Guide"]
+    assert fake.choices == ["auto", "auto"] and out["offered"] is False and out["reply"].sources == ["Guide"]
 
 
 def test_a_ticket_turn_reply_with_unsupported_facts_is_written_without_them(model, respond_node):
     model.add(*answer("no_answer", "العلامة المائية تحتاج تطبيق سطح المكتب. أي إصدار تستخدم؟", [], ["تطبيق سطح المكتب"]),
               *answer("answered", "تحتاج تطبيق سطح المكتب. أي إصدار تستخدم؟", [], ["تطبيق سطح المكتب"]))
-    out, fake = respond_node("ايه", [searching("watermark on iPad"), AIMessage(content="أي إصدار تستخدم؟")], [hit("Guide")],
+    out, fake = respond_node("ايه", [searching("watermark on iPad"), DONE, AIMessage(content="أي إصدار تستخدم؟")], [hit("Guide")],
                              next_="details")
     assert out["reply"].say == "أي إصدار تستخدم؟" and out["offered"] is False and out["reply"].sources == []
     assert "without stating anything about the product" in sent(fake)[-1].content
@@ -350,7 +363,7 @@ def test_a_ticket_turn_reply_with_unsupported_facts_is_written_without_them(mode
 
 def test_a_ticket_turn_reply_that_uses_no_passage_is_kept(model, respond_node):
     model.add(*answer("answered", "Which version do you use?"))
-    out, _ = respond_node("version 17", [searching("anything")], [hit("Guide")], next_="details")
+    out, _ = respond_node("version 17", [searching("anything"), DONE], [hit("Guide")], next_="details")
     assert out["reply"].say == "Which version do you use?" and out["corrections"] == [] and out["offered"] is False
 
 
@@ -462,13 +475,13 @@ def offered_seen(sid):
 
 
 def unanswered(new_path, sid, question, next_="question"):
-    return new_path(sid, question, next_, [searching(question), AIMessage(content="I have no answer. Open a ticket?")],
+    return new_path(sid, question, next_, [searching(question), DONE, AIMessage(content="I have no answer. Open a ticket?")],
                     [miss()])
 
 
 def test_new_path_answered_question_stays_in_none(new_path):
     sid = chat()
-    state, _ = new_path(sid, "How do I save a draft?", "question", [searching("How to save a draft?")],
+    state, _ = new_path(sid, "How do I save a draft?", "question", [searching("How to save a draft?"), DONE],
                         [hit("Guide")], answer("answered", "Press Save as draft.", ["Guide"]))
     assert (state["phase"], state["pending"], state["sources"]) == ("none", [], ["Guide"])
 
@@ -483,7 +496,7 @@ def test_new_path_unanswered_question_is_queued_and_offered(new_path):
 
 def test_new_path_partial_answer_is_cited_and_queued(new_path):
     sid = chat()
-    state, _ = new_path(sid, "How do I save a draft, and how long is it kept?", "question", [searching("drafts")],
+    state, _ = new_path(sid, "How do I save a draft, and how long is it kept?", "question", [searching("drafts"), DONE],
                         [hit("Guide")], answer("partial", "Press Save as draft. Open a ticket for the rest?", ["Guide"]))
     assert state["sources"] == ["Guide"] and state["phase"] == "offer_ticket"
     assert [p.text for p in state["pending"]] == ["How do I save a draft, and how long is it kept?"]
@@ -537,7 +550,7 @@ def test_new_path_decline_with_two_issues_offers_the_next(new_path):
 def test_new_path_side_question_keeps_the_offer_open(new_path):
     sid = chat()
     unanswered(new_path, sid, "Does it run on Linux?")
-    state, prompt_text = new_path(sid, "How do I save a draft?", "question", [searching("drafts")], [hit("Guide")],
+    state, prompt_text = new_path(sid, "How do I save a draft?", "question", [searching("drafts"), DONE], [hit("Guide")],
                                   answer("answered", "Press Save as draft. Still want the ticket?", ["Guide"]))
     assert [p.text for p in state["pending"]] == ["Does it run on Linux?"] and state["phase"] == "offer_ticket"
     assert state["sources"] == ["Guide"]
@@ -553,7 +566,7 @@ def test_new_path_same_unanswered_question_is_queued_once(new_path):
 
 def test_new_path_an_acknowledgement_is_never_queued(new_path):
     sid = chat()
-    new_path(sid, "How do I save a draft?", "question", [searching("drafts")], [hit("Guide")],
+    new_path(sid, "How do I save a draft?", "question", [searching("drafts"), DONE], [hit("Guide")],
              answer("answered", "Press Save as draft.", ["Guide"]))
     state, _ = new_path(sid, "ايه", "talk", [AIMessage(content="تمام، أي شيء ثاني؟")])
     assert (state["phase"], state["pending"]) == ("none", [])
@@ -689,8 +702,8 @@ def test_search_runs_on_question_and_details_and_respond_never_binds_a_tool(new_
     new_path(sid, "version 17", "details", [AIMessage(content="Anything else?")])
     new_path(sid, "nothing else", "done", [AIMessage(content="Submit it?")], groundings=[GOOD])
     fake = llm.tool_client
-    assert fake.choices == ["required", None, None, "auto", None, None]
-    assert [bool(b) for b in fake.bound] == [True, False, False, True, False, False]
+    assert fake.choices == ["required", "auto", None, None, "auto", None, None]
+    assert [bool(b) for b in fake.bound] == [True, True, False, False, True, False, False]
 
 
 def test_a_json_reply_is_retried_as_a_chat_message(new_path):
@@ -760,7 +773,7 @@ def test_the_cancel_task_is_the_last_message(new_path):
 def test_a_question_in_a_details_turn_is_searched_and_answered(new_path):
     sid = chat()
     collecting(new_path, sid)
-    state, _ = new_path(sid, "version 17. also, how do I save a draft?", "details", [searching("How to save a draft?")],
+    state, _ = new_path(sid, "version 17. also, how do I save a draft?", "details", [searching("How to save a draft?"), DONE],
                         [hit("Guide")], answer("answered", "Press Save as draft. When did it start?", ["Guide"]))
     assert state["sources"] == ["Guide"] and state["messages"][-1].text.startswith("Press Save as draft.")
     assert state["phase"] == "collect" and [p.text for p in state["pending"]] == ["Does it run on Linux?"]
