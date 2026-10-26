@@ -14,7 +14,7 @@ from ole5_chat.agent.state import ChatState
 
 log = logging.getLogger(__name__)
 
-HANDLER_NODES = ("chat", "queue", "accept", "decline", "details", "done", "change", "cancel", "submit", "status")
+HANDLER_NODES = tuple(dict.fromkeys(handlers.HANDLERS.values()))
 
 
 def route(state: ChatState) -> str:
