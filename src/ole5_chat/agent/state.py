@@ -45,8 +45,8 @@ class ChatState(MessagesState):
     pending: list[PendingIssue]
     next: Next | None
     task: str | None
-    language: str | None
-    offered: bool  # Set by respond_agent on a question turn it had no answer for; read by post_check.
+    language: str | None  # The customer's language, set by respond_agent; the router's try-again reply uses it.
+    offered: bool  # Set by respond_agent on a question turn it had no full answer for; read by post_check.
 
 
 def initial_state(identity: Identity) -> ChatState:
