@@ -71,6 +71,8 @@ HELD_OUT = [
     ("none", None, GREETING, "my ticket number is T-123, any update?", "status"),
     ("none", None, GREETING, "رفعت تذكرة أمس، وصلتكم؟", "status"),
     ("none", None, CREATED, "ما رقمها؟", "status"),
+    ("offer_ticket", ARCHIVE, OFFER, "why?", "talk"),
+    ("none", None, ANSWER, "why does it do that?", "question"),
     ("offer_ticket", ARCHIVE, OFFER, "before that, did you get my last ticket?", "status"),
     ("collect", DENIED, ERROR, "طيب تذكرتي الأولى وش وضعها؟", "status"),
     ("confirm", ARCHIVE, SUMMARY, "what's happening with my other ticket?", "status"),

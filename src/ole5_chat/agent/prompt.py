@@ -39,7 +39,8 @@ MEANINGS = {
                 "offers a ticket only when it has no answer.",
     "talk": "nothing to look up: a greeting, thanks, a question about the assistant itself (who it is, what it can do), "
             "an acknowledgement with nothing open to agree to, a side remark, a request to repeat what the assistant "
-            "just said, a problem or need with nothing specific in it yet (\"عندي مشكلة\", \"I need help\").",
+            "just said, a question about why the assistant said or did something (\"why?\", \"what do you mean?\"), a "
+            "problem or need with nothing specific in it yet (\"عندي مشكلة\", \"I need help\").",
     "ticket": "the message reports a topic from this list: {always_ticket}.",
     "urgent": "the message describes a situation from this list: {urgent_when}. Judge it from the impact described, "
               "not the tone.",
@@ -73,7 +74,7 @@ OLE5_EXAMPLES = {
     ("offer_ticket", "accept"): ['"ايه"', '"yes please"'],
     ("offer_ticket", "decline"): ['"لا شكراً"', '"no, it\'s fine"', '"ألغها"', '"cancel it"'],
     ("offer_ticket", "question"): ['"طيب وكيف أغير كلمة المرور؟"'],
-    ("offer_ticket", "talk"): ['"مين أنت؟"'],
+    ("offer_ticket", "talk"): ['"مين أنت؟"', '"ليش؟" (after the assistant said it can\'t do something)'],
     ("offer_ticket", "status"): ['"قبل كذا، التذكرة القديمة وش صار عليها؟"'],
     ("collect", "details"): ['"تطلع رسالة Access denied"', '"ما أعرف"', '"[attached: screen.png]"'],
     ("collect", "done"): ['"هذا كل شيء"', '"لا" (when the assistant asked whether there is anything else)',
