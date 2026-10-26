@@ -7,14 +7,14 @@ from fastapi.responses import FileResponse, HTMLResponse
 from langchain_core.messages import BaseMessage
 from pydantic import BaseModel, ConfigDict, Field
 
-from ole5_chat import attachments, products, sessions, sheets
+from ole5_chat import attachments, products, sessions
 from ole5_chat.attachments import AttachmentRefused
 from ole5_chat.config import get_settings
 from ole5_chat.agent.contracts import Phase
 from ole5_chat.agent.state import ChatState, TicketDraft
 from ole5_chat.identity import NotRegistered
 from ole5_chat.tickets import client as ticket_api
-from ole5_chat.tickets.client import TicketApiError
+from ole5_chat.tickets import status as ticket_status
 from ole5_chat.tickets.submit import SubmitRefused
 
 app = FastAPI(title="Ole5 chat", telemetry={"tracing": False})
@@ -188,18 +188,7 @@ def read_document(product: str, title: str) -> HTMLResponse:
 @app.get("/chat/tickets")
 def my_tickets(session_id: str) -> list[TicketView]:
     try:
-        email = sessions.current_identity(session_id).email.casefold()
+        email = sessions.current_identity(session_id).email
     except sessions.SessionNotFound as exc:
         raise HTTPException(status_code=404, detail="Session not found") from exc
-    api = ticket_api.ticket_client()
-    rows = [r for r in sheets.tickets() if str(r.get("customer_email") or "").casefold() == email]
-    views = []
-    for r in rows:
-        try:
-            state = api.get(str(r["ticket_id"])).get("state")
-        except TicketApiError:
-            state = None
-        views.append(TicketView(ticket_number=str(r["ticket_number"]), title=str(r.get("title") or ""),
-                                product=str(r.get("product") or ""), created_at=str(r.get("created_at") or ""),
-                                state=state))
-    return views
+    return [TicketView(**t) for t in ticket_status.my_tickets(email, ticket_api.ticket_client())]
