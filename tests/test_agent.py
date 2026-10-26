@@ -278,9 +278,16 @@ def test_respond_agent_rewrites_a_reply_with_chinese_characters(respond_node):
 
 def test_a_failed_search_sends_the_apology_not_an_offer(respond_node):
     failed = Retrieval(query="q", verdict=Verdict.NOT_IN_KB, error="ReadTimeout")
-    out, fake = respond_node("How do I save a draft?", [searching("How to save a draft?")], [failed])
+    out, fake = respond_node("How do I save a draft?", [searching("How to save a draft?")], [failed, failed])
     assert out["reply"].say.startswith("Sorry") and out["offered"] is False and out["corrections"] == ["search failed"]
     assert len(fake.calls) == 1
+
+
+def test_a_failed_search_is_tried_once_more(model, respond_node):
+    model.add(*answer("answered", "Press Save as draft.", ["Guide"]))
+    failed = Retrieval(query="q", verdict=Verdict.NOT_IN_KB, error="tool_use_failed")
+    out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?")], [failed, hit("Guide")])
+    assert out["reply"].say == "Press Save as draft." and out["reply"].sources == ["Guide"]
 
 
 def test_the_search_call_is_retried_warmer(model, respond_node):

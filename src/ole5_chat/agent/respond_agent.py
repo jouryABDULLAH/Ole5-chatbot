@@ -79,6 +79,10 @@ def search(state: ChatState) -> dict:
     for call in reply.tool_calls[:get_settings().kb_max_searches]:
         if call["name"] == tool.name:
             tool.invoke(call["args"])
+            if sink[-1].error:
+                # RAGent2's own model call sometimes fails; one more try usually gets through.
+                sink.pop()
+                tool.invoke(call["args"])
     log.info("search  next=%s searches=%d", state.get("next"), len(sink))
     return {"last_retrieval": merge(sink).as_json() if sink else None}
 
