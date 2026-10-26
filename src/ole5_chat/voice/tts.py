@@ -15,12 +15,25 @@ from groq import AsyncGroq
 
 from ole5_chat.agent.validate import script_language
 from ole5_chat.config import get_settings
+from ole5_chat.voice import groqhttp
 
 log = logging.getLogger(__name__)
 
 RATE = 24000
 FRAME_BYTES = RATE // 25 * 2  # 40 ms of mono PCM16
-CHARS_PER_SECOND_MAX = 35
+# Faster than this, a take lost words. The cached fixed lines run 10-17 characters a second in Arabic and 13-22 in
+# English (2026-10-26); a take that drops half its words runs about twice its normal rate.
+CHARS_PER_SECOND_MAX = {"ar": 24, "en": 30}
+SHORT_TEXT = 30  # a text this short has too few characters for its rate to say anything
+
+
+def cut_short(text: str, language: str | None, seconds: float) -> bool:
+    """The take is far shorter than the text needs: Groq ended the speech early (seen on 2026-10-26: 3.7 s for 163
+    characters, the question at its end missing)."""
+    if len(text) < SHORT_TEXT:
+        return False
+    ceiling = CHARS_PER_SECOND_MAX["ar" if (language or script_language(text)) == "ar" else "en"]
+    return seconds <= 0 or len(text) / seconds > ceiling
 
 
 class BadAudio(ValueError):
@@ -142,7 +155,8 @@ def new_client() -> AsyncGroq:
     s = get_settings()
     if not s.groq_api_key:
         raise RuntimeError("GROQ_API_KEY is not set")
-    return AsyncGroq(api_key=s.groq_api_key.get_secret_value(), timeout=15.0, max_retries=1)
+    return AsyncGroq(api_key=s.groq_api_key.get_secret_value(), timeout=15.0, max_retries=1,
+                     http_client=groqhttp.http_client())
 
 
 def client() -> AsyncGroq:
@@ -154,26 +168,48 @@ def client() -> AsyncGroq:
     return _client
 
 
+_used = 0.0  # when a request last went out on the client
+STALE_S = 40.0  # see stt.STALE_S
+
+
 async def warm() -> None:
+    global _used
     try:
+        _used = time.monotonic()
         await client().models.list()
     except Exception:
         log.warning("voice  speech warm-up failed", exc_info=True)
 
 
+async def touch() -> None:
+    """The customer started talking: a connection idle long enough to have been closed is opened again, so the reply
+    to what they say does not pay for it (see groqhttp)."""
+    if time.monotonic() - _used > STALE_S:
+        await warm()
+
+
 async def stream(text: str, language: str, api: AsyncGroq | None = None) -> AsyncIterator[bytes]:
     """The text spoken, as 40 ms PCM frames while Groq generates them. Closing the iterator closes the request."""
+    global _used
+    if api is None:
+        _used = time.monotonic()
     model, voice = voice_for(text, language)
     started, first, total = time.perf_counter(), None, 0
     wav, framer, trimmer = WavStream(), Framer(), Trimmer()
-    async with (api or client()).audio.speech.with_streaming_response.create(model=model, voice=voice, input=text,
-                                                                    response_format="wav") as response:
-        async for chunk in response.iter_bytes():
-            for frame in (kept for raw in framer.push(wav.feed(chunk)) for kept in trimmer.push(raw)):
-                if first is None:
-                    first = int((time.perf_counter() - started) * 1000)
-                total += len(frame)
-                yield frame
+    done = False
+    try:
+        async with (api or client()).audio.speech.with_streaming_response.create(model=model, voice=voice, input=text,
+                                                                        response_format="wav") as response:
+            async for chunk in response.iter_bytes():
+                for frame in (kept for raw in framer.push(wav.feed(chunk)) for kept in trimmer.push(raw)):
+                    if first is None:
+                        first = int((time.perf_counter() - started) * 1000)
+                    total += len(frame)
+                    yield frame
+        done = True
+    finally:
+        if not done and api is None:
+            _used = 0.0  # a stream cut off mid-body closes its connection: the next touch() opens one again
     tail = framer.flush()
     for frame in [*(trimmer.push(tail) if tail else []), *trimmer.flush()]:
         total += len(frame)
@@ -181,8 +217,7 @@ async def stream(text: str, language: str, api: AsyncGroq | None = None) -> Asyn
     seconds = total / 2 / RATE
     log.info("voice  tts voice=%s chars=%d first_ms=%s audio_s=%.1f ms=%d", voice, len(text), first, seconds,
              int((time.perf_counter() - started) * 1000))
-    if seconds < len(text) / CHARS_PER_SECOND_MAX:
-        # Measured speech runs 12-20 characters a second; a take far below that lost words (seen on 2026-10-26).
+    if cut_short(text, language, seconds):
         log.warning("voice  speech looks cut short: %.1f s for %d characters: %r", seconds, len(text), text[:80])
 
 

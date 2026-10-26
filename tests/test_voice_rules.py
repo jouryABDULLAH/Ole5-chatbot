@@ -163,3 +163,29 @@ def test_thanks_alone_at_confirm_goes_to_ole5_and_polite_words_alone_are_unclear
 ])
 def test_a_held_utterance_is_told_apart_as_a_question_or_an_addition(text, question):
     assert rules.is_question(text) is question
+
+
+def test_no_fixed_line_reads_as_a_command_a_yes_or_a_send_when_its_echo_comes_back():
+    # "One moment please, let me check that." was a wait: its echo stopped the search line with "take your time".
+    for key, texts in rules.LINES.items():
+        if key == "just_confirm":  # it tells the customer what to answer; the echo guards know it
+            continue
+        for language, text in texts.items():
+            assert rules.command(text, talking=True) is None, (key, language)
+            assert rules.interrupting(text) is None and rules.command_inside(text) is None, (key, language)
+            assert not rules.explicit_submit(text), (key, language)
+            assert rules.confirm_kind(text) in (("ack", "other") if key.startswith("ack_") else ("other",)), (key, language)
+
+
+def test_the_assistants_own_acknowledgements_are_listening_sounds_but_not_the_customers_ack():
+    # "فهمت" after "just to confirm" means "I understood", not "submit": it must not count for D15
+    for text in ("فهمت", "Got it.", "يسعدني ذلك", "Certainly."):
+        assert rules.is_backchannel(text) and rules.confirm_kind(text) != "ack", text
+
+
+@pytest.mark.parametrize("text, greeting", [
+    ("السلام عليكم، كيف حالك؟", True), ("hello there, good morning", True), ("مرحبا، عندي مشكلة في النظام", False),
+    ("Hi, how do I archive a correspondence?", False),
+])
+def test_a_greeting_alone_is_told_from_a_greeting_with_a_question(text, greeting):
+    assert rules.is_greeting(text) is greeting

@@ -12,8 +12,8 @@ English:
 
 - The assistant answers aloud from the real knowledge base (RAGent2), in the language the customer spoke: Arabic by
   Groq's Saudi voice `abdullah`, English by the Orpheus voice `troy` (male voices, D29).
-- No dead air: an acknowledgement as soon as the question is understood, "let me check" when a search starts, progress
-  lines while it runs, and a spoken apology on any error or timeout.
+- No dead air: an acknowledgement as soon as the question is understood (D38), "let me check" when a search starts,
+  progress lines while it runs (D39), and a spoken apology on any error or timeout.
 - The customer can interrupt. A "تمام" or "ok" said over the assistant is ignored; real words stop it.
 - A ticket can be opened by voice: offer → details → summary read aloud → explicit yes → ticket confirmed aloud. A bare
   "تمام" or "ok" at that point gets "just to confirm…". The on-screen card and the Submit button keep working.
@@ -166,8 +166,8 @@ language other than Arabic or English is retried with the session language. It i
 **Ticket number** (D12): the model's text keeps the full number, so the on-screen bubble shows it. The spoken version
 is changed in code: "your ticket number is on your screen, ending in zero zero zero one" (from `created_tickets`).
 
-**Silence** (D17): "are you still there?" once after 15–20 s, and only after the assistant asked a question; never
-after a ticket is created.
+**Silence** (D17, D44): «أنا هنا إن احتجت إلى أي مساعدة.» / "I'm here whenever you're ready." once after 18 s of quiet,
+and only after the assistant asked a question; never once a ticket exists, nor while the microphone is muted (D45).
 
 ## 7. What you need to do or decide
 
@@ -236,10 +236,13 @@ unless one of his fixes is needed, and then section 10 is re-run in full (D18).
 
 ## 11. Measurements and targets
 
-Every voice turn logs: speech end → STT done → first sound → Ole5 done → reply audio starts, plus Ole5's per-call
-times and the number of searches. Targets: first sound within about 1.5 s of the end of speech; a non-search reply
-within about 3–5 s; real-KB answers measured in CP1 (expected 25–35 s with one search), with progress lines
-throughout. The targets are reset from the CP1 measurements.
+Every voice turn logs one `voice  latency` line: seconds after the utterance arrived for STT done, turn start, first
+sound (and its kind), search started and done, Ole5 done and the reply's first sound. The browser reports the silence
+the customer heard (`voice  heard silence gap_ms`, and `longest_ms` before the reply), and
+`scripts/try_voice.py flow` plays whole conversations out in real time and prints each step's timeline. Targets (D43,
+reset from the CP3 measurements): first sound within 2.0 s of the end of speech (median ~1.6 s) for every utterance
+that gets an acknowledgement or a rule line; greetings, thanks, a bare no, typed messages and the Submit button about
+3 s; the reply about 0.4 s after Ole5 is done; no silence over about 6 s while Ole5 works.
 
 ## 12. What the spikes established (2026-10-26)
 

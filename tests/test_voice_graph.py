@@ -56,7 +56,7 @@ def test_a_voice_turn_takes_the_language_from_speech_and_streams_its_progress(gr
     kinds = [e.get("node") or e["type"] for e in events]
     assert kinds.index("router") < kinds.index("search_started") < kinds.index("search_done") < \
         kinds.index("respond_agent") < kinds.index("validate")
-    assert {"type": "search_done", "searches": 1} in events
+    assert {"type": "search_done", "searches": 1, "found": True} in events
 
 
 def test_a_chat_turn_still_judges_the_language_with_the_model(graph, model):

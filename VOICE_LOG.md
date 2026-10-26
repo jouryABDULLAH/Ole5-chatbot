@@ -43,6 +43,14 @@ Newest entries at the bottom of each section. Times are Riyadh time (AST).
 | D35 | 2026-10-26 | One voice per reply: a reply is spoken in its language's voice from start to end (replaces "voice chosen by the reply text's script" per sentence). An English reply's sentence that is mostly an Arabic screen name stays with `troy`; an Arabic reply's sentence that is mostly an English label stays with `abdullah`. | The user's real-mic pass: Arabic words in an English answer "sound like a different person". Heard back by Whisper: `troy` says the Arabic names recognisably ("Inche Murasila Jadida"); `abdullah` says English labels inside Arabic well ("اضغط على create new correspondence ثم save") while `troy` garbled that sentence. `abdullah` for all English too was tried and rejected: it stumbled on an English sentence with an Arabic name ("Open the. The. The.") | User report; fix by Claude |
 | D36 | 2026-10-26 | A question held during a turn is answered after a bridge line, "Now, about your other question." / «والآن، بخصوص سؤالك الآخر.» ("…about what you added" when it was not a question), queued before the held turn says anything. | The user's real-mic pass: the held answer ran straight on from the first one and "the two answers mix" | User report; fix by Claude |
 | D37 | 2026-10-26 | "Ole5" is spoken as "Oh-lee five" by `troy` and «أُولِي فايف» (with diacritics) by `abdullah`; the screen keeps "Ole5". One voice per reply (D35) stays for now; the user may revisit the English voice reading Arabic names. | The user's picks (E4, A3) from six spellings per voice; the earlier «أولي فايف» and the bare "Ole5" sounded "a bit off". Three takes of each greeting heard back the same (0.95–0.96) | User |
+| D38 | 2026-10-26 | A first acknowledgement as soon as what the customer said goes to Ole5, chosen by the step: «حسناً.» / "Okay." by default; «يسعدني ذلك.» / "Certainly." for a yes to the ticket offer; «فهمت.» / "Got it." and "Okay." in turn while details are collected; «حسناً، سأرسل التذكرة الآن.» / "Okay, sending the ticket now." for an explicit submit (and D15). None for a greeting or how-are-you, thanks, a bare no, a yes or acknowledgement alone in phase none, typed messages and the Submit button (answered directly, ~3 s). "Let me check" only when the search starts (0.5-0.8 s later), never before Ole5 decides. The assistant's acknowledgement words are listening sounds when their echo comes back. | Baseline: first sound median 3.9 s, max 7.2 s. Review: "let me check" before the router is untrue for greetings, "I need help" and urgent problems; «طيب/تمام» are the customer's words and colloquial (D16); «بكل سرور» came back «بكل سرق» on every take | Proposed by Claude, from the design review |
+| D39 | 2026-10-26 | Progress by silence: while Ole5 works, a line after 5.5 s in which nothing was heard (assistant, customer, or speech being transcribed), in the order still_looking, still_checking, «يستغرق هذا وقتاً أطول قليلاً، وما زلت أعمل عليه.» / "This is taking a little longer, but I'm still working on it.", «لم أنتهِ بعد، أواصل البحث.» / "Not done yet, I'm still searching.", then the first two in turn at twice the silence; none in the 3 s after the search returns (the answer is being written, and a line that has started cannot be withdrawn). No "I found something" line. | Baseline: 7.0-7.3 s of silence after "let me check" (a fixed 10 s clock), lines repeated word for word with three thank-yous; a progress line that began 0.2 s before Ole5 finished held the English answer back 3 s; a long-wait line timed from the turn start (28 s) left 9.2 s of silence before it; "found" is also true for answers that end in "no answer" | Proposed by Claude, from the design review |
+| D40 | 2026-10-26 | No fixed line may contain a command, a yes or a send word (a test checks every line), and the echo of any fixed line, at any length, is ignored when the utterance began while it played or within a second after it. English "One moment please" became "Let me check that for you." | The review found "one moment" is a wait command: the echo of "let me check" stopped the search line with "Of course, take your time"; a one-word "Okay." passes every other echo filter and came back as a new turn (at the confirm step it set up D15) | From the design review |
+| D41 | 2026-10-26 | The voice channel's Groq clients keep connections open for 5 minutes; when the customer starts talking, or the search returns, a connection idle for 40 s is reopened. HTTP/2 not used. | Measured: httpx closes idle connections after 5 s, so the two "parallel" Whisper calls took about the sum of both (0.67-1.25 s; 0.41-0.71 s kept open) and a reply's first sound after a search took 1.1-1.3 s (0.23-0.25 s kept open, after up to 45 s idle). HTTP/2 was no faster | Proposed by Claude, from measurements |
+| D42 | 2026-10-26 | Later parts of a reply are made in full and checked before they are sent, when the browser has enough audio queued to hide it; a part that came back cut short is made again unheard while the queue lasts, else streamed fresh. Cached lines and checked parts go out in one piece and start after a 20 ms lead instead of 120 ms. | O3: a 163-character sentence came back as 3.7 s of audio in a live run, its question lost. Without the queue check, part gaps of 0.3-1.7 s after a short first sentence | Proposed by Claude, from the review |
+| D43 | 2026-10-26 | CP3 exit target, restated from the measurements: first sound within 2.0 s of the customer stopping (median ~1.6 s) for every utterance that gets an acknowledgement or a rule line; the D38 exceptions about 3 s; the reply about 0.4 s after Ole5 is done; no silence over about 6 s while it works. A 1.5 s median would need a shorter detector wait (it would split the user's 0.83 s pauses), an acknowledgement before speech-to-text (it would answer commands, echo and mid-sentence pauses) or speculative speech-to-text (after the demo). | 0.85 s detector wait + 0.4-0.7 s speech-to-text + 0.15 s join grace + lead | From the latency review |
+| D44 | 2026-10-27 | Silence prompt (D17, CP4): when a reply that ends on a question has had 18 s of real quiet (nothing said by either side, no turn, nothing being transcribed, the microphone not muted), «أنا هنا إن احتجت إلى أي مساعدة.» / "I'm here whenever you're ready.", once; a statement, so it asks nothing twice and its echo cannot answer anything. Never once a ticket exists; the customer starting to speak, a stop or any turn cancels it. | D17; "are you still there?" holds the "there" command words, so its echo would be heard as the customer asking it | Proposed by Claude |
+| D45 | 2026-10-27 | Mute (CP4): a Mute/Unmute button in the voice bar and the M key (by key position, so an Arabic keyboard works; not while typing) stop the speech detector; the assistant can still be heard and stopped; the server is told, for D44. Push-to-talk is not brought back (D23). | A presenter over Meet can talk to the audience without the assistant answering | Proposed by Claude |
 | D27 | 2026-10-26 | Rule exchanges (stop, wait, repeat, are you there, "I'll come to that") are shown as a caption in the voice bar, not in the transcript; the "just to confirm" exchange is written into the conversation history. A message typed while voice is on goes over the socket and is answered aloud. The language switches only on an utterance of 3+ words in the other script. | Keeps the transcript equal to Ole5's history; a product name said alone ("Outlook") must not switch the reply language | Proposed by Claude |
 
 ## Open items
@@ -51,7 +59,8 @@ Newest entries at the bottom of each section. Times are Riyadh time (AST).
 |---|---|---|---|
 | O1 | 2026-10-26 17:10 | A voice search past the 30 s cap answered with the apology. | Closed by D28 |
 | O2 | 2026-10-26 15:30 | A sentence with a pause arrives as two utterances (mic lab `p_pause`). | Joined since CP1 (the browser reports speech start; the server waits for the rest). Open part: with the fake microphone (no noise suppression) the pause stayed inside one segment and Whisper dropped the first half; shortening the pause did not fix it reliably, so it was not kept. Check on the real microphone at the CP2 pass |
-| O3 | 2026-10-26 17:40 | Groq occasionally returns speech cut short (seen while it was also returning 500s). Fixed lines are checked and re-made; live reply segments are only logged ("speech looks cut short"). | CP3: re-synthesize a cut segment |
+| O3 | 2026-10-26 17:40 | Groq occasionally returns speech cut short (seen while it was also returning 500s). Fixed lines are checked and re-made; live reply segments are only logged ("speech looks cut short"). | Mostly closed by D42: later parts are checked and made again; the first part of a reply still streams unchecked (latency) |
+| O4 | 2026-10-26 23:40 | In one live run Ole5 said "I have opened a support ticket for the app closing…" while still collecting details (the accept/details tasks say "Don't say a ticket is opened"), and took two extra collect turns, so the en_ticket flow missed its expected phases. Model variance in the graph, not the voice shell; text chat has the same prompts. | CP5: a code check on collect-phase replies, or a prompt fix with Joori |
 
 ## Checkpoints
 
@@ -60,8 +69,8 @@ Newest entries at the bottom of each section. Times are Riyadh time (AST).
 | 0 Setup | done | 15:30 | plan, spikes, mic lab |
 | 1 Hands-free half-duplex end to end | done | 17:55 | tag `voice-cp1`; 311 tests; real-KB browser check passed |
 | 2 Ole5 voice mode | done | 21:55 | tag `voice-cp2`; 413 tests; both demo scenarios pass live; grounding gate passes |
-| 3 No dead air | not started | | |
-| 4 Hands-free + barge-in | not started | | |
+| 3 No dead air | done | 00:50 | tag `voice-cp3`; first sound median 1.6 s, max 1.8 s (was 3.9 / 7.2); see Progress |
+| 4 Hands-free + barge-in | done | 00:50 | most of it came early (D23, D30, CP2); added the silence prompt (D44) and mute (D45); in the `voice-cp3` commit |
 | 5 Quality pass + rehearsal | not started | | |
 
 ## Progress
@@ -176,3 +185,36 @@ Newest entries at the bottom of each section. Times are Riyadh time (AST).
   interruptions still work ("تمام" ignored, "وقف" stops in ~1.5 s). **Grounding gate (plan 8.3) passes:** 10 turns per
   channel — voice answered 6, offered 4, apologised 0, grounding retries 0, median 15.5 s; chat 6, 4, 0, 3, 24.6 s.
   Live speech-to-text check 33/36. Tests: 413 passed, 1 skipped.
+- 2026-10-26 22:30 — **The user's real-microphone pass (CP2) and fixes.** Notes: a question held during an answer ran
+  straight on from it ("the two answers mix") → D36 bridge line; Arabic names in an English answer switched voice → D35
+  one voice per reply; "Ole5" sounded off → D37, the user's picks from six spellings per voice (E4, A3). Commit 7b30c37.
+- 2026-10-26 23:00 — **CP3 baseline** (`scripts/try_voice.py flow` now plays the audio out in real time and prints each
+  step's stages and silences; `voice-lab/cp3_baseline.txt`): all four demo flows pass; first sound after the customer
+  stops median 3.9 s, max 7.2 s; longest silence per step median 4.9 s, max 7.3 s. Probes: the two "parallel" Whisper
+  calls cost about their sum because httpx closes idle connections after 5 s (D41); a reply's first sound after a
+  search 1.1-1.3 s for the same reason.
+- 2026-10-26 23:15 — **CP3 design review** (three critics — conversation, concurrency, latency — and a verifier): 21
+  findings, 18 real, 3 partly; folded in before and while coding (D38-D43). The main ones: "let me check" before Ole5
+  decides is untrue for greetings and urgent problems; one-word acknowledgements pass every echo filter; the English
+  "one moment please" lines were a wait command when echoed (an existing bug); progress lines played over the customer
+  and repeated word for word; a failed second take dropped the rest of a reply; 1.5 s is not reachable as a median.
+- 2026-10-27 00:00 — **CP3 live run** (`voice-lab/cp3_after.txt`): first sound median 1.6 s, max 1.8 s (was 3.9 / 7.2);
+  speech-to-text 0.4-0.7 s; the reply about 0.4 s after Ole5 is done. One 9.2 s silence before a long-wait line timed
+  from the turn start → fixed (D39, the line is now third in the order). en_ticket missed its phases once: Ole5 asked two
+  extra questions and said "I have opened a support ticket" mid-collect (O4).
+- 2026-10-27 00:30 — **CP3 code review** (three reviewers — turn manager, browser and connections, measurement — each
+  with a skeptic): 16 findings; all fixed with tests. The main ones: the assistant's own «فهمت» / "Got it" had been added
+  to the customer's acknowledgement words, so «فهمت» right after "just to confirm" would have submitted the ticket
+  (D15) — they are now listening sounds only; «شكراً» over «سأرسل التذكرة الآن» stopped that line; a later reply part
+  made whole had no deadline; a stream cut off by a stop closed its connection without the next turn reopening it;
+  "repeat" replayed a cut-short first part; "still looking through the documentation" on turns that never searched;
+  cached audio now goes out in 250 ms pieces (one large message was slow on a phone link); the browser's silence
+  report counted frames of the reply already playing. CP4 (D44, D45) added; tests: 447 passed, 1 skipped.
+- 2026-10-27 00:45 — **CP3 final live run** (`voice-lab/cp3_final.txt`, all CP3 and CP4 code): all four flows pass.
+  First sound after a spoken turn 1.3-2.0 s (median 1.8 s with the typed step's 4.1 s, which gets no acknowledgement by
+  D38); longest silence per step median 3.3 s, max 7.4 s (the held question: the 3 s hold after the search added to the
+  5.5 s quiet; the line still came before the answer). Sounds as designed: «حسناً.» → «لحظات من فضلك، أتحقق من ذلك.» →
+  progress → answer; "Certainly." → the questions; "Okay, sending the ticket now." → "The ticket was created…".
+  Seen in the logs: Groq's tool_use_failed on Ole5's search call (several queries in one call), retried by the graph;
+  that turn took 24 s.
+

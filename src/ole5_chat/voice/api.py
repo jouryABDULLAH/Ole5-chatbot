@@ -3,9 +3,11 @@
 Browser to server: {"type": "utterance", "over_bot", "ms"} followed by one binary frame, a 16 kHz mono WAV of what the
 speech detector cut; {"type": "played", "id"} when an item finished playing; {"type": "stop"} (the Stop button);
 {"type": "barge_in"}; {"type": "speech", "on"} when the speech detector starts hearing the customer, and off when that
-was not speech or will not be sent; {"type": "submit"} (the Submit button in voice mode); {"type": "text", "text"} (typed in voice
-mode). Server to browser: ready, heard, ignored, status, tts_start / binary 40 ms PCM frames / tts_end, stop_audio,
-view and error."""
+was not speech or will not be sent; {"type": "submit"} (the Submit button in voice mode); {"type": "text", "text"}
+(typed in voice mode); {"type": "latency", "gap_ms" or "longest_ms", "id"}, the silences the customer heard, for the
+log; {"type": "mute", "on"} when the customer mutes or unmutes the microphone. Server to browser: ready, heard,
+ignored, status, tts_start (with "whole" when the audio is complete, sent in 250 ms pieces) / binary PCM / tts_end,
+stop_audio, view and error."""
 
 import asyncio
 import json
@@ -24,6 +26,10 @@ router = APIRouter()
 
 async def _warm() -> None:
     await asyncio.gather(stt.warm(), tts.warm())
+
+
+async def _touch() -> None:
+    await asyncio.gather(stt.touch(), tts.touch())
 
 
 @router.get("/chat/voice/config")
@@ -54,7 +60,7 @@ async def voice(websocket: WebSocket, session_id: str) -> None:
         async with lock:
             await websocket.send_bytes(data)
 
-    session = VoiceSession(session_id, send_json, send_bytes, Backend(warm=_warm))
+    session = VoiceSession(session_id, send_json, send_bytes, Backend(warm=_warm, touch=_touch))
     log.info("voice  connected session=%s", session_id[:8])
     pending: dict | None = None
     try:
@@ -87,6 +93,10 @@ async def voice(websocket: WebSocket, session_id: str) -> None:
                 session.submit()
             elif kind == "text":
                 session.typed(str(data.get("text") or "")[:4000])
+            elif kind == "latency":
+                session.latency(data)
+            elif kind == "mute":
+                session.mute(bool(data.get("on")))
     except (WebSocketDisconnect, RuntimeError):
         pass
     finally:

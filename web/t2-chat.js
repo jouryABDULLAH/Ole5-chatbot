@@ -18,8 +18,10 @@
       tooBig: "The file is too large.", badType: "This file type cannot be attached.",
       tooMany: "No more files can be attached to this ticket.",
       voiceOn: "Talk to the assistant", voiceOff: "Turn the microphone off", stop: "Stop",
+      mute: "Mute", unmute: "Unmute", muteKey: "Mute or unmute the microphone (M)",
       stages: { starting: "Starting the microphone", listening: "Listening", hearing: "Hearing you",
-                thinking: "Thinking", searching: "Checking the knowledge base", speaking: "Speaking" },
+                thinking: "Thinking", searching: "Checking the knowledge base", speaking: "Speaking",
+                muted: "Microphone muted" },
       you: "You", micBlocked: "The microphone is blocked. Allow it in the browser to talk.",
       voiceFailed: "Voice could not start. You can keep typing.", voiceLost: "The voice connection was lost.",
     },
@@ -39,8 +41,10 @@
       tooBig: "حجم الملف كبير جداً.", badType: "لا يمكن إرفاق هذا النوع من الملفات.",
       tooMany: "لا يمكن إرفاق ملفات أخرى بهذه التذكرة.",
       voiceOn: "تحدث مع المساعد", voiceOff: "إيقاف الميكروفون", stop: "إيقاف",
+      mute: "كتم", unmute: "إلغاء الكتم", muteKey: "كتم الميكروفون أو إلغاء كتمه (M)",
       stages: { starting: "جارٍ تشغيل الميكروفون", listening: "أستمع إليك", hearing: "أسمعك",
-                thinking: "أفكر في ردي", searching: "أبحث في قاعدة المعرفة", speaking: "أتحدث" },
+                thinking: "أفكر في ردي", searching: "أبحث في قاعدة المعرفة", speaking: "أتحدث",
+                muted: "الميكروفون مكتوم" },
       you: "أنت", micBlocked: "الميكروفون محظور. اسمح به في المتصفح لتتحدث.",
       voiceFailed: "تعذّر تشغيل الصوت. يمكنك متابعة الكتابة.", voiceLost: "انقطع الاتصال الصوتي.",
     },
@@ -237,6 +241,20 @@
       }
       this.render();
       this.checkVoice();
+      // M mutes and unmutes the microphone while voice is on, unless the customer is typing. By key position, so it
+      // works with an Arabic keyboard too.
+      document.addEventListener("keydown", (e) => {
+        if (!this.voice || e.code !== "KeyM" || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+        const target = e.composedPath()[0];
+        if (target && (target.tagName === "TEXTAREA" || target.tagName === "INPUT" || target.isContentEditable)) return;
+        e.preventDefault();
+        this.toggleMute();
+      });
+    }
+
+    toggleMute() {
+      if (!this.voice) return;
+      this.voice.setMuted(!this.voice.muted).then(() => this.updateVoiceBar());
     }
 
     async checkVoice() {
@@ -344,7 +362,10 @@
         el("span", { class: "words" }, el("span", { class: "stage" }, this.t.stages[stage] || ""),
            this.caption ? el("span", { class: "caption", dir: "auto", title: this.caption }, this.caption) : null),
         stage === "speaking" ? el("button", { class: "stopbtn", type: "button", onclick: () => this.voice && this.voice.interrupt() },
-                                  this.t.stop) : null);
+                                  this.t.stop) : null,
+        this.voice ? el("button", { class: "stopbtn", type: "button", title: this.t.muteKey,
+                                    "aria-pressed": this.voice.muted ? "true" : "false", onclick: () => this.toggleMute() },
+                        this.voice.muted ? this.t.unmute : this.t.mute) : null);
     }
 
     /** Only the voice bar changes: a full render would rebuild the panel on every status. */

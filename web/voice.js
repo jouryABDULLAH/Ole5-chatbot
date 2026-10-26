@@ -19,6 +19,7 @@
   const TAIL_S = 0.6;          // speech starting in the assistant's last 0.6 s is an answer, not an interruption
   const JUDGED_MS = 2500;      // after speech over the assistant, it stays quiet this long for the server's verdict
   const INTERRUPT_REDEMPTION_MS = 500;   // speech over the assistant ends sooner: "stop" acts ~0.35 s faster
+  const WHOLE_LEAD_S = 0.02;   // audio that arrives complete (a cached line) starts almost at once
 
   const scripts = {};
   function loadScript(src) {
@@ -59,7 +60,7 @@
     remaining() { return this.playing ? Math.max(0, this.nextTime - this.ctx.currentTime) : 0; }
     async resume() { if (this.ctx.state !== "running") await this.ctx.resume(); }
 
-    push(arrayBuffer) {
+    push(arrayBuffer, lead = this.lead) {
       let bytes = new Uint8Array(arrayBuffer);
       if (this.carry) { const m = new Uint8Array(this.carry.length + bytes.length); m.set(this.carry); m.set(bytes, this.carry.length); bytes = m; this.carry = null; }
       if (bytes.length % 2) { this.carry = bytes.slice(-1); bytes = bytes.subarray(0, bytes.length - 1); }
@@ -69,13 +70,16 @@
       for (let i = 0; i < n; i++) ch[i] = dv.getInt16(i * 2, true) / 32768;
       const src = this.ctx.createBufferSource(); src.buffer = buf; src.connect(this.gain);
       const now = this.ctx.currentTime;
-      if (this.nextTime < now + 0.005) this.nextTime = now + this.lead;   // first frame, or fell behind: re-prime
+      if (this.nextTime < now + 0.005) this.nextTime = now + lead;   // first frame, or fell behind: re-prime
+      const startsIn = this.nextTime - now;
       src.start(this.nextTime); this.nextTime += buf.duration;
       this.sources.add(src);
       src.onended = () => {
         this.sources.delete(src);
         if (!this.sources.size) { this.idleAt = performance.now(); if (this.onIdle) this.onIdle(); }
       };
+      // When this frame will be heard, the output device's own delay included (large on Bluetooth headsets).
+      return performance.now() + (startsIn + (this.ctx.outputLatency || this.ctx.baseLatency || 0)) * 1000;
     }
     /** Calls back when everything pushed so far has played. */
     whenPlayed(callback) {
@@ -154,6 +158,8 @@
 
     speechStart() {
       this.speaking = true;
+      this.pendingFrom = this.waitFrom;   // a misfire gives the measurement back
+      this.waitFrom = null;
       this.overBot = this.player.remaining() > TAIL_S;
       // How long after the assistant's last sound this speech began: the server checks a quick start for echo.
       this.sinceBot = this.player.playing ? 0 : Math.round(performance.now() - this.player.idleAt);
@@ -183,6 +189,7 @@
     /** The detector heard a sound too short to be speech. */
     misfire() {
       this.overBot = false;
+      if (this.pendingFrom != null) this.waitFrom = this.pendingFrom;
       this.speechDone();
       this.send({ type: "speech", on: false });
     }
@@ -196,6 +203,10 @@
         return;
       }
       this.speechDone(overBot && !this.halfDuplex ? JUDGED_MS : 0);
+      // The customer stopped speaking about one redemption window ago: the silence they hear is timed from there.
+      // Speech over the assistant is timed too; if it is only a backchannel, the server's "ignored" clears it.
+      this.waitFrom = performance.now() - (overBot && !this.halfDuplex ? INTERRUPT_REDEMPTION_MS : VAD.redemptionMs);
+      this.pendingFrom = null; this.longest = 0;
       this.send({ type: "utterance", over_bot: overBot, ms: Math.round(audio.length / 16), over_id: this.overId,
                   since_bot_ms: this.sinceBot < 5000 ? this.sinceBot : null });
       this.send(encodeWav(audio));
@@ -205,7 +216,10 @@
 
     event(m) {
       if (m.type === "tts_start") {
-        this.item = { id: m.id, kind: m.kind, dropped: this.hush };
+        // after: announced once the customer stopped, so it can be the answer to what they said (an item that was
+        // already playing when they spoke over it cannot).
+        this.item = { id: m.id, kind: m.kind, whole: !!m.whole, dropped: this.hush,
+                      after: this.waitFrom != null || this.pendingFrom != null };
         if (!this.hush) this.marks.push({ id: m.id, end: null });
         if (!this.hush) this.showStage("speaking");
         if (m.kind !== "reply" || !this.player.playing) this.unduck();   // something new to say: full volume
@@ -220,20 +234,59 @@
           if (!this.player.playing) this.showStage();   // an item with no audio must not leave "speaking" up
         }
       } else if (m.type === "stop_audio") {
+        // A stop is followed by silence on purpose: nothing after it is timed as the answer to it.
+        if (this.item) this.item.after = false;
+        this.waitFrom = null; this.pendingFrom = null;
         this.silence();
         this.hush = false;
       } else if (m.type === "status") {
         this.stage = m.stage;
         this.showStage();
       } else if (m.type === "ignored") {
+        this.waitFrom = null;   // nothing will answer it: no silence to time
         this.unduck();   // a backchannel or the assistant's own echo: carry on at full volume
       }
       this.on.event?.(m);
     }
 
-    frame(buffer) { if (this.item && !this.item.dropped) this.player.push(buffer); }
+    frame(buffer) {
+      const item = this.item;
+      if (!item || item.dropped) return;
+      const idle = !this.player.playing, idleAt = this.player.idleAt;
+      const heardAt = this.player.push(buffer, item.whole && idle ? WHOLE_LEAD_S : undefined);
+      if (heardAt == null) return;
+      const from = this.waitFrom != null ? this.waitFrom : this.pendingFrom;   // pending: a detection under way
+      const lag = (this.player.ctx.outputLatency || this.player.ctx.baseLatency || 0) * 1000;
+      if (from != null && item.after && !item.started) {   // the first sound after the customer stopped
+        this.send({ type: "latency", gap_ms: Math.max(0, Math.round(heardAt - from)), id: item.id, kind: item.kind });
+        this.longest = 0; this.timing = true; this.waitFrom = null; this.pendingFrom = null;
+      } else if (this.timing && idle && !item.started) {   // a later silence while the answer is awaited
+        this.longest = Math.max(this.longest, heardAt - lag - idleAt);   // both ends on the output side
+      }
+      if (this.timing && item.kind === "reply" && !item.started) {   // the answer: its longest silence before it
+        this.send({ type: "latency", longest_ms: Math.round(this.longest), id: item.id });
+        this.timing = false;
+      }
+      item.started = true;
+    }
 
-    showStage(forced) { this.on.stage?.(forced || (this.player && this.player.playing ? "speaking" : this.stage)); }
+    showStage(forced) {
+      this.on.stage?.(forced || (this.player && this.player.playing ? "speaking" : this.muted ? "muted" : this.stage));
+    }
+
+    /** Mute: the detector stops listening (the assistant can still be heard and stopped); unmute starts it again. */
+    async setMuted(on) {
+      if (!this.vad || this.muted === on) return;
+      this.muted = on;
+      if (on) {
+        this.vad.pause();
+        if (this.speaking) { this.speechDone(); this.send({ type: "speech", on: false }); }
+      } else {
+        await this.vad.start();
+      }
+      this.send({ type: "mute", on });
+      this.showStage();
+    }
 
     silence() {
       if (this.item) this.item.dropped = true;
@@ -251,13 +304,15 @@
     /** The Stop button: silence at once, and the server drops what it was about to say. Audio already on its way is
         dropped until the server answers with stop_audio. */
     interrupt(kind = "stop") {
+      this.waitFrom = null; this.pendingFrom = null;
       this.silence();
       this.hush = true;
       this.send({ type: kind });
     }
 
-    submit() { this.send({ type: "submit" }); }
-    text(text) { this.send({ type: "text", text }); }
+    // The Submit button and typed text get no acknowledgement (D38): their silence is timed from the click.
+    submit() { this.waitFrom = performance.now(); this.send({ type: "submit" }); }
+    text(text) { this.waitFrom = performance.now(); this.send({ type: "text", text }); }
 
     stop() {
       if (this.stopped) return;

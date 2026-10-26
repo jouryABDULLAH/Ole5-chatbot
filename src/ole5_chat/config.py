@@ -74,7 +74,8 @@ class Settings(BaseSettings):
     voice_kb_find_timeout: float = 60.0  # RAGent2's own limit: a search the voice turn gave up on stops soon after
     voice_search_timeout: float = 35.0  # past this the turn answers as for a question with no answer and offers a ticket
     voice_turn_deadline: float = 55.0
-    voice_progress_every: float = 10.0  # a "still checking" line after this long without speech, twice at most
+    voice_progress_every: float = 5.5  # while Ole5 works: a "still checking" line after this long with nothing heard
+    voice_idle_prompt: float = 18.0  # a question of the assistant's unanswered this long gets "I'm here…" once (D17)
     voice_max_utterance_s: float = 60.0
     voice_cache_dir: Path = ROOT / ".voice_cache"
 

@@ -161,11 +161,12 @@ def test_a_question_is_heard_answered_and_spoken_in_order():
     page = run(fake, scenario)
     assert fake.sent == [("كيف أستعيد كلمة المرور؟", "ar", "voice")]
     kinds = page.types()
-    assert kinds.index("heard") < kinds.index("turn") < kinds.index("view") < kinds.index("tts_start")
-    assert page.said("reply") == ["افتح صفحة الدخول. ثم اضغط نسيت كلمة المرور."]
+    # the acknowledgement as soon as the turn starts (D38), the reply after the view
+    assert kinds.index("heard") < kinds.index("turn") < kinds.index("tts_start") < kinds.index("view")
+    assert page.said() == [line("ack_ok"), "افتح صفحة الدخول. ثم اضغط نسيت كلمة المرور."]
     assert page.events("turn")[0]["text"] == "كيف أستعيد كلمة المرور؟"
     assert page.events("status")[-1]["stage"] == "listening"
-    assert kinds.count("audio") == 2 and page.events("tts_end")[-1]["cancelled"] is False
+    assert kinds.count("audio") == 1 + 2 and page.events("tts_end")[-1]["cancelled"] is False  # cached: one piece
 
 
 def test_a_search_says_let_me_check_before_the_reply():
@@ -181,24 +182,94 @@ def test_a_search_says_let_me_check_before_the_reply():
         await idle(voice, page)
 
     page = run(fake, scenario)
-    assert page.said() == [line("searching"), "اضغط نسيت كلمة المرور."]
+    assert page.said() == [line("ack_ok"), line("searching"), "اضغط نسيت كلمة المرور."]
     assert {"type": "status", "stage": "searching"} in page.out
 
 
-def test_a_long_turn_gets_progress_lines():
+def test_a_long_turn_gets_progress_lines_none_twice_then_slower():
     fake = FakeOle5(heard=["سؤال طويل عن النظام"], replies=["الجواب."])
+    fake.events = [{"type": "search_started"}]
     fake.gate = threading.Event()
 
     async def scenario(voice, page):
         voice.utterance({}, WAV)
-        await until(lambda: len(page.said("filler")) == 3)
-        await asyncio.sleep(0.2)  # no fourth line
+        await until(lambda: len(page.said("filler")) == 7)
         fake.gate.set()
         await until(lambda: page.said("reply"))
         await idle(voice, page)
 
     page = run(fake, scenario, progress_every=0.05)
-    assert page.said() == [line("still_checking"), line("still_looking"), line("still_checking"), "الجواب."]
+    lines = [line(k) for k in ("ack_ok", "searching", "still_looking", "still_checking", "long_wait", "not_done",
+                               "still_looking")]
+    assert page.said()[:7] == lines and page.said()[-1] == "الجواب."
+
+
+def test_a_turn_that_did_not_search_says_nothing_about_the_documentation():
+    fake = FakeOle5(phase="collect", heard=["على أندرويد"], replies=["هل تظهر رسالة خطأ؟"])
+    fake.gate = threading.Event()
+
+    async def scenario(voice, page):
+        voice.utterance({}, WAV)
+        await until(lambda: len(page.said("filler")) == 4)
+        fake.gate.set()
+        await until(lambda: page.said("reply"))
+        await idle(voice, page)
+
+    page = run(fake, scenario, progress_every=0.05)
+    assert page.said("filler")[:4] == [line(k) for k in ("ack_noted", "still_checking", "long_wait", "still_checking")]
+
+
+def test_got_it_after_just_to_confirm_is_not_a_yes():
+    fake = FakeOle5(phase="confirm", heard=["تمام", "فهمت"], replies=["هل تريد إرسالها؟"])
+
+    async def scenario(voice, page):
+        voice.utterance({}, WAV)
+        await until(lambda: page.said())
+        await idle(voice, page)
+        voice.utterance({}, WAV)
+        await until(lambda: fake.sent or fake.submitted)
+        await idle(voice, page)
+
+    run(fake, scenario)
+    assert not fake.submitted and [t for t, _, _ in fake.sent] == ["فهمت"]
+
+
+def test_repeat_makes_a_cut_short_part_again_instead_of_replaying_it():
+    text = "افتح صفحة الدخول، ثم اضغط على نسيت كلمة المرور، وأدخل بريدك الإلكتروني المسجل في النظام."
+    fake = FakeOle5(heard=["عيد"])
+
+    async def scenario(voice, page):
+        voice.last_reply = [voice.speaker.say("reply", text, "ar")]  # streams 2 frames: far too short for the text
+        await until(lambda: page.events("tts_end"))
+        await idle(voice, page)
+        voice.utterance({}, WAV)
+        await until(lambda: len(page.events("tts_end")) == 2)
+
+    run(fake, scenario)
+    assert fake.spoken.count(text) == 2
+
+
+def test_a_progress_line_waits_for_silence_after_what_is_being_said():
+    fake = FakeOle5(heard=["شكراً جزيلاً"], replies=["الجواب."])  # thanks: no acknowledgement first
+    fake.gate = threading.Event()
+
+    async def scenario(voice, page):
+        voice.utterance({}, WAV)
+        await until(lambda: voice.turn is not None)
+        voice.speaker.say("filler", "لحظات من فضلك، أتحقق من ذلك.", "ar")  # still in the browser: not played yet
+        await asyncio.sleep(0.3)
+        assert page.said("filler") == ["لحظات من فضلك، أتحقق من ذلك."]  # no progress line over it
+        voice.played(page.events("tts_start")[-1]["id"])
+        await until(lambda: len(page.said("filler")) == 2)
+        page.autoplay = True
+        await until(lambda: page.events("tts_end")[-1]["id"] == page.events("tts_start")[-1]["id"])
+        voice.played(page.events("tts_start")[-1]["id"])
+        fake.gate.set()
+        await until(lambda: page.said("reply"))
+        await idle(voice, page)
+
+    page = run(fake, scenario, autoplay=False, progress_every=0.1)
+    assert page.said("filler")[1] == line("still_checking")  # no search in this turn
 
 
 def test_a_reply_drops_the_fillers_still_waiting():
@@ -254,7 +325,7 @@ def test_the_stop_button_cuts_the_reply_being_spoken():
 
 
 def test_repeat_says_the_last_reply_again_from_its_audio():
-    fake = FakeOle5(heard=["كيف أضيف توقيعاً؟", "عيد"], replies=["افتح إعدادات المستخدم ثم التوقيع."])
+    fake = FakeOle5(heard=["كيف أضيف توقيعاً؟", "عيد"], replies=["افتح الإعدادات ثم التوقيع."])
 
     async def scenario(voice, page):
         voice.utterance({}, WAV)
@@ -265,8 +336,8 @@ def test_repeat_says_the_last_reply_again_from_its_audio():
         await idle(voice, page)
 
     page = run(fake, scenario)
-    assert page.said("reply") == ["افتح إعدادات المستخدم ثم التوقيع."] * 2
-    assert fake.spoken == ["افتح إعدادات المستخدم ثم التوقيع."]  # said again from the kept audio
+    assert page.said("reply") == ["افتح الإعدادات ثم التوقيع."] * 2
+    assert fake.spoken == ["افتح الإعدادات ثم التوقيع."]  # said again from the kept audio
     assert len(fake.sent) == 1
 
 
@@ -300,7 +371,8 @@ def test_during_a_turn_a_backchannel_is_dropped_and_a_question_is_held_then_answ
     assert [t for t, _, _ in fake.sent] == ["كيف أستعيد كلمة المرور؟", "وكيف أغير البريد الإلكتروني؟"]
     assert {"type": "ignored", "reason": "backchannel"} in page.out
     # the second answer opens with a bridge, so it does not run straight on from the first
-    assert page.said() == [line("held"), "اضغط نسيت كلمة المرور.", line("next_question"), "افتح الملف الشخصي."]
+    assert page.said() == [line("ack_ok"), line("held"), "اضغط نسيت كلمة المرور.", line("next_question"),
+                           "افتح الملف الشخصي."]
 
 
 def test_something_added_during_a_turn_is_answered_after_a_bridge_that_says_so():
@@ -318,7 +390,8 @@ def test_something_added_during_a_turn_is_answered_after_a_bridge_that_says_so()
         await idle(voice, page)
 
     page = run(fake, scenario)
-    assert page.said() == [line("held"), "هل تظهر رسالة خطأ؟", line("next_added"), "شكراً، هل هناك شيء آخر؟"]
+    assert page.said() == [line("ack_ok"), line("held"), "هل تظهر رسالة خطأ؟", line("next_added"),
+                           "شكراً، هل هناك شيء آخر؟"]
 
 
 def test_are_you_there_during_a_turn():
@@ -334,7 +407,7 @@ def test_are_you_there_during_a_turn():
         await until(lambda: page.said("reply"))
         await idle(voice, page)
 
-    assert run(fake, scenario).said() == [line("there_busy"), "الجواب."]
+    assert run(fake, scenario).said() == [line("ack_ok"), line("there_busy"), "الجواب."]
 
 
 def test_a_turn_past_the_deadline_says_so_and_its_late_reply_is_shown_not_spoken():
@@ -343,7 +416,7 @@ def test_a_turn_past_the_deadline_says_so_and_its_late_reply_is_shown_not_spoken
 
     async def scenario(voice, page):
         voice.utterance({}, WAV)
-        await until(lambda: page.said())
+        await until(lambda: line("late") in page.said())
         voice._graph_event(voice.turn_no, {"type": "search_started"})  # a search starting after the deadline
         voice.utterance({}, WAV)  # asked again while the late turn still runs
         await until(lambda: voice.held is not None)
@@ -352,7 +425,7 @@ def test_a_turn_past_the_deadline_says_so_and_its_late_reply_is_shown_not_spoken
         await idle(voice, page)
 
     page = run(fake, scenario, deadline=0.1)
-    assert page.said() == [line("late"), line("held"), "رد سريع."]
+    assert page.said() == [line("ack_ok"), line("late"), line("held"), line("ack_ok"), "رد سريع."]  # held, no bridge
     assert page.events("view")[0]["session"]["messages"][-1] == "رد متأخر."
 
 
@@ -365,7 +438,7 @@ def test_a_failed_turn_gets_the_apology_and_the_page_stops_waiting():
         await idle(voice, page)
 
     page = run(fake, scenario)
-    assert page.said() == [line("apology")] and page.events("view")
+    assert page.said() == [line("ack_ok"), line("apology")] and page.events("view")
 
 
 def test_speech_to_text_failing_asks_to_say_it_again():
@@ -1009,3 +1082,262 @@ def test_a_yes_in_latin_letters_does_not_switch_the_conversation_to_english():
 
     run(fake, scenario)
     assert fake.sent[0][1] == "ar"
+
+
+def test_a_later_part_of_a_reply_cut_short_is_made_again_and_the_longer_take_is_sent():
+    text = "ثم اضغط على نسيت كلمة المرور، وأدخل بريدك الإلكتروني المسجل في النظام لتصلك رسالة فيها الرابط."
+    fake = FakeOle5()
+    # frames per take: the first part is long enough (3 s) to cover making the later part twice, whose first take
+    # came back cut short
+    takes = {"first": [75], text: [2, 150]}
+
+    async def speech(said, language):
+        fake.spoken.append(said)
+        for _ in range(takes[said].pop(0)):
+            yield FRAME
+
+    fake.speech = speech
+
+    async def scenario(voice, page):
+        voice.speaker.say("reply", "first", "ar", part=0)
+        voice.speaker.say("reply", text, "ar", part=1)
+        await until(lambda: len(page.events("tts_end")) == 2)
+
+    page = run(fake, scenario)
+    assert fake.spoken == ["first", text, text]  # the first part streams once; the cut later part is made again
+    sent = [n for x, n in (x for x in page.out if isinstance(x, tuple))]
+    assert sum(sent) == (75 + 150) * len(FRAME) and sent[-1] < 150 * len(FRAME)  # the longer take, in 250 ms pieces
+
+
+def test_a_later_part_that_cannot_be_made_whole_in_time_streams():
+    text = "ثم اضغط على نسيت كلمة المرور، وأدخل بريدك الإلكتروني المسجل في النظام لتصلك رسالة فيها الرابط."
+    fake = FakeOle5()
+    takes = {"first": [2], text: [2]}  # 80 ms of audio ahead: no time to make the later part whole and check it
+
+    async def speech(said, language):
+        fake.spoken.append(said)
+        for _ in range(takes[said].pop(0)):
+            yield FRAME
+
+    fake.speech = speech
+
+    async def scenario(voice, page):
+        voice.speaker.say("reply", "first", "ar", part=0)
+        voice.speaker.say("reply", text, "ar", part=1)
+        await until(lambda: len(page.events("tts_end")) == 2)
+
+    page = run(fake, scenario)
+    assert fake.spoken == ["first", text] and [m["whole"] for m in page.events("tts_start")] == [False, False]
+
+
+def acks_for(phase, heard, language="ar"):
+    """What is said first for each utterance at a phase (the turn's reply is a placeholder)."""
+    fake = FakeOle5(phase=phase, heard=heard, replies=["ر."] * len(heard), language=language)
+
+    async def scenario(voice, page):
+        for i in range(len(heard)):
+            voice.utterance({}, WAV)
+            await until(lambda: len(page.said("reply")) == i + 1)
+            await idle(voice, page)
+
+    return [t for t in run(fake, scenario).said() if t != "ر."]
+
+
+def test_the_first_acknowledgement_fits_the_step():
+    assert acks_for("none", ["كيف أؤرشف مراسلة في النظام؟"]) == [line("ack_ok")]
+    assert acks_for("none", ["السلام عليكم، كيف حالك؟", "شكراً", "نعم"]) == []  # answered at once
+    assert acks_for("offer_ticket", ["نعم"]) == [line("ack_accept")]
+    assert acks_for("offer_ticket", ["لا شكراً"]) == []  # Ole5's reply acknowledges the no
+    assert acks_for("collect", ["على أندرويد", "من أمس", "تمام"]) == [line("ack_noted"), line("ack_ok"),
+                                                                       line("ack_noted")]
+    assert acks_for("confirm", ["نعم أرسلها"]) == [line("submitting")]
+    assert acks_for("confirm", ["غير الأولوية إلى عالية"]) == [line("ack_ok")]
+    assert acks_for("none", ["How do I archive a correspondence?"], "en") == [line("ack_ok", "en")]
+
+
+def test_the_echo_of_an_acknowledgement_after_a_quick_turn_is_not_a_new_turn():
+    fake = FakeOle5(phase="collect", heard=["على أندرويد", "فهمت"], replies=["هل تظهر رسالة خطأ؟"])
+
+    async def scenario(voice, page):
+        voice.utterance({}, WAV)
+        await until(lambda: page.said("reply"))
+        await idle(voice, page)
+        await asyncio.sleep(0.8)  # a 1 s clip that began as "فهمت." played arrives after it (and the detector wait)
+        voice.utterance({"since_bot_ms": 0}, WAV)  # the microphone heard "فهمت." as it ended
+        await until(lambda: page.events("ignored"))
+        await idle(voice, page)
+
+    page = run(fake, scenario)
+    assert [t for t, _, _ in fake.sent] == ["على أندرويد"] and not fake.notes
+    assert page.events("ignored")[-1]["reason"] == "echo"
+
+
+def test_no_progress_line_while_the_answer_is_being_written_after_the_search():
+    fake = FakeOle5(heard=["كيف أؤرشف مراسلة في النظام؟"], replies=["الجواب."])
+    fake.events = [{"type": "search_started"}, {"type": "search_done", "searches": 1, "found": True}]
+    fake.gate = threading.Event()
+
+    async def scenario(voice, page):
+        voice.utterance({}, WAV)
+        await until(lambda: len(page.said("filler")) == 2)  # the acknowledgement and "let me check"
+        await asyncio.sleep(0.5)  # well past progress_every, within the 3 s after the search
+        assert len(page.said("filler")) == 2
+        fake.gate.set()
+        await until(lambda: page.said("reply"))
+        await idle(voice, page)
+
+    page = run(fake, scenario, progress_every=0.05)
+    assert page.said() == [line("ack_ok"), line("searching"), "الجواب."]
+
+
+def test_thanks_said_over_the_sending_line_does_not_stop_it():
+    fake = FakeOle5(phase="confirm", heard=["نعم أرسلها", "شكراً"], replies=["تم إنشاء التذكرة."])
+    fake.gate = threading.Event()
+
+    async def scenario(voice, page):
+        voice.utterance({}, WAV)
+        await until(lambda: page.said("filler"))
+        ack = page.events("tts_start")[-1]["id"]
+        voice.utterance({"over_bot": True, "over_id": ack}, WAV)  # «شكراً» while «حسناً، سأرسل التذكرة الآن.» plays
+        await until(lambda: page.events("ignored"))
+        fake.gate.set()
+        await until(lambda: page.said("reply"))
+        await idle(voice, page)
+
+    page = run(fake, scenario)
+    assert page.said() == [line("submitting"), "تم إنشاء التذكرة."] and not page.events("stop_audio")
+
+
+def test_the_customer_going_on_over_the_acknowledgement_is_held_not_dropped():
+    fake = FakeOle5(heard=["عندي مشكلة في البريد", "يطلع لي خطأ عند فتح المرفقات"], replies=["ر1.", "ر2."])
+    fake.gate = threading.Event()
+
+    async def scenario(voice, page):
+        voice.utterance({}, WAV)
+        await until(lambda: page.said("filler"))
+        voice.utterance({"over_bot": True, "over_id": page.events("tts_start")[-1]["id"]}, WAV)
+        await until(lambda: voice.held is not None)
+        fake.gate.set()
+        await until(lambda: len(page.said("reply")) == 2)
+        await idle(voice, page)
+
+    page = run(fake, scenario)
+    assert [t for t, _, _ in fake.sent] == ["عندي مشكلة في البريد", "يطلع لي خطأ عند فتح المرفقات"]
+
+
+def test_the_customers_own_okay_well_after_the_acknowledgement_is_answered():
+    fake = FakeOle5(phase="collect", heard=["على أندرويد", "حسناً"], replies=["هل هناك شيء آخر؟", "ر."])
+
+    async def scenario(voice, page):
+        voice.utterance({}, WAV)
+        await until(lambda: page.said("reply"))
+        await idle(voice, page)
+        await asyncio.sleep(1.5)  # the acknowledgement «فهمت.» ended long before this began
+        voice.utterance({"since_bot_ms": 300}, WAV)
+        await until(lambda: len(page.said("reply")) == 2)
+        await idle(voice, page)
+
+    run(fake, scenario)
+    assert [t for t, _, _ in fake.sent] == ["على أندرويد", "حسناً"]
+
+
+def test_fixed_lines_come_whole_and_stream_when_the_cache_fails():
+    fake = FakeOle5(heard=["كيف أؤرشف مراسلة؟"], replies=["الجواب."])
+
+    async def broken(text, language):
+        raise OSError("disk")
+
+    async def scenario(voice, page):
+        voice.utterance({}, WAV)
+        await until(lambda: page.said("reply"))
+        await idle(voice, page)
+        voice.backend.cached = broken
+        voice.speaker.say("line", line("there"), "ar", fixed=True)
+        await until(lambda: len(page.events("tts_end")) == 3)
+
+    page = run(fake, scenario)
+    starts = page.events("tts_start")
+    assert [m["whole"] for m in starts] == [True, False, False]  # cached ack; reply streams; the line streams
+    assert line("there") in fake.spoken
+
+
+def test_progress_silence_is_counted_from_the_end_of_what_was_heard_and_the_customer_holds_it():
+    fake = FakeOle5(heard=["شكراً جزيلاً"], replies=["الجواب."])  # no acknowledgement: nothing else is said
+    fake.gate = threading.Event()
+
+    async def scenario(voice, page):
+        voice.utterance({}, WAV)
+        await until(lambda: voice.turn is not None)
+        voice.speech(True)  # the customer talks on for longer than the silence a line waits for
+        await asyncio.sleep(0.4)
+        assert not page.said("filler")
+        voice.speech(False)
+        await until(lambda: page.said("filler"))
+        fake.gate.set()
+        await until(lambda: page.said("reply"))
+        await idle(voice, page)
+
+    run(fake, scenario, progress_every=0.1)
+
+
+def test_touch_reopens_connections_when_speech_starts_and_the_search_returns():
+    fake = FakeOle5(heard=["كيف أؤرشف مراسلة؟"], replies=["الجواب."])
+    fake.events = [{"type": "search_started"}, {"type": "search_done", "searches": 1, "found": True}]
+    touched = []
+
+    async def touch():
+        touched.append(1)
+
+    async def scenario(voice, page):
+        voice.backend.touch = touch
+        voice.speech(True)
+        voice.utterance({}, WAV)
+        await until(lambda: page.said("reply"))
+        await idle(voice, page)
+
+    run(fake, scenario)
+    assert len(touched) >= 3  # speech start, the turn's start, the search's end
+
+
+def test_an_unanswered_question_gets_one_silence_prompt():
+    fake = FakeOle5(heard=["عندي مشكلة في البريد"], replies=["هل تظهر لك رسالة خطأ؟"])
+
+    async def scenario(voice, page):
+        voice.utterance({}, WAV)
+        await until(lambda: page.said("reply"))
+        await until(lambda: line("idle_prompt") in page.said())
+        await asyncio.sleep(0.4)  # once only
+        await idle(voice, page)
+
+    page = run(fake, scenario, idle_after=0.2)
+    assert page.said().count(line("idle_prompt")) == 1
+
+
+def test_no_silence_prompt_after_a_statement_while_muted_or_once_a_ticket_exists():
+    for reply, muted, tickets in (("تم حفظ الملاحظة.", False, []), ("هل تريد شيئاً آخر؟", True, []),
+                                  ("هل تريد شيئاً آخر؟", False, [{"ticket_number": "T-1"}])):
+        fake = FakeOle5(heard=["سؤال عن البريد الوارد"], replies=[reply])
+        fake.after = {"created_tickets": tickets}
+
+        async def scenario(voice, page, muted=muted):
+            voice.mute(muted)
+            voice.utterance({}, WAV)
+            await until(lambda: page.said("reply"))
+            await idle(voice, page)
+            await asyncio.sleep(0.5)
+
+        assert line("idle_prompt") not in run(fake, scenario, idle_after=0.2).said(), (reply, muted, tickets)
+
+
+def test_the_customer_starting_to_speak_cancels_the_silence_prompt():
+    fake = FakeOle5(heard=["عندي مشكلة في البريد"], replies=["هل تظهر لك رسالة خطأ؟"])
+
+    async def scenario(voice, page):
+        voice.utterance({}, WAV)
+        await until(lambda: page.said("reply"))
+        await idle(voice, page)
+        voice.speech(True)
+        voice.speech(False)  # a cough: nothing sent, but the customer is there
+        await asyncio.sleep(0.5)
+
+    assert line("idle_prompt") not in run(fake, scenario, idle_after=0.2).said()

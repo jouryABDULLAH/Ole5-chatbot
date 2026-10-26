@@ -41,6 +41,15 @@ POLITE = _norm("لو سمحت", "من فضلك", "please", "ok", "okay", "اوك
 # Acknowledgements: listening sounds, never a decision on their own.
 ACK = _norm("تمام", "تامام", "تاما", "طيب", "اوكي", "اوكيه", "اوك", "حسنا", "زين", "ماشي", "اها", "اه", "امم", "مم", "ممم", "ok", "okay",
             "okey", "alright", "all right", "hmm", "mhm", "mhmm", "mm hmm", "uh huh", "tama", "tamam")
+# The assistant's own acknowledgements (D38) that are not the customer's: their echo during a turn is a listening
+# sound, but they stay out of ACK, so the confirm table and D15 are unchanged ("فهمت" after "just to confirm" means
+# "I understood the instructions", not "submit").
+OWN_ACK = _norm("فهمت", "يسعدني ذلك", "got it", "certainly")
+# Greetings and how-are-you: answered by Ole5 at once, with no acknowledgement before it.
+GREETING = _norm("السلام عليكم", "السلام", "عليكم السلام", "وعليكم السلام", "مرحبا", "مرحبتين", "هلا", "هلا والله", "اهلا",
+                 "اهلين", "صباح الخير", "مساء الخير", "كيف حالك", "كيف الحال", "كيفك", "شلونك", "عساك بخير",
+                 "اهلا وسهلا", "مرحبا بك", "يا هلا", "hi", "hello", "hey", "hi there", "hello there", "hey there",
+                 "good morning", "good afternoon", "good evening", "how are you")
 # A plain yes: an answer to a direct question. Polite words alone ("لو سمحت", "please") are not a yes.
 YES = _norm("نعم", "ايه", "اي", "ايوه", "ايوا", "اكيد", "موافق", "naam", "aywa", "yes", "yeah", "yep", "sure",
             "of course")
@@ -65,7 +74,7 @@ NEGATION = _norm("لا", "لاء", "مو", "ما", "بلاش", "الغ", "الغ
 KNOWN_SHORT = _norm("hi", "oh", "اوه", "بس", "هل", "من", "في", "و", "يا", "is", "it", "me", "my", "on", "to")
 
 PHRASES = frozenset().union(*COMMANDS.values(), STOP_WHILE_TALKING, POLITE, ACK, YES, SUBMIT, THANKS, CONFIRM_FILLER,
-                            CONTENT_FREE, NEGATION)
+                            CONTENT_FREE, NEGATION, GREETING, OWN_ACK)
 LONGEST = max(len(p.split()) for p in PHRASES)
 
 
@@ -156,7 +165,7 @@ def is_short_sound(text: str, seconds: float | None) -> bool:
 def is_backchannel(text: str) -> bool:
     """True for "تمام", "ايه", "ok thanks", "all right" and the like: what a listener says while the assistant talks."""
     found = tokens(text)
-    return bool(found) and len(found) <= 3 and all(t in ACK or t in YES or t in THANKS for t in found)
+    return bool(found) and len(found) <= 3 and all(t in ACK or t in YES or t in THANKS or t in OWN_ACK for t in found)
 
 
 ConfirmKind = Literal["submit", "ack", "unclear", "other"]
@@ -204,6 +213,21 @@ def is_thanks(text: str) -> bool:
     return bool(found) and all(t in THANKS or t in POLITE for t in found) and any(t in THANKS for t in found)
 
 
+def is_greeting(text: str) -> bool:
+    """Only a greeting or how-are-you, maybe with thanks or a polite word: nothing to look up."""
+    found = tokens(text)
+    return bool(found) and all(t in GREETING or t in POLITE or t in THANKS or t in ACK or t in OWN_ACK
+                               for t in found) \
+        and any(t in GREETING for t in found)
+
+
+def is_no(text: str) -> bool:
+    """A bare no ("لا شكراً", "no thanks"): Ole5's own reply acknowledges it."""
+    found = tokens(text)
+    return bool(found) and all(t in NEGATION or t in POLITE or t in THANKS for t in found) \
+        and any(t in NEGATION for t in found)
+
+
 def is_fragment(text: str) -> bool:
     """One or two letters that are not a known word: what Whisper makes of a short word it missed ("E", "y")."""
     found = tokens(text)
@@ -229,10 +253,21 @@ def is_question(text: str) -> bool:
 
 
 LINES = {
-    "searching":{"ar": "لحظات من فضلك، أتحقق من ذلك.", "en": "One moment please, let me check that."},
+    # No line may hold a command, a yes or a send word: its echo would be heard as the customer saying it (the English
+    # "one moment please" was a wait; tests/test_voice_rules.py checks every line).
+    "searching": {"ar": "لحظات من فضلك، أتحقق من ذلك.", "en": "Let me check that for you."},
     "still_checking": {"ar": "ما زلت أتحقق، شكراً لصبرك.", "en": "I am still checking. Thank you for your patience."},
-    "still_looking": {"ar": "ما زلت أبحث في الأدلة، لحظات من فضلك.",
-                      "en": "Still looking through the documentation, one moment please."},
+    "still_looking": {"ar": "ما زلت أبحث في أدلة الاستخدام.", "en": "Still looking through the documentation."},
+    "long_wait": {"ar": "يستغرق هذا وقتاً أطول قليلاً، وما زلت أعمل عليه.",
+                  "en": "This is taking a little longer, but I'm still working on it."},
+    "not_done": {"ar": "لم أنتهِ بعد، أواصل البحث.", "en": "Not done yet, I'm still searching."},
+    # Said once when a question of the assistant's has gone unanswered (D17): a statement, so nothing is asked twice.
+    "idle_prompt": {"ar": "أنا هنا إن احتجت إلى أي مساعدة.", "en": "I'm here whenever you're ready."},
+    # The first acknowledgement, said as soon as what the customer said goes to Ole5 (D38).
+    "ack_ok": {"ar": "حسناً.", "en": "Okay."},
+    "ack_accept": {"ar": "يسعدني ذلك.", "en": "Certainly."},  # «بكل سرور» came back «بكل سرق» every take
+    "ack_noted": {"ar": "فهمت.", "en": "Got it."},
+    "submitting": {"ar": "حسناً، سأرسل التذكرة الآن.", "en": "Okay, sending the ticket now."},
     "apology": {"ar": "عذراً، حدث خطأ من جهتنا. هل تعيد ما قلته من فضلك؟",
                 "en": "Sorry, something went wrong on our side. Could you say that again?"},
     "late": {"ar": "عذراً، هذا يستغرق وقتاً أطول من المعتاد. سيظهر الرد على الشاشة حين يصل.",

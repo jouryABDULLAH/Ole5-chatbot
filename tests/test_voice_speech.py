@@ -266,3 +266,13 @@ def test_the_number_sentence_stays_before_the_next_issues_question():
     arabic = speakable.speakable(f"تم إنشاء التذكرة. رقم تذكرتك هو {NUMBER}. هل تريد أن أفتح تذكرة للمشكلة الأخرى؟", "ar",
                                  [NUMBER])
     assert arabic.endswith("هل تريد أن أفتح تذكرة للمشكلة الأخرى؟") and "ظاهر على شاشتك" in arabic
+
+
+def test_a_take_far_faster_than_the_voice_speaks_was_cut_short():
+    english = ("Install the app. Sign in with your credentials. Do you see any error message when the app closes, "
+               "and does it happen on every phone or only on one?")
+    assert tts.cut_short(english, "en", 3.7)  # seen on 2026-10-26: the question at the end was lost
+    assert not tts.cut_short(english, "en", 7.5)
+    arabic = "ثم اضغط على نسيت كلمة المرور، وأدخل بريدك الإلكتروني المسجل في النظام لتصلك رسالة فيها الرابط."
+    assert tts.cut_short(arabic, "ar", 3.0) and not tts.cut_short(arabic, "ar", 6.5)
+    assert not tts.cut_short("Got it.", "en", 0.3)  # too short to judge

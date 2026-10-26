@@ -29,6 +29,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 os.environ["TRACING"] = "false"
 sys.stdout.reconfigure(encoding="utf-8")
+if os.environ.get("VOICE_LOG"):  # the voice modules' own timing lines (stt, tts, turn), printed among the steps
+    import logging
+    logging.basicConfig(format="      log %(message)s", stream=sys.stdout)
+    logging.getLogger("ole5_chat.voice").setLevel(logging.INFO)
 
 from ole5_chat.voice import rules  # noqa: E402
 
@@ -133,8 +137,8 @@ async def check_tts() -> None:
 
 
 # Demo scenarios (VOICE_PLAN.md section 10) as steps: a recording (by mic-lab phrase id) or typed text, and the phase
-# expected after it (None: not checked). Typed text stands in where no recording exists. "during": a recording sent
-# DURING_S after the step before it, while that step's turn still runs (it is held, then answered).
+# expected after it (None: not checked). Typed text stands in where no recording exists. "during": a recording said
+# while the step before it is still being answered, a second after its first filler (it is held, then answered).
 FLOWS = {
     "ar_kb": [("rec", "s1_kb_password", None)],
     "en_ticket": [("rec", "s2_en_crash", "offer_ticket"), ("rec", "w_yes", "collect"), ("rec", "s2_en_detail", "collect"),
@@ -143,10 +147,14 @@ FLOWS = {
     "ar_urgent": [("rec", "s3_urgent", "confirm"), ("rec", "s3_send", "none")],
     "held": [("rec", "s1_kb_archive", None), ("during", "s1_kb_password", None)],
 }
-DURING_S = 4.0
 REDEMPTION_S = 0.85  # the browser sends an utterance this long after the customer stops (web/voice.js, D30)
 LEAD_S = 0.12  # a silent player starts this long after its first frame arrives (web/voice.js)
+WHOLE_LEAD_S = 0.02  # ... or this long, for audio sent complete in one piece
+TAIL_S = 0.6  # speech starting in the assistant's last 0.6 s is not over it (web/voice.js)
+OVER_REDEMPTION_S = 0.5  # the detector's wait for speech that began over the assistant (web/voice.js)
+PRE_PAD_S = 0.3  # each recorded clip starts this long before the voice (the detector's pre-speech pad)
 DEAD_AIR_S = 1.5  # the CP3 target: no silence longer than this after the customer stops
+REPLY_GAP_S = 0.4  # the customer starts speaking this long after the assistant stops
 
 
 class Page:
@@ -157,13 +165,15 @@ class Page:
         self.out, self.session = [], None
         self.end = 0.0  # when everything queued so far will have played
         self.sound: list[list] = []
+        self.whole = False
         self._played: list[asyncio.TimerHandle] = []
 
     async def json(self, data):
         now = time.perf_counter()
         self.out.append({**data, "at": now})
         if data["type"] == "tts_start":
-            self.sound.append([None, None, data["kind"], data["text"]])
+            self.sound.append([None, None, data["kind"], data["text"], data["id"]])
+            self.whole = bool(data.get("whole"))
         elif data["type"] == "tts_end" and not data["cancelled"]:
             ends = self.sound[-1][1] or now
             self._played.append(asyncio.get_running_loop().call_later(max(0.0, ends - now), self.session.played,
@@ -178,14 +188,15 @@ class Page:
 
     async def audio(self, data):
         now = time.perf_counter()
-        start = self.end if self.end > now else now + LEAD_S
+        start = self.end if self.end > now else now + (WHOLE_LEAD_S if self.whole else LEAD_S)
         self.end = start + len(data) / 2 / 24000
         item = self.sound[-1]
         item[0] = start if item[0] is None else item[0]
         item[1] = self.end
 
-    def audible(self, at: float) -> bool:
-        return any(s[0] is not None and s[0] <= at < s[1] for s in self.sound)
+    def audible(self, at: float) -> str | None:
+        """The id of the item heard at that moment, if any."""
+        return next((s[4] for s in self.sound if s[0] is not None and s[0] <= at < s[1]), None)
 
     def last_end(self, at: float) -> float | None:
         return max((s[1] for s in self.sound if s[1] is not None and s[1] <= at), default=None)
@@ -202,9 +213,10 @@ def timeline(page: Page, mark: int, spoke_at: list[float], began: float) -> list
              ("ole5 done", next((m["at"] for m in out if m["type"] == "view"), None))]
     lines.append("    stages after the customer stopped: " + ", ".join(
         f"{name} {at - stopped:.1f}s" for name, at in marks if at))
-    sounds = sorted((s for s in page.sound if s[0] is not None and s[1] > s[0] and s[1] > stopped), key=lambda s: s[0])
+    sounds = sorted((s for s in page.sound if s[0] is not None and s[1] > s[0] and s[0] >= stopped - 0.05),
+                    key=lambda s: s[0])  # what started after the customer stopped (5 ms timer slack)
     cursor, gaps = stopped, []
-    for start, end, kind, text in sounds:
+    for start, end, kind, text, _ in sounds:
         if start - cursor > 0:
             gaps.append((start - cursor, cursor, kind, text))
         lines.append(f"    {start - stopped:5.1f}-{end - stopped:5.1f}s [{kind}] {text[:70]}")
@@ -221,42 +233,67 @@ def timeline(page: Page, mark: int, spoke_at: list[float], began: float) -> list
 async def run_flow(name: str, steps: list, folder: Path, email: str) -> dict:
     from ole5_chat import sessions
     from ole5_chat.voice import fillers
-    from ole5_chat.voice.session import VoiceSession
+    from ole5_chat.voice.api import _touch, _warm
+    from ole5_chat.voice.session import Backend, VoiceSession
 
     entries = json.loads((folder / "recordings.json").read_text(encoding="utf-8"))
     files, seconds = {}, {}
     for e in entries:
         if e["kind"].startswith("vad"):
             files.setdefault(e["phrase"], folder / e["file"])
+    from ole5_chat.voice import stt, tts
+    stt._client = tts._client = None  # each flow runs in its own event loop; a client (and its pool) belongs to one
     await fillers.warm()  # new fixed lines are made and heard back before the flow needs them
     sid, _ = sessions.start(email)
     page = Page()
-    voice = VoiceSession(sid, page.json, page.audio)
+    voice = VoiceSession(sid, page.json, page.audio, Backend(warm=_warm, touch=_touch))  # as the server makes it
     page.session = voice
     await voice.start()
+    while voice.speaker.busy:  # the greeting is heard out before the customer speaks
+        await asyncio.sleep(0.1)
     ok, stats = True, {"first": [], "worst": [], "long": 0}
     print(f"\n=== {name} ===")
     group = None
     try:
         for i, (kind, what, want) in enumerate(steps):
+            if kind == "typed":
+                while page.end > time.perf_counter():
+                    await asyncio.sleep(0.05)
+                await asyncio.sleep(REPLY_GAP_S)
+            if kind in ("rec", "during"):
+                if kind == "rec":  # the customer answers once the assistant stops
+                    await asyncio.sleep(REPLY_GAP_S)
+                else:  # asked while the turn before still runs: a second after its first filler started
+                    for _ in range(600):
+                        if any(m["type"] == "tts_start" and m["kind"] == "filler" for m in page.out[group[0]:]):
+                            break
+                        await asyncio.sleep(0.05)
+                    await asyncio.sleep(1.0)
+                voice.speech(True)  # the browser reports the voice starting
+                started_over = page.end - time.perf_counter() > TAIL_S  # judged at speech start, as voice.js does
+                # The clip holds the 0.3 s before the voice and the detector's 0.85 s after it: it is sent at its end,
+                # or 0.35 s sooner over the assistant (the detector then waits 500 ms).
+                await asyncio.sleep((len(files[what].read_bytes()) - 44) / 32000 - PRE_PAD_S
+                                    - (REDEMPTION_S - OVER_REDEMPTION_S if started_over else 0.0))
             now = time.perf_counter()
             if group is None:
-                group = (len(page.out), [now if kind == "typed" else now - REDEMPTION_S], now, what)
+                stop_wait = 0.0 if kind == "typed" else OVER_REDEMPTION_S if started_over else REDEMPTION_S
+                group = (len(page.out), [now - stop_wait], now, what)
             if kind == "typed":
                 voice.typed(what)
             else:
                 wav = files[what].read_bytes()
-                spoke = now - REDEMPTION_S - (len(wav) - 44) / 32000  # when the customer started speaking
-                over = page.audible(spoke)
+                over = kind != "typed" and started_over
+                spoke = now - (len(wav) - 44) / 32000 + PRE_PAD_S + (REDEMPTION_S - OVER_REDEMPTION_S if over else 0.0)
+                playing = page.audible(spoke)
                 last = page.last_end(spoke)
-                voice.utterance({"over_bot": over, "over_id": "", "since_bot_ms": None if over or last is None
-                                 else (spoke - last) * 1000}, wav)
+                since = 0 if playing else None if last is None or spoke - last > 5 else (spoke - last) * 1000
+                voice.utterance({"over_bot": over, "over_id": playing if over else "", "since_bot_ms": since}, wav)
             for _ in range(300):  # the step has been heard (or, typed, has started a turn or been held)
                 if any(m["type"] in ("heard", "ignored", "turn") for m in page.out[group[0]:]) or voice.held:
                     break
                 await asyncio.sleep(0.1)
             if i + 1 < len(steps) and steps[i + 1][0] == "during":
-                await asyncio.sleep(max(0.0, DURING_S - (time.perf_counter() - now)))
                 continue
             await asyncio.sleep(0.3)
             for _ in range(1800):  # up to 180 s for the turn and what it says, played out
@@ -276,7 +313,7 @@ async def run_flow(name: str, steps: list, folder: Path, email: str) -> dict:
                   f"{', tickets ' + str(tickets) if tickets else ''}]")
             report = timeline(page, mark, spoke_at, began)
             print("\n".join(report))
-            sounds = sorted((s for s in page.sound if s[0] is not None and s[1] > s[0] and s[1] > spoke_at[0]),
+            sounds = sorted((s for s in page.sound if s[0] is not None and s[1] > s[0] and s[0] >= spoke_at[0] - 0.05),
                             key=lambda s: s[0])
             if sounds:
                 stats["first"].append(sounds[0][0] - spoke_at[0])

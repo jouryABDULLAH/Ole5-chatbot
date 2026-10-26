@@ -138,8 +138,11 @@ def search(state: ChatState) -> dict:
                 result = tool.invoke(call)
             convo.append(result)
     log.info("search  next=%s searches=%d", state.get("next"), len(sink))
-    _emit({"type": "search_done", "searches": len(sink)})
-    return {"last_retrieval": merge(sink).as_json() if sink else None}
+    merged = merge(sink) if sink else None
+    # found: the knowledge base had something to answer from (the voice channel says so while the answer is written).
+    _emit({"type": "search_done", "searches": len(sink),
+           "found": bool(merged and merged.verdict != Verdict.NOT_IN_KB and not merged.error)})
+    return {"last_retrieval": merged.as_json() if merged else None}
 
 
 # Writing the reply.

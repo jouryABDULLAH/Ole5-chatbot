@@ -21,7 +21,7 @@ from groq import AsyncGroq
 
 from ole5_chat.agent.validate import script_language
 from ole5_chat.config import get_settings
-from ole5_chat.voice import rules
+from ole5_chat.voice import groqhttp, rules
 from ole5_chat.voice.rules import TASHKEEL
 
 log = logging.getLogger(__name__)
@@ -63,7 +63,8 @@ def new_client() -> AsyncGroq:
     s = get_settings()
     if not s.groq_api_key:
         raise RuntimeError("GROQ_API_KEY is not set")
-    return AsyncGroq(api_key=s.groq_api_key.get_secret_value(), timeout=10.0, max_retries=1)
+    return AsyncGroq(api_key=s.groq_api_key.get_secret_value(), timeout=10.0, max_retries=1,
+                     http_client=groqhttp.http_client())
 
 
 def client() -> AsyncGroq:
@@ -74,12 +75,26 @@ def client() -> AsyncGroq:
     return _client
 
 
+_used = 0.0  # when a request last went out on the client
+STALE_S = 40.0  # idle this long, a connection may be closed (open was measured up to 45 s): reopened on speech start
+
+
 async def warm() -> None:
-    """Opens the connection before the first utterance: the first request of a client took ~1.4 s instead of ~0.3."""
+    """Opens both connections (one per parallel call) before the first utterance: the first request of a client
+    took ~1.4 s instead of ~0.3, and a second concurrent request opens a connection of its own."""
+    global _used
     try:
-        await client().models.list()
+        _used = time.monotonic()
+        await asyncio.gather(client().models.list(), client().models.list())
     except Exception:
         log.warning("voice  speech-to-text warm-up failed", exc_info=True)
+
+
+async def touch() -> None:
+    """The customer started talking: if the connections sat idle long enough to be closed, they are opened again
+    while they speak (an utterance arrives a second or more later)."""
+    if time.monotonic() - _used > STALE_S:
+        await warm()
 
 
 def seconds_of(wav: bytes) -> float:
@@ -108,8 +123,11 @@ class _Take:
 
 
 async def _whisper(wav: bytes, language: str, hint: str | None, api: AsyncGroq | None = None) -> _Take:
+    global _used
     s = get_settings()
     extra = {"prompt": hint} if hint else {}
+    if api is None:  # the warm-up thread's own client says nothing about this one's connections
+        _used = time.monotonic()
     result = await (api or client()).audio.transcriptions.create(model=s.voice_stt_model, file=("speech.wav", wav),
                                                         language=language, response_format="verbose_json",
                                                         temperature=0, **extra)
