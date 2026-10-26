@@ -162,7 +162,8 @@ def _answer(convo, retrieval: Retrieval, exchange: str, language: str,
     """The reply from DIRECT passages, with its status and the sources it names, kept only if they are DIRECT titles.
 
     A reply that states what no passage says is written once more. If it still does, it becomes the no-answer
-    wording. A reply that names no source is kept: it may be a clarifying question."""
+    wording. A reply that names no source is kept: it may be a clarifying question. Called only when last_retrieval
+    has DIRECT passages."""
     direct = list(dict.fromkeys(e.document for e in retrieval.direct))
     rule = HumanMessage(content=NOTE + STATUS.format(schema=llm.schema_text(Answer)))
     for attempt in (1, 2):
