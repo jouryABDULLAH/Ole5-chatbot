@@ -1,4 +1,4 @@
-"""Talk and question conversations through the graph, printing the reply, next, phase, pending, sources, corrections and time after each turn."""
+"""Talk, question and ticket-status conversations through the graph, printing the reply, next, phase, pending, sources, corrections and time after each turn."""
 import os, sys, time
 from pathlib import Path
 
@@ -16,6 +16,8 @@ CONVERSATIONS = [
     ["what can you do?"],
     ["عندي مشكلة", "no", "nothing", "i have no problems!", "شكراً"],
     ["كيف اضيف علامة مائية؟ وكيف اعيد تعيين كلمة المرور؟"],
+    ["وش صار على تذكرتي؟"],
+    ["هل يمكن جدولة إرسال مراسلة في وقت لاحق؟", "ايه", "هذا كل شيء", "ارسلها", "وش صار على تذكرتي؟"],
 ]
 
 for n, turns in enumerate(CONVERSATIONS, 1):
