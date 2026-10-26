@@ -73,17 +73,20 @@ OLE5_EXAMPLES = {
     ("offer_ticket", "decline"): ['"لا شكراً"', '"no, it\'s fine"', '"ألغها"', '"cancel it"'],
     ("offer_ticket", "question"): ['"طيب وكيف أغير كلمة المرور؟"'],
     ("offer_ticket", "talk"): ['"مين أنت؟"'],
+    ("offer_ticket", "status"): ['"قبل كذا، التذكرة القديمة وش صار عليها؟"'],
     ("collect", "details"): ['"تطلع رسالة Access denied"', '"ما أعرف"', '"[attached: screen.png]"'],
     ("collect", "done"): ['"هذا كل شيء"', '"لا" (when the assistant asked whether there is anything else)',
                           '"التطبيق يقفل لحاله بعد التحديث، وهذا اللي أعرفه"', '"ما عندي شي ثاني، افتح التذكرة"'],
     ("collect", "cancel"): ['"خلاص ألغ التذكرة"'],
     ("collect", "question"): ['"ايش يعني درجة السرية؟"'],
     ("collect", "talk"): ['"ليش تحتاج هالمعلومة؟"'],
+    ("collect", "status"): ['"التذكرة اللي فتحتها وش صار عليها؟"'],
     ("confirm", "yes"): ['"ارسلها"', '"submit it"'],
     ("confirm", "change"): ['"خل الأولوية عالية"'],
     ("confirm", "cancel"): ['"لا، ألغها"'],
     ("confirm", "question"): ['"كم ياخذ الرد عادة؟"'],
     ("confirm", "talk"): ['"لحظة، بشوف شي"'],
+    ("confirm", "status"): ['"وصلتكم تذكرتي اللي قبل؟"'],
 }
 
 EXAMPLES = {

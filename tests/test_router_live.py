@@ -25,6 +25,7 @@ SUMMARY = "Your ticket summary is ready. Shall I submit it?"
 ARCHIVE = "The archive button does nothing"
 DENIED = "Access denied when opening a correspondence"
 ANSWER = "To add a watermark, open the document settings and choose Watermark."
+CREATED = "تم إنشاء التذكرة، وسيرد فريق الدعم عبر البريد الإلكتروني."
 
 # phase, the issue being handled, the assistant's last message, the customer's message, the expected next.
 CASES = [
@@ -69,6 +70,10 @@ HELD_OUT = [
     ("offer_ticket", ARCHIVE, OFFER, "لا ما يحتاج thanks", "decline"),
     ("none", None, GREETING, "my ticket number is T-123, any update?", "status"),
     ("none", None, GREETING, "رفعت تذكرة أمس، وصلتكم؟", "status"),
+    ("none", None, CREATED, "ما رقمها؟", "status"),
+    ("offer_ticket", ARCHIVE, OFFER, "before that, did you get my last ticket?", "status"),
+    ("collect", DENIED, ERROR, "طيب تذكرتي الأولى وش وضعها؟", "status"),
+    ("confirm", ARCHIVE, SUMMARY, "what's happening with my other ticket?", "status"),
     ("none", None, GREETING, "كل المستخدمين عندنا طالعين من النظام وما أحد يقدر يدخل", "urgent"),
     ("none", None, GREETING, "nobody in our ministry can log in since 8am, شغلنا واقف", "urgent"),
     ("none", None, GREETING, "أبي أرحّل الأرشيف القديم حقنا للنظام", "ticket"),
