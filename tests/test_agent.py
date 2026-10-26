@@ -251,20 +251,21 @@ def test_status_in_collect_lists_the_tickets_and_goes_back_to_the_draft(new_path
     sheet_tickets(monkeypatch, [ticket_row(email.upper()), ticket_row("someone@else.com", "T-2", "8")], {"7": "open"})
     state, prompt_text = new_path(sid, "وش صار على تذكرتي؟", "status", [AIMessage(content="T-1 مفتوحة.")])
     assert "- T-1, Archive button, 2026-10-01, open" in prompt_text and "T-2" not in prompt_text
+    assert "one per line as number, title, date, state" in prompt_text and "never the word unknown" in prompt_text
     assert "Then continue the current ticket: ask what else the support team needs for" in prompt_text
     assert state["phase"] == "collect" and state["pending"] == before["pending"]
     assert state["ticket_draft"] == before["ticket_draft"]
 
 
-def test_status_lists_the_five_newest_tickets_newest_first_with_dates_only(new_path, monkeypatch):
+def test_status_gives_every_ticket_newest_first_with_dates_only(new_path, monkeypatch):
     sid = chat()
     email = sessions.get(sid)["identity"].email
     rows = [{**ticket_row(email, f"T-{n}", str(n)), "created_at": f"2026-10-0{n}T09:00:00+00:00"} for n in range(1, 7)]
     sheet_tickets(monkeypatch, rows, {str(n): "open" for n in range(1, 7)})
     _, prompt_text = new_path(sid, "what's the status of my tickets?", "status", [AIMessage(content="Your tickets.")])
     listed = [line.split(",")[0][2:] for line in prompt_text.splitlines() if line.startswith("- T-")]
-    assert listed == ["T-6", "T-5", "T-4", "T-3", "T-2"] and "- T-6, Archive button, 2026-10-06, open" in prompt_text
-    assert "Today: " in prompt_text and "Titles and states stay as written" in prompt_text
+    assert listed == ["T-6", "T-5", "T-4", "T-3", "T-2", "T-1"] and "- T-6, Archive button, 2026-10-06, open" in prompt_text
+    assert "Today: " in prompt_text and "give the 5 most recent and say how many more there are" in prompt_text
 
 
 def test_a_ticket_whose_state_cannot_be_read_shows_unknown(new_path, monkeypatch):

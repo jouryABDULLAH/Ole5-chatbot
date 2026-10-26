@@ -21,9 +21,6 @@ HANDLERS = {"ticket": "queue", "urgent": "queue", "question": "chat", "talk": "c
             "status": "status"}
 NOT_CREATED = "The ticket could not be created. Say so in one line and ask them to try again."
 NOT_READ = "The list of their tickets could not be read right now. Say so in one line and ask them to try again later."
-# How many tickets a status reply lists: the most recent ones.
-STATUS_TICKETS = 5
-
 
 def advance(pending: list[PendingIssue]) -> Phase:
     return "none" if not pending else "offer_ticket"
@@ -162,7 +159,7 @@ def status(state: ChatState) -> dict:
     except Exception as exc:  # A missing, locked or corrupt sheet: the only thing to do is say try again.
         log.warning("handlers  tickets not read: %s", exc)
         return {"task": _then(NOT_READ, back), "corrections": state["corrections"] + [f"status lookup failed: {exc}"]}
-    recent = sorted(found, key=lambda t: t["created_at"], reverse=True)[:STATUS_TICKETS]
+    recent = sorted(found, key=lambda t: t["created_at"], reverse=True)
     lines = "\n".join(f"- {t['ticket_number']}, {t['title']}, {t['created_at'][:10]}, {t['state'] or 'unknown'}"
                       for t in recent)
     today = datetime.now(timezone.utc).date().isoformat()

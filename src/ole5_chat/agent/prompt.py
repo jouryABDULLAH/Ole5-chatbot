@@ -186,11 +186,15 @@ TASKS = {
                "email. Nothing more.",
     "cancelled": "The customer cancelled the ticket. Acknowledge it in one line and say they can contact support at any "
                  "time.",
-    "status": "The customer asked about their tickets. Today: {today}. These are the most recent tickets on their "
-              "account, newest first, from the ticket system:\n{tickets}\nList them as given: number, title, state, "
-              "date. Titles and states stay as written; your own words follow the customer's language. State nothing "
-              "that isn't in the list, no timeframes, no promises. If the customer asked about one ticket in "
-              "particular, give that one.",
+    "status": "The customer asked about their tickets. Today: {today}. These are the tickets on their account, newest "
+              "first, from the ticket system, one per line as number, title, date, state:\n{tickets}\nAnswer in "
+              "sentences, not as a list copied from above: one ticket is one sentence; several are one line each. "
+              "Give the number, title, date and state. Titles stay as written; your own words follow the customer's "
+              "language. A state of unknown means the system didn't return one: say the state isn't available right "
+              "now, never the word unknown. If the customer asked about one ticket (the latest, a number, a title, a "
+              "date), give that one only. If they didn't say which, give the 5 most recent and say how many more there "
+              "are. If they ask about a ticket not in the list, say you have no record of it here. State nothing that "
+              "isn't in the list: no timeframes, no promises, nothing about what the team is doing.",
     "status_none": "The customer asked about their tickets. There are no tickets on their account from this chat. Say "
                    "so in one line, and that they can describe a problem here to get help or open one. Don't ask "
                    "whether to open a ticket.",
