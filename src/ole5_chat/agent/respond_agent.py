@@ -4,8 +4,8 @@ search: on a question turn the model writes the searches, one per reply, and cod
 through: a ticket turn is an answer about the ticket, and a question asked during a ticket is routed to question.
 
 respond_agent: writes the reply, with no tool.
-- DIRECT passages: answer from them with a status. A grounding call names the documents the reply uses (the sources)
-  and any statement no passage makes.
+- DIRECT passages: answer from them with a status and the documents used (the sources, kept only if DIRECT). A
+  grounding call names any statement no passage makes.
 - A question with no DIRECT passage: the no-answer wording.
 - Anything else: a plain reply.
 Code, not the model, decides whether the reply offers a ticket: on a question turn whose status is not answered."""
@@ -38,18 +38,18 @@ CHINESE = re.compile(r"[一-鿿㐀-䶿]")
 STATUS = ("Reply with JSON only, matching this schema: {schema}\nreply is your message to the customer. status is "
           "answered when the passages answer what the customer asked, partial when they answer only part of it and the "
           "reply offers a ticket for the rest, no_answer when they don't answer it and the reply says so and offers a "
-          "ticket. On a turn where the customer asked nothing, status is answered.")
+          "ticket. On a turn where the customer asked nothing, status is answered. sources lists the document titles, "
+          "as written in the passages, that your reply draws on; empty if none.")
 UNSUPPORTED = "Remove these from your reply; no passage states them: {}. Keep only what the passages say."
-UNUSED = "Your reply draws on none of the passages. Write what they say about the customer's question, and nothing more."
 
 
 class Answer(BaseModel):
     status: Literal["answered", "partial", "no_answer"]
     reply: str
+    sources: list[str]
 
 
 class Grounding(BaseModel):
-    used: list[str]
     unsupported: list[str]
 
 
@@ -159,10 +159,10 @@ def _ground(exchange: str, text: str, retrieval: Retrieval) -> Grounding:
 
 def _answer(convo, retrieval: Retrieval, exchange: str, language: str,
             corrections: list[str]) -> tuple[str, list[str], str]:
-    """The reply from DIRECT passages, with its sources and status.
+    """The reply from DIRECT passages, with its status and the sources it names, kept only if they are DIRECT titles.
 
-    A reply that states what no passage says, or uses no passage, is written once more. If it still fails, it becomes
-    the no-answer wording."""
+    A reply that states what no passage says is written once more. If it still does, it becomes the no-answer
+    wording. A reply that names no source is kept: it may be a clarifying question."""
     direct = list(dict.fromkeys(e.document for e in retrieval.direct))
     rule = HumanMessage(content=NOTE + STATUS.format(schema=llm.schema_text(Answer)))
     for attempt in (1, 2):
@@ -175,23 +175,22 @@ def _answer(convo, retrieval: Retrieval, exchange: str, language: str,
         convo.append(AIMessage(content=answer.reply))
         if answer.status == "no_answer":
             return answer.reply, [], "no_answer"
+        sources = [d for d in direct if any(d in s for s in answer.sources)]
         try:
             grounding = _ground(exchange, answer.reply, retrieval)
         except llm.ModelFailed as exc:
             log.warning("respond_agent  grounding call failed: %s", str(exc)[:300])
             corrections.append("grounding call failed")
-            return answer.reply, direct, answer.status
-        used = [d for d in direct if any(d in u for u in grounding.used)]
-        log.info("respond_agent  attempt=%d status=%s used=%s unsupported=%s", attempt, answer.status, used,
+            return answer.reply, sources, answer.status
+        log.info("respond_agent  attempt=%d status=%s sources=%s unsupported=%s", attempt, answer.status, sources,
                  grounding.unsupported)
-        if not grounding.unsupported and used:
-            return answer.reply, used, answer.status
-        if attempt == 1 and grounding.unsupported:
+        if not grounding.unsupported:
+            if answer.status == "answered" and not sources:
+                corrections.append("answered without a source")
+            return answer.reply, sources, answer.status
+        if attempt == 1:
             convo.append(HumanMessage(content=NOTE + UNSUPPORTED.format("; ".join(grounding.unsupported))))
             corrections.append("retried: unsupported")
-        elif attempt == 1:
-            convo.append(HumanMessage(content=NOTE + UNUSED))
-            corrections.append("retried: no passage used")
     corrections.append("reply not grounded")
     return _no_answer(convo, language, corrections), [], "no_answer"
 

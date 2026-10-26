@@ -135,10 +135,10 @@ def searching(*questions):
                                              for i, q in enumerate(questions)])
 
 
-def answer(status, reply, used=(), unsupported=()):
-    """What respond writes from DIRECT passages, and the grounding call's verdict on it."""
+def answer(status, reply, sources=(), unsupported=()):
+    """What respond writes from DIRECT passages, with the sources it names, and the grounding call's verdict on it."""
     from ole5_chat.agent.respond_agent import Answer, Grounding
-    return [Answer(status=status, reply=reply), Grounding(used=list(used), unsupported=list(unsupported))]
+    return [Answer(status=status, reply=reply, sources=list(sources)), Grounding(unsupported=list(unsupported))]
 
 
 def hit(*documents, verdict=Verdict.ANSWERABLE):
@@ -182,7 +182,7 @@ def test_respond_agent_keeps_a_partial_answer_that_offers_a_ticket(model, respon
     assert out["offered"] is True and out["corrections"] == []
 
 
-def test_respond_agent_cites_the_document_the_grounding_names(model, respond_node):
+def test_respond_agent_cites_the_document_the_reply_names(model, respond_node):
     model.add(*answer("answered", "Press Save as draft.", ["Guide"]))
     out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?"), DONE], [hit("Guide", "Manual")])
     assert out["reply"].say == "Press Save as draft." and out["reply"].sources == ["Guide"]
@@ -240,10 +240,10 @@ def test_a_declined_direct_passage_is_the_no_answer_without_a_retry(model, respo
     assert out["offered"] is True and out["corrections"] == [] and grounding(model) == []
 
 
-def test_respond_agent_cites_every_direct_document_when_grounding_fails(model, respond_node):
-    model.add(answer("answered", "Press Save as draft.")[0])
+def test_respond_agent_keeps_its_own_sources_when_grounding_fails(model, respond_node):
+    model.add(answer("answered", "Press Save as draft.", ["Guide"])[0])
     out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?"), DONE], [hit("Guide", "Manual")])
-    assert out["reply"].say == "Press Save as draft." and out["reply"].sources == ["Guide", "Manual"]
+    assert out["reply"].say == "Press Save as draft." and out["reply"].sources == ["Guide"]
     assert out["corrections"] == ["grounding call failed"] and out["offered"] is False
 
 
@@ -319,10 +319,23 @@ def test_the_search_node_runs_at_most_the_cap(respond_node, monkeypatch):
     assert out["reply"].say == "No answer." and out["offered"] is True
 
 
-def test_respond_agent_finds_the_title_inside_what_the_grounding_returns(model, respond_node):
+def test_respond_agent_finds_the_title_inside_the_sources_the_reply_names(model, respond_node):
     model.add(*answer("answered", "Press Save as draft.", ["[Guide] Saving drafts"]))
     out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?"), DONE], [hit("Guide", "Manual")])
     assert out["reply"].sources == ["Guide"] and out["corrections"] == []
+
+
+def test_a_source_that_is_not_a_direct_title_is_dropped(model, respond_node):
+    model.add(*answer("answered", "Press Save as draft.", ["Guide", "Admin handbook"]))
+    out, _ = respond_node("How do I save a draft?", [searching("How to save a draft?"), DONE], [hit("Guide")])
+    assert out["reply"].sources == ["Guide"] and out["corrections"] == []
+
+
+def test_an_answer_without_a_source_is_kept_and_logged(model, respond_node):
+    model.add(*answer("answered", "Which report do you mean?"))
+    out, fake = respond_node("The report doesn't come out", [searching("Report shows no results"), DONE], [hit("Guide")])
+    assert out["reply"].say == "Which report do you mean?" and out["reply"].sources == [] and out["offered"] is False
+    assert out["corrections"] == ["answered without a source"] and len(grounding(model)) == 1 and len(fake.calls) == 2
 
 
 def test_respond_agent_removes_unsupported_facts_on_retry(model, respond_node):
