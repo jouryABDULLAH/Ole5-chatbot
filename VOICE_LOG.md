@@ -73,6 +73,39 @@ Newest entries at the bottom of each section. Times are Riyadh time (AST).
 | 4 Hands-free + barge-in | done | 00:50 | most of it came early (D23, D30, CP2); added the silence prompt (D44) and mute (D45); in the `voice-cp3` commit |
 | 5 Quality pass + rehearsal | not started | | |
 
+## Demo runbook
+
+**Before (morning, about 15 minutes):**
+1. Close Excel (it locks `sheets/tickets.xlsx`). The demo runs on a copy of `sheets/`, so the real file is never written.
+2. Check `Ole5-chatbot/.env`: `GROQ_API_KEY`, `KB_BACKEND=ragent2` and the Qdrant URL on port 443 (the knowledge base is
+   the remote one); `TRACING=false` unless Phoenix is running.
+3. Start the server from `Ole5-chatbot/` in Git Bash, on a fresh copy of the sheets and the mock ticket API:
+   ```
+   T=$(mktemp -d) && cp -r sheets "$T/" && W=$(cygpath -w "$T") && PYTHONIOENCODING=utf-8 PYTHONUTF8=1 \
+     SHEETS_DIR="$W\sheets" ATTACHMENTS_DIR="$W\uploads" TRACING=false TICKET_API_URL= \
+     venv/Scripts/python.exe -m uvicorn ole5_chat.main:app --app-dir src --host 127.0.0.1 --port 8000 \
+     > ../voice-lab/server8000.log 2>&1
+   ```
+4. Wait for `voice  fixed lines ready` in the log: every fixed line is made and heard back once (new ones take a
+   minute).
+5. Chrome (not Edge) at `http://localhost:8000` (the microphone needs localhost or HTTPS, not the LAN address). Sign in
+   with the demo customer's email, turn the microphone on, and ask one question in Arabic and one in English: the first
+   search and the first Groq calls of the day are slow.
+6. Headset on. In Meet, share the Chrome tab with its audio.
+
+**During:**
+- The five scenarios are VOICE_PLAN.md section 10. Phrases that work: «كيف أؤرشف مراسلة في النظام؟»,
+  «نسيت كلمة المرور كيف أستعيدها؟»; "The mobile app closes by itself when I open the inbox." → "Yes." → details →
+  "That's all I know." → "Okay." (it asks again) → "Yes, submit"; «ولا موظف عندنا يقدر يسجل دخول من الصبح» → «نعم أرسلها».
+- **M** (or the Mute button) mutes the microphone while you talk to the audience; the assistant can still be stopped.
+- Stop: say «وقف» / "stop", or press Stop. Typing in the box always works, also in voice mode.
+- Scenario 5 (failure): `venv/Scripts/python.exe scripts/try_voice.py kb-down on`, ask a question (the apology is
+  spoken), then `... kb-down off` and ask again. No restart.
+
+**If something goes wrong:** the text chat keeps working with the microphone off. Restart the server (step 3). Fall back
+to the last tagged build: `git checkout voice-cp3` (or `voice-cp2`). The log's `voice  latency` and
+`voice  heard silence` lines show where the time went.
+
 ## Progress
 
 - 2026-10-26 13:30 — Branch `voice-cascade` created from `router-next-only-design` (`98558be`). The working tree still
@@ -217,4 +250,8 @@ Newest entries at the bottom of each section. Times are Riyadh time (AST).
   progress → answer; "Certainly." → the questions; "Okay, sending the ticket now." → "The ticket was created…".
   Seen in the logs: Groq's tool_use_failed on Ole5's search call (several queries in one call), retried by the graph;
   that turn took 24 s.
+- 2026-10-27 01:00 — **CP5 so far.** Scenario 5 had no switch: `scripts/try_voice.py kb-down on|off` (a flag file every
+  search checks; no restart) — a question then gets «حسناً.», "let me check" and the spoken apology, and the next one
+  after `off` is answered. New harness flows `interrupt` and `failure` cover scenarios 4 and 5 live: «تمام» over the
+  answer ignored, «عيد» (heard «ريد») repeats it, «وقف» (heard «لغير») over the repeat stops it. Demo runbook above.
 

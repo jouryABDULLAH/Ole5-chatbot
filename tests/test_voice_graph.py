@@ -161,3 +161,14 @@ def test_a_spoken_submit_keeps_the_words_and_skips_the_router(graph, model):
     assert len([c for c in model.calls if c[0].__name__ == "RouteDecision"]) == routed
     assert [(m.type, m.text) for m in state["messages"][-2:]] == [("human", "تمام"), ("ai", "تم إنشاء التذكرة.")]
     assert graph.languages[-1] == "ar" and len(language_calls(model)) == before
+
+
+def test_the_knowledge_base_switched_off_fails_at_once_and_the_reply_is_the_apology(tmp_path, monkeypatch):
+    from ole5_chat.knowledge import search
+    flag = tmp_path / ".kb_down"
+    monkeypatch.setattr(get_settings(), "kb_down_flag", flag)
+    assert search.search("كيف أؤرشف مراسلة؟", "OLE5").error is None  # the stand-in answers while the flag is off
+    flag.touch()
+    started = time.perf_counter()
+    result = search.search("كيف أؤرشف مراسلة؟", "OLE5")
+    assert result.error and time.perf_counter() - started < 0.1

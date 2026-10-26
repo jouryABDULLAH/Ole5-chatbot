@@ -12,3 +12,4 @@ exp_results/
 .evalkit/
 _to_delete/
 .voice_cache/
+.kb_down

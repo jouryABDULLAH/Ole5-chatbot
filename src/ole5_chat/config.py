@@ -78,6 +78,8 @@ class Settings(BaseSettings):
     voice_idle_prompt: float = 18.0  # a question of the assistant's unanswered this long gets "I'm here…" once (D17)
     voice_max_utterance_s: float = 60.0
     voice_cache_dir: Path = ROOT / ".voice_cache"
+    # While this file exists every knowledge search fails at once (demo scenario 5): no restart needed.
+    kb_down_flag: Path = ROOT / ".kb_down"
 
 
 @lru_cache(maxsize=1)

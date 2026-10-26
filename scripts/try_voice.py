@@ -5,6 +5,8 @@
                                                  spoken and heard back by Whisper to catch dropped words
   python scripts/try_voice.py kb [REPEATS]       the demo questions through the real graph and knowledge base, timed,
                                                  on the voice channel and the chat channel
+  python scripts/try_voice.py kb-down on|off     the knowledge base fails at once while on (demo scenario 5);
+                                                 takes effect on the next search, no restart
   python scripts/try_voice.py flow [NAME]        whole conversations (the demo scenarios) through the real voice
                                                  session: the user's recordings, real speech to text, the real graph,
                                                  knowledge base and speech, played in real time by a simulated
@@ -139,6 +141,7 @@ async def check_tts() -> None:
 # Demo scenarios (VOICE_PLAN.md section 10) as steps: a recording (by mic-lab phrase id) or typed text, and the phase
 # expected after it (None: not checked). Typed text stands in where no recording exists. "during": a recording said
 # while the step before it is still being answered, a second after its first filler (it is held, then answered).
+# "over": said over the reply, 1.5 s into it. "kb": the knowledge base switched "down" or "up" (scenario 5).
 FLOWS = {
     "ar_kb": [("rec", "s1_kb_password", None)],
     "en_ticket": [("rec", "s2_en_crash", "offer_ticket"), ("rec", "w_yes", "collect"), ("rec", "s2_en_detail", "collect"),
@@ -146,6 +149,12 @@ FLOWS = {
                   ("rec", "s2_en_yes", "none")],
     "ar_urgent": [("rec", "s3_urgent", "confirm"), ("rec", "s3_send", "none")],
     "held": [("rec", "s1_kb_archive", None), ("during", "s1_kb_password", None)],
+    # Scenario 4: "تمام" over the answer is ignored, "عيد" repeats it, "وقف" over the repeat stops it.
+    "interrupt": [("rec", "s1_kb_archive", None), ("over", "w_tamam", None), ("rec", "w_eid", None),
+                  ("over", "w_wagif", None)],
+    # Scenario 5: the knowledge base down: the apology, and the conversation goes on once it is back.
+    "failure": [("kb", "down", None), ("rec", "s1_kb_archive", None), ("kb", "up", None),
+                ("rec", "s1_kb_password", None)],
 }
 REDEMPTION_S = 0.85  # the browser sends an utterance this long after the customer stops (web/voice.js, D30)
 LEAD_S = 0.12  # a silent player starts this long after its first frame arrives (web/voice.js)
@@ -232,6 +241,7 @@ def timeline(page: Page, mark: int, spoke_at: list[float], began: float) -> list
 
 async def run_flow(name: str, steps: list, folder: Path, email: str) -> dict:
     from ole5_chat import sessions
+    from ole5_chat.config import get_settings
     from ole5_chat.voice import fillers
     from ole5_chat.voice.api import _touch, _warm
     from ole5_chat.voice.session import Backend, VoiceSession
@@ -256,13 +266,25 @@ async def run_flow(name: str, steps: list, folder: Path, email: str) -> dict:
     group = None
     try:
         for i, (kind, what, want) in enumerate(steps):
+            if kind == "kb":
+                flag = get_settings().kb_down_flag
+                flag.touch() if what == "down" else flag.unlink(missing_ok=True)
+                print(f"\n--- knowledge base {what} ---")
+                continue
             if kind == "typed":
                 while page.end > time.perf_counter():
                     await asyncio.sleep(0.05)
                 await asyncio.sleep(REPLY_GAP_S)
-            if kind in ("rec", "during"):
+            if kind in ("rec", "during", "over"):
                 if kind == "rec":  # the customer answers once the assistant stops
                     await asyncio.sleep(REPLY_GAP_S)
+                elif kind == "over":  # 1.5 s into a reply that is being heard
+                    for _ in range(1200):
+                        playing = page.audible(time.perf_counter())
+                        if playing and any(x[4] == playing and x[2] == "reply" for x in page.sound):
+                            break
+                        await asyncio.sleep(0.05)
+                    await asyncio.sleep(1.5)
                 else:  # asked while the turn before still runs: a second after its first filler started
                     for _ in range(600):
                         if any(m["type"] == "tts_start" and m["kind"] == "filler" for m in page.out[group[0]:]):
@@ -293,7 +315,7 @@ async def run_flow(name: str, steps: list, folder: Path, email: str) -> dict:
                 if any(m["type"] in ("heard", "ignored", "turn") for m in page.out[group[0]:]) or voice.held:
                     break
                 await asyncio.sleep(0.1)
-            if i + 1 < len(steps) and steps[i + 1][0] == "during":
+            if i + 1 < len(steps) and steps[i + 1][0] in ("during", "over"):
                 continue
             await asyncio.sleep(0.3)
             for _ in range(1800):  # up to 180 s for the turn and what it says, played out
@@ -304,6 +326,9 @@ async def run_flow(name: str, steps: list, folder: Path, email: str) -> dict:
             group = None
             seen = page.out[mark:]
             heard = [m["text"] for m in seen if m["type"] == "heard"] or [first_what if kind == "typed" else "?"]
+            ignored = [m["reason"] for m in seen if m["type"] == "ignored"]
+            if ignored or any(m["type"] == "stop_audio" for m in seen):
+                print(f"    ignored: {ignored}; stopped: {any(m['type'] == 'stop_audio' for m in seen)}")
             phase = sessions.get(sid)["phase"]
             tickets = [t["ticket_number"] for t in sessions.get(sid)["created_tickets"]]
             good = want is None or phase == want
@@ -325,6 +350,8 @@ async def run_flow(name: str, steps: list, folder: Path, email: str) -> dict:
                 stats["worst"].append(worst)
     finally:
         await voice.close()
+        if any(kind == "kb" for kind, _, _ in steps):
+            get_settings().kb_down_flag.unlink(missing_ok=True)  # never leave the knowledge base switched off
     stats["ok"] = ok
     return stats
 
@@ -442,6 +469,14 @@ if __name__ == "__main__":
         asyncio.run(check_tts())
     elif mode == "kb":
         check_kb(int(sys.argv[2]) if len(sys.argv) > 2 else 3)
+    elif mode == "kb-down":
+        from ole5_chat.config import get_settings
+        flag = get_settings().kb_down_flag
+        if (sys.argv[2] if len(sys.argv) > 2 else "on") == "on":
+            flag.touch()
+        else:
+            flag.unlink(missing_ok=True)
+        print(f"knowledge base {'DOWN' if flag.exists() else 'up'} ({flag})")
     elif mode == "flow":
         check_flow(sys.argv[2] if len(sys.argv) > 2 else None, ROOT.parent / "voice-lab" / "recordings")
     else:
