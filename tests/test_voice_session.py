@@ -1341,3 +1341,22 @@ def test_the_customer_starting_to_speak_cancels_the_silence_prompt():
         await asyncio.sleep(0.5)
 
     assert line("idle_prompt") not in run(fake, scenario, idle_after=0.2).said()
+
+
+def test_an_unsure_transcript_is_asked_again_not_answered():
+    fake = FakeOle5()
+
+    async def transcribe(wav, language):
+        return Heard(text="", language=None, raw="Kæf og erjist", seconds=3.1, ms=5, forced="ar", confidence=-0.85,
+                     unclear=True)
+
+    fake.transcribe = transcribe
+
+    async def scenario(voice, page):
+        voice.utterance({}, WAV)
+        await until(lambda: page.said())
+        await idle(voice, page)
+
+    page = run(fake, scenario)
+    assert page.said() == [line("unclear")] and not fake.sent
+

@@ -358,14 +358,14 @@
 
     fillVoiceBar(bar) {
       const stage = this.stage;
-      bar.replaceChildren(el("span", { class: `pulse ${stage}`, "aria-hidden": "true" }),
+      bar.replaceChildren(...[el("span", { class: `pulse ${stage}`, "aria-hidden": "true" }),
         el("span", { class: "words" }, el("span", { class: "stage" }, this.t.stages[stage] || ""),
            this.caption ? el("span", { class: "caption", dir: "auto", title: this.caption }, this.caption) : null),
         stage === "speaking" ? el("button", { class: "stopbtn", type: "button", onclick: () => this.voice && this.voice.interrupt() },
                                   this.t.stop) : null,
         this.voice ? el("button", { class: "stopbtn", type: "button", title: this.t.muteKey,
                                     "aria-pressed": this.voice.muted ? "true" : "false", onclick: () => this.toggleMute() },
-                        this.voice.muted ? this.t.unmute : this.t.mute) : null);
+                        this.voice.muted ? this.t.unmute : this.t.mute) : null].filter(Boolean));  // a null child prints "null"
     }
 
     /** Only the voice bar changes: a full render would rebuild the panel on every status. */

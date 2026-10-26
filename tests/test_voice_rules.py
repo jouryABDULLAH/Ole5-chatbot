@@ -189,3 +189,9 @@ def test_the_assistants_own_acknowledgements_are_listening_sounds_but_not_the_cu
 ])
 def test_a_greeting_alone_is_told_from_a_greeting_with_a_question(text, greeting):
     assert rules.is_greeting(text) is greeting
+
+
+@pytest.mark.parametrize("text", ["امم", "hmm", "ممم"])
+def test_a_hesitation_is_a_listening_sound_but_never_a_yes_at_the_confirm_step(text):
+    assert rules.is_backchannel(text) and rules.confirm_kind(text) == "unclear"
+

@@ -134,6 +134,8 @@
       await this.connect();
       if (this.stopped) return;
       await this.vad.start();
+      // The detector runs: show where things stand (with no greeting to play, the bar stayed on "Starting").
+      this.showStage();
     }
 
     connect() {

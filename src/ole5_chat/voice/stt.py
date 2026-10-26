@@ -54,6 +54,11 @@ class Heard:
     ms: int
     forced: str | None  # the language of the call that was kept
     confidence: float = 0.0  # its mean log-probability per token, by segment length
+    unclear: bool = False  # words came back, but too unsure to act on: the customer is asked to say it again
+
+
+UNSURE_MIN_S = 2.5  # clips this long or longer ...
+UNSURE_CONFIDENCE = -0.7  # ... whose kept take is less sure than this are not acted on
 
 
 _client: AsyncGroq | None = None
@@ -186,5 +191,12 @@ async def transcribe(wav: bytes, session_language: str) -> Heard:
     ms = int((time.perf_counter() - started) * 1000)
     log.info("voice  stt seconds=%.2f ms=%d kept=%s %s", seconds, ms, kept.language,
              " | ".join(f"{t.language}:{t.confidence:.2f}:{t.raw!r}" for t in takes))
+    if seconds >= UNSURE_MIN_S and kept.text and kept.confidence < UNSURE_CONFIDENCE:
+        # A replayed Arabic question came back as "Kæf og erjist möraslaði fannig nígama?" (-0.85, even from the
+        # Arabic call) and was answered in English. Real speech of 2 s or more kept -0.55 or better on all the user's
+        # recordings; one-word clips go far lower (-1.07 for «وقف»), so they are not judged this way.
+        log.warning("voice  stt too unsure (%.2f), asked again: %r", kept.confidence, kept.raw)
+        return Heard(text="", language=None, raw=kept.raw, seconds=round(seconds, 2), ms=ms, forced=kept.language,
+                     confidence=round(kept.confidence, 3), unclear=True)
     return Heard(text=kept.text, language=script_language(kept.text), raw=kept.raw, seconds=round(seconds, 2), ms=ms,
                  forced=kept.language, confidence=round(kept.confidence, 3))

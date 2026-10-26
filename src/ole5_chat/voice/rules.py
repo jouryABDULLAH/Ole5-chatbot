@@ -39,8 +39,11 @@ COMMANDS = {
 STOP_WHILE_TALKING = _norm("خلاص", "خلاص خلاص", "enough", "that's enough")
 POLITE = _norm("لو سمحت", "من فضلك", "please", "ok", "okay", "اوكي", "تمام", "طيب", "يا", "now", "الحين")
 # Acknowledgements: listening sounds, never a decision on their own.
-ACK = _norm("تمام", "تامام", "تاما", "طيب", "اوكي", "اوكيه", "اوك", "حسنا", "زين", "ماشي", "اها", "اه", "امم", "مم", "ممم", "ok", "okay",
-            "okey", "alright", "all right", "hmm", "mhm", "mhmm", "mm hmm", "uh huh", "tama", "tamam")
+ACK = _norm("تمام", "تامام", "تاما", "طيب", "اوكي", "اوكيه", "اوك", "حسنا", "زين", "ماشي", "اها", "اه", "ok", "okay",
+            "okey", "alright", "all right", "mhm", "mhmm", "mm hmm", "uh huh", "tama", "tamam")
+# Hesitations: listening sounds too, but at the confirm step "امم" / "hmm" means "I'm thinking", not "go ahead", so it
+# is asked again and never counts for D15.
+HESITATION = _norm("امم", "مم", "ممم", "هممم", "hmm", "hm", "umm", "um")
 # The assistant's own acknowledgements (D38) that are not the customer's: their echo during a turn is a listening
 # sound, but they stay out of ACK, so the confirm table and D15 are unchanged ("فهمت" after "just to confirm" means
 # "I understood the instructions", not "submit").
@@ -74,7 +77,7 @@ NEGATION = _norm("لا", "لاء", "مو", "ما", "بلاش", "الغ", "الغ
 KNOWN_SHORT = _norm("hi", "oh", "اوه", "بس", "هل", "من", "في", "و", "يا", "is", "it", "me", "my", "on", "to")
 
 PHRASES = frozenset().union(*COMMANDS.values(), STOP_WHILE_TALKING, POLITE, ACK, YES, SUBMIT, THANKS, CONFIRM_FILLER,
-                            CONTENT_FREE, NEGATION, GREETING, OWN_ACK)
+                            CONTENT_FREE, NEGATION, GREETING, OWN_ACK, HESITATION)
 LONGEST = max(len(p.split()) for p in PHRASES)
 
 
@@ -165,7 +168,8 @@ def is_short_sound(text: str, seconds: float | None) -> bool:
 def is_backchannel(text: str) -> bool:
     """True for "تمام", "ايه", "ok thanks", "all right" and the like: what a listener says while the assistant talks."""
     found = tokens(text)
-    return bool(found) and len(found) <= 3 and all(t in ACK or t in YES or t in THANKS or t in OWN_ACK for t in found)
+    return bool(found) and len(found) <= 3 and all(t in ACK or t in YES or t in THANKS or t in OWN_ACK or t in HESITATION
+                                                   for t in found)
 
 
 ConfirmKind = Literal["submit", "ack", "unclear", "other"]
@@ -203,7 +207,7 @@ def confirm_kind(text: str) -> ConfirmKind:
         return "ack"  # "ok thanks" is an acknowledgement; thanks alone is not
     if explicit_submit(text):
         return "submit"
-    if is_fragment(text) or all(t in POLITE for t in found):
+    if is_fragment(text) or all(t in POLITE or t in HESITATION for t in found):
         return "unclear"
     return "other"
 

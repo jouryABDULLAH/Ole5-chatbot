@@ -474,6 +474,10 @@ class VoiceSession:
             return
         if self.clock:
             self.clock.mark("stt")
+        if heard.unclear and not over_bot:  # words, but too unsure to answer: asked again rather than guessed
+            await self._say_line("unclear")
+            await self.send_json({"type": "ignored", "reason": "unclear"})
+            return
         if not heard.text:
             await self.send_json({"type": "ignored", "reason": "empty"})
             return

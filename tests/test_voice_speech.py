@@ -276,3 +276,14 @@ def test_a_take_far_faster_than_the_voice_speaks_was_cut_short():
     arabic = "ثم اضغط على نسيت كلمة المرور، وأدخل بريدك الإلكتروني المسجل في النظام لتصلك رسالة فيها الرابط."
     assert tts.cut_short(arabic, "ar", 3.0) and not tts.cut_short(arabic, "ar", 6.5)
     assert not tts.cut_short("Got it.", "en", 0.3)  # too short to judge
+
+
+def test_a_long_clip_heard_too_unsurely_is_not_acted_on(monkeypatch):
+    # the browser's replayed Arabic question, seen on 2026-10-27
+    fake_whisper(monkeypatch, {"ar": ("Kæf og erjist möraslaði fannig nígama?", -0.85),
+                               "en": ("Kæf og erjist möraslaði fannig nígama?", -0.9)})
+    heard = asyncio.run(stt.transcribe(wav(3.1), "ar"))
+    assert heard.unclear and heard.text == ""
+    fake_whisper(monkeypatch, {"ar": ("لغير", -1.07), "en": ("Lagheer", -1.2)})  # a one-word «وقف» is still heard
+    assert not asyncio.run(stt.transcribe(wav(1.5), "ar")).unclear
+
