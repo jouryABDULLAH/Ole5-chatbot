@@ -211,8 +211,25 @@ def is_fragment(text: str) -> bool:
             and found[0] not in KNOWN_SHORT)
 
 
+QUESTION_WORDS = _norm("how", "what", "why", "where", "when", "which", "who", "can", "could", "would", "is", "are", "do",
+                       "does", "did", "should", "will", "كيف", "ماذا", "لماذا", "ليش", "ليه", "متى", "وين", "اين", "فين", "هل",
+                       "ايش", "وش", "شو", "شلون", "كم", "مين", "ممكن")
+QUESTION_NOUNS = _norm("سؤال", "سوال", "استفسار", "question", "questions")
+
+
+def is_question(text: str) -> bool:
+    """Written as a question (Whisper ends one with "?"), begun with a question word ("وكيف" counts as "كيف"), or
+    saying it is one ("وعندي سؤال ثاني")."""
+    words = normalize(text).split()
+    if not words:
+        return False
+    return (text.rstrip().endswith(("?", "؟")) or words[0] in QUESTION_WORDS
+            or (words[0].startswith("و") and words[0][1:] in QUESTION_WORDS)
+            or any(w in QUESTION_NOUNS for w in words))
+
+
 LINES = {
-    "searching": {"ar": "لحظات من فضلك، أتحقق من ذلك.", "en": "One moment please, let me check that."},
+    "searching":{"ar": "لحظات من فضلك، أتحقق من ذلك.", "en": "One moment please, let me check that."},
     "still_checking": {"ar": "ما زلت أتحقق، شكراً لصبرك.", "en": "I am still checking. Thank you for your patience."},
     "still_looking": {"ar": "ما زلت أبحث في الأدلة، لحظات من فضلك.",
                       "en": "Still looking through the documentation, one moment please."},
@@ -228,6 +245,9 @@ LINES = {
                      "en": "Just to confirm: to send the ticket, say: yes, submit, or say no. Would you like it "
                            "submitted now?"},
     "held": {"ar": "سأجيب عن ذلك بعد قليل.", "en": "I'll come to that right after this."},
+    # Said between the answer that was running and the one held during it, so the second does not run on from the first.
+    "next_question": {"ar": "والآن، بخصوص سؤالك الآخر.", "en": "Now, about your other question."},
+    "next_added": {"ar": "والآن، بخصوص ما أضفته.", "en": "Now, about what you added."},
     "wait": {"ar": "حسناً، أنا في انتظارك.", "en": "Of course, take your time."},
     "there": {"ar": "نعم، أنا معك.", "en": "Yes, I'm here."},
     "there_busy": {"ar": "نعم، ما زلت أتحقق من سؤالك.", "en": "Yes, I'm still checking your question."},

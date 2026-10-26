@@ -6,8 +6,10 @@
   python scripts/try_voice.py kb [REPEATS]       the demo questions through the real graph and knowledge base, timed,
                                                  on the voice channel and the chat channel
   python scripts/try_voice.py flow [NAME]        whole conversations (the demo scenarios) through the real voice
-                                                 session: the user's recordings, real speech to text, the real graph
-                                                 and knowledge base; every step printed. Speech output is skipped.
+                                                 session: the user's recordings, real speech to text, the real graph,
+                                                 knowledge base and speech, played in real time by a simulated
+                                                 browser; every step's stages and audible timeline printed, with its
+                                                 silences after the customer stopped (CP3: none over 1.5 s)
 
 RECORDINGS defaults to ../voice-lab/recordings (recordings.json and the WAV files the lab saved). The kb check runs
 on a temporary copy of sheets/ with the mock ticket API, and traces are off.
@@ -131,82 +133,163 @@ async def check_tts() -> None:
 
 
 # Demo scenarios (VOICE_PLAN.md section 10) as steps: a recording (by mic-lab phrase id) or typed text, and the phase
-# expected after it. Typed text stands in where no recording exists.
+# expected after it (None: not checked). Typed text stands in where no recording exists. "during": a recording sent
+# DURING_S after the step before it, while that step's turn still runs (it is held, then answered).
 FLOWS = {
+    "ar_kb": [("rec", "s1_kb_password", None)],
     "en_ticket": [("rec", "s2_en_crash", "offer_ticket"), ("rec", "w_yes", "collect"), ("rec", "s2_en_detail", "collect"),
                   ("typed", "That's all I know.", "confirm"), ("rec", "w_ok", "confirm"),
                   ("rec", "s2_en_yes", "none")],
     "ar_urgent": [("rec", "s3_urgent", "confirm"), ("rec", "s3_send", "none")],
+    "held": [("rec", "s1_kb_archive", None), ("during", "s1_kb_password", None)],
 }
+DURING_S = 4.0
+REDEMPTION_S = 0.85  # the browser sends an utterance this long after the customer stops (web/voice.js, D30)
+LEAD_S = 0.12  # a silent player starts this long after its first frame arrives (web/voice.js)
+DEAD_AIR_S = 1.5  # the CP3 target: no silence longer than this after the customer stops
 
 
 class Page:
-    """What the browser would receive; every item counts as played at once."""
+    """The browser, played in real time: frames go on a gapless player, an item is reported played when its last frame
+    has been heard, and stop_audio silences it. sound: one [start, end, kind, text] per item."""
 
     def __init__(self):
         self.out, self.session = [], None
+        self.end = 0.0  # when everything queued so far will have played
+        self.sound: list[list] = []
+        self._played: list[asyncio.TimerHandle] = []
 
     async def json(self, data):
-        self.out.append(data)
-        if data["type"] == "tts_end" and not data["cancelled"]:
-            asyncio.get_running_loop().call_soon(self.session.played, data["id"])
+        now = time.perf_counter()
+        self.out.append({**data, "at": now})
+        if data["type"] == "tts_start":
+            self.sound.append([None, None, data["kind"], data["text"]])
+        elif data["type"] == "tts_end" and not data["cancelled"]:
+            ends = self.sound[-1][1] or now
+            self._played.append(asyncio.get_running_loop().call_later(max(0.0, ends - now), self.session.played,
+                                                                      data["id"]))
+        elif data["type"] == "stop_audio":
+            for handle in self._played:
+                handle.cancel()
+            self.end = min(self.end, now)
+            for item in self.sound:
+                if item[0] is not None and item[1] > now:
+                    item[1] = max(item[0], now)
 
     async def audio(self, data):
-        pass
+        now = time.perf_counter()
+        start = self.end if self.end > now else now + LEAD_S
+        self.end = start + len(data) / 2 / 24000
+        item = self.sound[-1]
+        item[0] = start if item[0] is None else item[0]
+        item[1] = self.end
+
+    def audible(self, at: float) -> bool:
+        return any(s[0] is not None and s[0] <= at < s[1] for s in self.sound)
+
+    def last_end(self, at: float) -> float | None:
+        return max((s[1] for s in self.sound if s[1] is not None and s[1] <= at), default=None)
 
 
-async def run_flow(name: str, steps: list, folder: Path, email: str) -> bool:
+def timeline(page: Page, mark: int, spoke_at: list[float], began: float) -> list[str]:
+    """The step's audible stretches and its silences after the customer stopped: lines to print."""
+    out = page.out[mark:]
+    stopped = spoke_at[0]
+    lines = []
+    marks = [("heard", next((m["at"] for m in out if m["type"] == "heard"), None)),
+             ("turn", next((m["at"] for m in out if m["type"] == "turn"), None)),
+             ("search", next((m["at"] for m in out if m["type"] == "status" and m.get("stage") == "searching"), None)),
+             ("ole5 done", next((m["at"] for m in out if m["type"] == "view"), None))]
+    lines.append("    stages after the customer stopped: " + ", ".join(
+        f"{name} {at - stopped:.1f}s" for name, at in marks if at))
+    sounds = sorted((s for s in page.sound if s[0] is not None and s[1] > s[0] and s[1] > stopped), key=lambda s: s[0])
+    cursor, gaps = stopped, []
+    for start, end, kind, text in sounds:
+        if start - cursor > 0:
+            gaps.append((start - cursor, cursor, kind, text))
+        lines.append(f"    {start - stopped:5.1f}-{end - stopped:5.1f}s [{kind}] {text[:70]}")
+        cursor = max(cursor, end)
+    first = sounds[0][0] - stopped if sounds else None
+    worst = max(gaps, default=(0.0, stopped, "-", ""))
+    long = [g for g in gaps if g[0] > DEAD_AIR_S]
+    lines.append(f"    first sound {first:.1f}s after the customer stopped; longest silence "
+                 f"{worst[0]:.1f}s (before [{worst[2]}] {worst[3][:40]}); silences over {DEAD_AIR_S}s: {len(long)}"
+                 if sounds else "    no sound")
+    return lines
+
+
+async def run_flow(name: str, steps: list, folder: Path, email: str) -> dict:
     from ole5_chat import sessions
-    from ole5_chat.voice.session import Backend, VoiceSession
-
-    async def no_speech(text, language):
-        yield b"\x00\x00" * 960
-
-    async def no_cached(text, language):
-        return b"\x00\x00" * 960
+    from ole5_chat.voice import fillers
+    from ole5_chat.voice.session import VoiceSession
 
     entries = json.loads((folder / "recordings.json").read_text(encoding="utf-8"))
-    files = {}
+    files, seconds = {}, {}
     for e in entries:
         if e["kind"].startswith("vad"):
             files.setdefault(e["phrase"], folder / e["file"])
+    await fillers.warm()  # new fixed lines are made and heard back before the flow needs them
     sid, _ = sessions.start(email)
     page = Page()
-    voice = VoiceSession(sid, page.json, page.audio, Backend(speech=no_speech, cached=no_cached))
+    voice = VoiceSession(sid, page.json, page.audio)
     page.session = voice
     await voice.start()
-    ok = True
+    ok, stats = True, {"first": [], "worst": [], "long": 0}
     print(f"\n=== {name} ===")
+    group = None
     try:
-        for kind, what, want in steps:
-            mark, began = len(page.out), time.perf_counter()
-            if kind == "rec":
-                voice.utterance({"over_bot": False}, files[what].read_bytes())
-            else:
+        for i, (kind, what, want) in enumerate(steps):
+            now = time.perf_counter()
+            if group is None:
+                group = (len(page.out), [now if kind == "typed" else now - REDEMPTION_S], now, what)
+            if kind == "typed":
                 voice.typed(what)
+            else:
+                wav = files[what].read_bytes()
+                spoke = now - REDEMPTION_S - (len(wav) - 44) / 32000  # when the customer started speaking
+                over = page.audible(spoke)
+                last = page.last_end(spoke)
+                voice.utterance({"over_bot": over, "over_id": "", "since_bot_ms": None if over or last is None
+                                 else (spoke - last) * 1000}, wav)
             for _ in range(300):  # the step has been heard (or, typed, has started a turn or been held)
-                if any(m["type"] in ("heard", "ignored", "turn") for m in page.out[mark:]) or voice.held:
+                if any(m["type"] in ("heard", "ignored", "turn") for m in page.out[group[0]:]) or voice.held:
                     break
                 await asyncio.sleep(0.1)
+            if i + 1 < len(steps) and steps[i + 1][0] == "during":
+                await asyncio.sleep(max(0.0, DURING_S - (time.perf_counter() - now)))
+                continue
             await asyncio.sleep(0.3)
-            for _ in range(1200):  # up to 120 s for the turn and what it says
+            for _ in range(1800):  # up to 180 s for the turn and what it says, played out
                 if voice.turn is None and voice._inbox.empty() and not voice.speaker.busy and voice.partial is None:
                     break
                 await asyncio.sleep(0.1)
+            mark, spoke_at, began, first_what = group
+            group = None
             seen = page.out[mark:]
-            heard = next((m["text"] for m in seen if m["type"] == "heard"), what if kind == "typed" else "?")
-            said = [f"[{m['kind']}] {m['text']}" for m in seen if m["type"] == "tts_start"]
+            heard = [m["text"] for m in seen if m["type"] == "heard"] or [first_what if kind == "typed" else "?"]
             phase = sessions.get(sid)["phase"]
             tickets = [t["ticket_number"] for t in sessions.get(sid)["created_tickets"]]
-            good = phase == want
+            good = want is None or phase == want
             ok &= good
-            print(f"\n{'ok ' if good else 'BAD'} customer ({kind}): {heard}   [{time.perf_counter() - began:.1f}s, "
-                  f"phase {phase}, want {want}{', tickets ' + str(tickets) if tickets else ''}]")
-            for line in said:
-                print(f"    {line}")
+            print(f"\n{'ok ' if good else 'BAD'} customer ({kind}): {' / '.join(heard)}   "
+                  f"[{time.perf_counter() - began:.1f}s, phase {phase}, want {want}"
+                  f"{', tickets ' + str(tickets) if tickets else ''}]")
+            report = timeline(page, mark, spoke_at, began)
+            print("\n".join(report))
+            sounds = sorted((s for s in page.sound if s[0] is not None and s[1] > s[0] and s[1] > spoke_at[0]),
+                            key=lambda s: s[0])
+            if sounds:
+                stats["first"].append(sounds[0][0] - spoke_at[0])
+                cursor, worst = spoke_at[0], 0.0
+                for start, end, *_ in sounds:
+                    worst = max(worst, start - cursor)
+                    stats["long"] += start - cursor > DEAD_AIR_S
+                    cursor = max(cursor, end)
+                stats["worst"].append(worst)
     finally:
         await voice.close()
-    return ok
+    stats["ok"] = ok
+    return stats
 
 
 def check_flow(name: str | None, folder: Path) -> None:
@@ -226,7 +309,13 @@ def check_flow(name: str | None, folder: Path) -> None:
                  if str(r.get("product") or "").upper() == "OLE5" and str(r.get("active") or "").lower() == "yes")
     chosen = {name: FLOWS[name]} if name else FLOWS
     results = {n: asyncio.run(run_flow(n, steps, folder, email)) for n, steps in chosen.items()}
-    print("\n" + "  ".join(f"{n}: {'pass' if r else 'FAIL'}" for n, r in results.items()))
+    print("\n" + "  ".join(f"{n}: {'pass' if r['ok'] else 'FAIL'}" for n, r in results.items()))
+    first = sorted(x for r in results.values() for x in r["first"])
+    worst = sorted(x for r in results.values() for x in r["worst"])
+    if first:
+        print(f"first sound after the customer stopped: median {first[len(first) // 2]:.1f}s, max {first[-1]:.1f}s; "
+              f"longest silence per step: median {worst[len(worst) // 2]:.1f}s, max {worst[-1]:.1f}s; silences over "
+              f"{DEAD_AIR_S}s: {sum(r['long'] for r in results.values())} in {len(first)} steps")
 
 
 def wav_of(pcm: bytes, rate: int) -> bytes:

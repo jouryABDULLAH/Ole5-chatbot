@@ -154,3 +154,12 @@ def test_thanks_alone_at_confirm_goes_to_ole5_and_polite_words_alone_are_unclear
     assert rules.confirm_kind("لو سمحت") == "unclear" and rules.confirm_kind("please") == "unclear"
 
 
+
+
+@pytest.mark.parametrize("text, question", [
+    ("وكيف أغير البريد الإلكتروني؟", True), ("how do I archive it", True), ("وكيف أغير البريد", True),
+    ("وعندي سؤال ثاني عن البريد", True), ("Can I add a signature?", True),
+    ("وصار هذا من أمس على أندرويد", False), ("It started yesterday on Android.", False), ("", False),
+])
+def test_a_held_utterance_is_told_apart_as_a_question_or_an_addition(text, question):
+    assert rules.is_question(text) is question

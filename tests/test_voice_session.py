@@ -299,7 +299,26 @@ def test_during_a_turn_a_backchannel_is_dropped_and_a_question_is_held_then_answ
     page = run(fake, scenario)
     assert [t for t, _, _ in fake.sent] == ["كيف أستعيد كلمة المرور؟", "وكيف أغير البريد الإلكتروني؟"]
     assert {"type": "ignored", "reason": "backchannel"} in page.out
-    assert page.said() == [line("held"), "اضغط نسيت كلمة المرور.", "افتح الملف الشخصي."]
+    # the second answer opens with a bridge, so it does not run straight on from the first
+    assert page.said() == [line("held"), "اضغط نسيت كلمة المرور.", line("next_question"), "افتح الملف الشخصي."]
+
+
+def test_something_added_during_a_turn_is_answered_after_a_bridge_that_says_so():
+    fake = FakeOle5(heard=["التطبيق يغلق عند فتح البريد", "وصار هذا من أمس على أندرويد"],
+                    replies=["هل تظهر رسالة خطأ؟", "شكراً، هل هناك شيء آخر؟"])
+    fake.gate = threading.Event()
+
+    async def scenario(voice, page):
+        voice.utterance({}, WAV)
+        await until(lambda: voice.turn is not None)
+        voice.utterance({}, WAV)
+        await until(lambda: voice.held is not None)
+        fake.gate.set()
+        await until(lambda: len(page.said("reply")) == 2)
+        await idle(voice, page)
+
+    page = run(fake, scenario)
+    assert page.said() == [line("held"), "هل تظهر رسالة خطأ؟", line("next_added"), "شكراً، هل هناك شيء آخر؟"]
 
 
 def test_are_you_there_during_a_turn():

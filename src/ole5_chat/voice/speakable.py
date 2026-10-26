@@ -13,9 +13,10 @@ ON_SCREEN = {
     "en": "Your ticket number is on your screen, ending in {digits}.",
 }
 THEN = {"ar": "، ثم ", "en": ", then "}
-# How names are said, where the voice gets them wrong: the Saudi voice read "Ole5" as "ولا خمسة"; the user says it
-# "أولي فايف" (mic lab, 2026-10-26).
-PRONOUNCE = {"ar": [(re.compile(r"\bole\s?5\b", re.IGNORECASE), "أولي فايف")], "en": []}
+# How names are said, where the voice gets them wrong: the Saudi voice read "Ole5" as "ولا خمسة". The spellings below
+# are the user's picks from samples of each voice (D37, 2026-10-26); the diacritics make abdullah say "oo-lee".
+OLE5 = re.compile(r"\bole\s?5\b", re.IGNORECASE)
+PRONOUNCE = {"ar": [(OLE5, "أُولِي فايف")], "en": [(OLE5, "Oh-lee five")]}
 SEGMENT_CHARS = 220
 MARK = "\u0000"  # where the on-screen sentence goes, while the text is rebuilt
 SENTENCE_DONE = re.compile(r"[.!?؟\n]\s*$")

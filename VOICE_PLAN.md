@@ -58,7 +58,7 @@ Server, per socket (src/ole5_chat/voice/)                                  ▼
        a reply cancels pending fillers; stop/barge-in purges the queue and closes TTS
   6. Speakable: markdown and "←" out, lines joined, ticket number → "on your screen, ending in…"
   7. TTS (AsyncGroq Orpheus): sentence segments, pipelined; WAV header parsed (78 bytes);
-       40 ms PCM16 24 kHz frames; voice chosen by the reply text's script
+       40 ms PCM16 24 kHz frames; one voice per reply, by the reply's language (D35)
   8. View push: the SessionView after every Ole5 turn (transcript, phase, card)
   Turn deadline 45 s → spoken apology; a late result is shown, never spoken
                                                                            │
@@ -267,7 +267,7 @@ throughout. The targets are reset from the CP1 measurements.
 | Real Saudi speech (VAD drops one-word answers, Whisper mishears) | Your recordings drive tuning and tests; short clips get the language forced; the text box stays for emails and codes |
 | The confirm step derails | Confirm table with a test per row, the graph-side guard, read-back from the draft |
 | Groq quota or a 429 on demo morning | Limits checked now; fixed-line audio cached on disk, including the apology; overnight runs budgeted |
-| English replies with Arabic screen names, read by `troy` | To test; if garbled, those spans are spoken by `abdullah` or replaced with "the option on your screen" |
+| English replies with Arabic screen names, read by `troy` | Tested: `troy` says them recognisably, and switching to `abdullah` for those sentences sounded like a second speaker, so `troy` keeps the whole reply (D35) |
 | Joori's changes | Frozen demo commit; merge after the demo |
 | Environment traps (Excel holding `tickets.xlsx`, `TRACING` without Phoenix, Edge, LAN IP, CDN) | Demo runbook in the log; demo runs on a copy of `sheets/`; VAD assets vendored |
 

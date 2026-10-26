@@ -125,10 +125,12 @@ def frames_of(pcm: bytes) -> list[bytes]:
     return [*framer.push(pcm), *filter(None, [framer.flush()])]
 
 
-def voice_for(text: str, language: str) -> tuple[str, str]:
-    """The model and voice for a text: by its letters, else by the conversation's language."""
+def voice_for(text: str, language: str | None) -> tuple[str, str]:
+    """The model and voice for a text: by the language it is said in, else by its letters. A reply is said in one
+    language, so all of it gets one voice (D35): choosing by each sentence's letters gave a sentence that is mostly an
+    Arabic screen name, in an English reply, the Arabic voice, and it sounded like someone else talking."""
     s = get_settings()
-    if (script_language(text) or language) == "ar":
+    if (language or script_language(text) or "en") == "ar":
         return s.voice_tts_model_ar, s.voice_tts_voice_ar
     return s.voice_tts_model_en, s.voice_tts_voice_en
 

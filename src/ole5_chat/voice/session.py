@@ -229,7 +229,8 @@ class VoiceSession:
         if self.id not in GREETED and messages and not any(m.type == "human" for m in messages):
             GREETED.add(self.id)
             text = speakable.speakable(messages[-1].text, self.language)  # the same text fillers.warm caches
-            self.last_reply = [self.speaker.say("reply", text, self.language, pcm=await self._cached(text))]
+            language = script_language(text) or self.language
+            self.last_reply = [self.speaker.say("reply", text, language, pcm=await self._cached(text, language))]
 
     def utterance(self, meta: dict, wav: bytes) -> None:
         self.talking = False
@@ -528,9 +529,10 @@ class VoiceSession:
 
     # ---- one Ole5 turn ----
 
-    def _start(self, kind: str, text: str | None, language: str | None) -> None:
+    def _start(self, kind: str, text: str | None, language: str | None, bridge: str | None = None) -> None:
         self.turn_no += 1
-        self.turn = asyncio.create_task(self._turn(self.turn_no, kind, text, language), name=f"voice-turn-{self.turn_no}")
+        self.turn = asyncio.create_task(self._turn(self.turn_no, kind, text, language, bridge),
+                                        name=f"voice-turn-{self.turn_no}")
 
     def _call(self, kind: str, text: str | None, language: str | None, on_event: Callable[[dict], None]) -> tuple[int, dict]:
         """Runs in a worker thread: the graph is synchronous and holds the session lock for the whole turn. Returns
@@ -545,21 +547,23 @@ class VoiceSession:
                                         on_event=on_event)
         return before, state
 
-    async def _turn(self, no: int, kind: str, text: str | None, language: str | None) -> None:
+    async def _turn(self, no: int, kind: str, text: str | None, language: str | None, bridge: str | None = None) -> None:
         """language: what the customer spoke, or None for a typed message or the Submit button (Ole5 then judges it
-        as it does in the text chat)."""
+        as it does in the text chat). bridge: a line said first, after the previous answer (a held turn)."""
         loop = asyncio.get_running_loop()
         started = time.perf_counter()
 
         def on_event(event: dict) -> None:
             loop.call_soon_threadsafe(self._graph_event, no, event)
 
+        if bridge:  # queued before anything this turn says: its search line, its reply
+            await self._say_line(bridge)
         phase_before = self._phase()
         await self.send_json({"type": "turn", "text": text})
         await self._status("thinking")
         progress = asyncio.create_task(self._progress(no))
         work = asyncio.ensure_future(asyncio.to_thread(self._call, kind, text, language, on_event))
-        late, outcome, shown = False, "spoken", False
+        late, outcome, shown, spoke = False, "spoken", False, False
         try:
             try:
                 before, state = await asyncio.wait_for(asyncio.shield(work), self.deadline)
@@ -582,6 +586,7 @@ class VoiceSession:
             reply = "\n".join(m.text for m in messages[before:] if m.type == "ai").strip()
             numbers = [t["ticket_number"] for t in state.get("created_tickets") or []]
             self._speak_reply(reply, script_language(reply) or language or self.language, numbers, turn=no)
+            spoke = bool(reply)
             asked = rules.normalize(rules.line("just_confirm", script_language(reply) or self.language))
             if state.get("reconfirmed") and state.get("phase") == "confirm" and self.last_reply and \
                     rules.normalize(reply).endswith(asked):
@@ -605,18 +610,20 @@ class VoiceSession:
             # No await between clearing the turn and starting the held one: an utterance handled in between would
             # start a turn of its own.
             self.turn = None
-            following = self._start_held(phase_before) if not self.closed else False
+            following = self._start_held(phase_before, after_reply=spoke) if not self.closed else False
             if not self.closed:
                 if not shown:  # the page shows the customer's words with a "writing" mark until a view arrives
                     await self._push_view()
                 if not following:
                     await self._status()
 
-    def _start_held(self, phase_before: str) -> bool:
+    def _start_held(self, phase_before: str, after_reply: bool = False) -> bool:
         """Sends what the customer said during the turn. At the confirm step a yes, an acknowledgement or a fragment
         said during the turn is dropped: it was said before the reply that asks to submit, and a yes must answer a
         summary the customer heard (D4). Seen in a test run: a held "نعم أرسلها" created the urgent ticket before its
-        summary was read. phase_before: kept for the log."""
+        summary was read. phase_before: kept for the log. after_reply: the turn that ended queued a reply; the held
+        answer then opens with "now, about your other question" (it ran straight on from the first answer, and the
+        two answers sounded mixed: the user's real-microphone pass, 2026-10-26)."""
         if not self.held:
             return False
         text, language = self.held
@@ -624,7 +631,8 @@ class VoiceSession:
         if self._phase() == "confirm" and rules.confirm_kind(text) in ("submit", "ack", "unclear"):
             log.info("voice  held %r dropped: said before the reply that asks to submit", text)
             return False
-        self._start("send", text, language)
+        bridge = ("next_question" if rules.is_question(text) else "next_added") if after_reply else None
+        self._start("send", text, language, bridge)
         return True
 
     def _speech_failed(self, item: Item) -> None:
@@ -700,9 +708,9 @@ class VoiceSession:
         last = rules.normalize(self.speaker.recent[-1][1]).split()
         return _run(words, last[-(len(words) + 3):]) >= max(3, round(len(words) * 0.8))
 
-    async def _cached(self, text: str) -> bytes | None:
+    async def _cached(self, text: str, language: str | None = None) -> bytes | None:
         try:
-            return await self.backend.cached(text, self.language)
+            return await self.backend.cached(text, language or self.language)
         except Exception:
             log.exception("voice  no audio for the fixed line %r", text)
             return None

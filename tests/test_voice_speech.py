@@ -175,10 +175,12 @@ def test_silence_around_speech_is_cut_and_long_pauses_are_shortened():
     assert trimmed(silence(1.0)) == 0
 
 
-def test_the_voice_follows_the_letters_of_the_text():
-    assert tts.voice_for("أهلاً بك في Ole5", "en")[1] == "abdullah"
-    assert tts.voice_for("Open Settings, then Users.", "ar")[1] == "troy"
-    assert tts.voice_for("OK", "ar")[1] == "abdullah"
+def test_the_voice_follows_the_language_of_the_reply_not_the_letters_of_one_sentence():
+    # D35: an English reply's sentence that is mostly an Arabic screen name keeps the English voice
+    assert tts.voice_for('Then choose "إنشاء مراسلة جديدة".', "en")[1] == "troy"
+    assert tts.voice_for('اضغط على "Create New Correspondence" ثم "Save".', "ar")[1] == "abdullah"
+    assert tts.voice_for("أهلاً بك في Ole5", None)[1] == "abdullah"  # no language given: by its letters
+    assert tts.voice_for("OK", None)[1] == "troy"
 
 
 def test_markdown_lists_links_and_menu_paths_read_as_sentences():
@@ -230,9 +232,10 @@ def test_the_ticket_noun_stays_when_the_number_leaves(text, spoken):
     assert speakable.speakable(text, "en", [NUMBER]) == f"{spoken} {ENDING}".strip()
 
 
-def test_ole5_is_said_the_way_the_customer_says_it_in_arabic():
-    assert speakable.speakable("أنا مساعد دعم Ole5 ونظام OLE5.", "ar") == "أنا مساعد دعم أولي فايف ونظام أولي فايف."
-    assert speakable.speakable("I am the Ole5 assistant.", "en") == "I am the Ole5 assistant."
+def test_ole5_is_said_the_way_the_user_picked_in_each_language():
+    assert speakable.speakable("أنا مساعد دعم Ole5 ونظام OLE5.", "ar") == "أنا مساعد دعم أُولِي فايف ونظام أُولِي فايف."
+    assert speakable.speakable("I am the Ole5 assistant, Ole 5 support.", "en") == \
+        "I am the Oh-lee five assistant, Oh-lee five support."
 
 
 def test_a_reply_without_the_number_is_unchanged():
