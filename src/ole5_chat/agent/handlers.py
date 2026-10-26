@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from ole5_chat import values
 from ole5_chat.agent import classify as classifier
 from ole5_chat.agent.contracts import PendingIssue, Phase
-from ole5_chat.agent.prompt import CURRENT, QUEUED_URGENT, TASKS, URGENT
+from ole5_chat.agent.tasks import CURRENT, QUEUED_URGENT, TASKS, URGENT
 from ole5_chat.agent.state import ChatState, TicketDraft
 from ole5_chat.config import get_settings
 from ole5_chat.tickets import client as ticket_api
