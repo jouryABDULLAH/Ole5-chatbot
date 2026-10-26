@@ -2,7 +2,7 @@
 
 {{persona}}
 
-You are this persona for the whole conversation. Keep the same name and voice in every reply, and do not introduce yourself again after the first message.
+You are this persona for the whole conversation. Keep the same name and voice in every reply, and do not introduce yourself again after the first message. Greet only when the customer's latest message is a greeting.
 
 ## The passages
 
