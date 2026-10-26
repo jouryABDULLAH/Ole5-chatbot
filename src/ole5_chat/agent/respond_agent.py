@@ -1,7 +1,7 @@
 """The search node and the respond node.
 
-search: on a question turn the model writes the searches, one per reply, and code runs them. On `details` and `change` it
-searches only if the customer also asked something. Every other turn passes through.
+search: on a question turn the model writes the searches, one per reply, and code runs them. Every other turn passes
+through: a ticket turn is an answer about the ticket, and a question asked during a ticket is routed to question.
 
 respond_agent: writes the reply, with no tool.
 - DIRECT passages: answer from them with a status. A grounding call names the documents the reply uses (the sources)
@@ -34,9 +34,6 @@ NOTE = "Note from the system, not the customer: "
 LANGUAGE_RETRIES = 2
 # Turns answered as a question. status has no handler of its own yet.
 QUESTIONS = ("question", "status")
-# Ticket turns that search only if the customer also asks something. An accept that asks something is routed to
-# question.
-SEARCHES = ("details", "change")
 CHINESE = re.compile(r"[一-鿿㐀-䶿]")
 STATUS = ("Reply with JSON only, matching this schema: {schema}\nreply is your message to the customer. status is "
           "answered when the passages answer what the customer asked, partial when they answer only part of it and the "
@@ -44,7 +41,6 @@ STATUS = ("Reply with JSON only, matching this schema: {schema}\nreply is your m
           "ticket. On a turn where the customer asked nothing, status is answered.")
 UNSUPPORTED = "Remove these from your reply; no passage states them: {}. Keep only what the passages say."
 UNUSED = "Your reply draws on none of the passages. Write what they say about the customer's question, and nothing more."
-NO_FACTS = "Write your reply again without stating anything about the product; do only what the task says."
 
 
 class Answer(BaseModel):
@@ -73,17 +69,16 @@ def _invoke(convo: list[BaseMessage], tool=None, tool_choice: str | None = None)
 
 
 def search(state: ChatState) -> dict:
-    question = state.get("next") in QUESTIONS
-    if not question and state.get("next") not in SEARCHES:
+    if state.get("next") not in QUESTIONS:
         return {}
     sink: list[Retrieval] = []
     tool = make_search_tool(state["identity"].product, sink)
-    convo = [SystemMessage(content=prompt.search(state, question)), *state["messages"]]
+    convo = [SystemMessage(content=prompt.search(state)), *state["messages"]]
     cap = get_settings().kb_max_searches
     # The model makes one tool call per reply, so it sees each result and searches again until it stops or hits the cap.
     while len(sink) < cap:
         try:
-            reply = _invoke(convo, tool, "required" if question and not sink else "auto")
+            reply = _invoke(convo, tool, "auto" if sink else "required")
         except llm.ModelFailed as exc:
             log.warning("search  model failed: %s", str(exc)[:300])
             if sink:
@@ -162,12 +157,12 @@ def _ground(exchange: str, text: str, retrieval: Retrieval) -> Grounding:
     return llm.structured(prompt.ground(), [HumanMessage(content=content)], Grounding, node="ground")
 
 
-def _answer(convo, retrieval: Retrieval, exchange: str, language: str, corrections: list[str],
-            question: bool) -> tuple[str, list[str], str]:
+def _answer(convo, retrieval: Retrieval, exchange: str, language: str,
+            corrections: list[str]) -> tuple[str, list[str], str]:
     """The reply from DIRECT passages, with its sources and status.
 
-    A reply that states what no passage says, or on a question turn uses no passage, is written once more. If it still
-    fails, a question gets the no-answer wording and a ticket turn gets a reply with no product facts."""
+    A reply that states what no passage says, or uses no passage, is written once more. If it still fails, it becomes
+    the no-answer wording."""
     direct = list(dict.fromkeys(e.document for e in retrieval.direct))
     rule = HumanMessage(content=NOTE + STATUS.format(schema=llm.schema_text(Answer)))
     for attempt in (1, 2):
@@ -178,7 +173,7 @@ def _answer(convo, retrieval: Retrieval, exchange: str, language: str, correctio
             answer = exc.result
             corrections.append(f"language: {exc}")
         convo.append(AIMessage(content=answer.reply))
-        if question and answer.status == "no_answer":
+        if answer.status == "no_answer":
             return answer.reply, [], "no_answer"
         try:
             grounding = _ground(exchange, answer.reply, retrieval)
@@ -189,7 +184,7 @@ def _answer(convo, retrieval: Retrieval, exchange: str, language: str, correctio
         used = [d for d in direct if any(d in u for u in grounding.used)]
         log.info("respond_agent  attempt=%d status=%s used=%s unsupported=%s", attempt, answer.status, used,
                  grounding.unsupported)
-        if not grounding.unsupported and (used or not question):
+        if not grounding.unsupported and used:
             return answer.reply, used, answer.status
         if attempt == 1 and grounding.unsupported:
             convo.append(HumanMessage(content=NOTE + UNSUPPORTED.format("; ".join(grounding.unsupported))))
@@ -198,10 +193,7 @@ def _answer(convo, retrieval: Retrieval, exchange: str, language: str, correctio
             convo.append(HumanMessage(content=NOTE + UNUSED))
             corrections.append("retried: no passage used")
     corrections.append("reply not grounded")
-    if question:
-        return _no_answer(convo, language, corrections), [], "no_answer"
-    convo.append(HumanMessage(content=NOTE + NO_FACTS))
-    return _write(convo, language, corrections), [], "answered"
+    return _no_answer(convo, language, corrections), [], "no_answer"
 
 
 # The respond node.
@@ -239,8 +231,7 @@ def respond_agent(state: ChatState) -> dict:
     sources, status = [], "answered"
     try:
         if retrieval and retrieval.direct:
-            text, sources, status = _answer(convo, retrieval, _exchange(state["messages"]), language, corrections,
-                                            question)
+            text, sources, status = _answer(convo, retrieval, _exchange(state["messages"]), language, corrections)
         elif question and retrieval and retrieval.error:
             text = SORRY[language]
             corrections.append("search failed")

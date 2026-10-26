@@ -344,27 +344,11 @@ def test_respond_agent_unsupported_facts_twice_give_the_no_answer(model, respond
     assert out["corrections"] == ["retried: unsupported", "reply not grounded"]
 
 
-def test_an_answer_on_a_ticket_turn_never_offers(model, respond_node):
-    model.add(*answer("partial", "Press Save as draft. Which version do you use?", ["Guide"]))
-    out, fake = respond_node("version 17, and how do I save a draft?", [searching("How to save a draft?"), DONE],
-                             [hit("Guide")], next_="details")
-    assert fake.choices == ["auto", "auto"] and out["offered"] is False and out["reply"].sources == ["Guide"]
-
-
-def test_a_ticket_turn_reply_with_unsupported_facts_is_written_without_them(model, respond_node):
-    model.add(*answer("no_answer", "العلامة المائية تحتاج تطبيق سطح المكتب. أي إصدار تستخدم؟", [], ["تطبيق سطح المكتب"]),
-              *answer("answered", "تحتاج تطبيق سطح المكتب. أي إصدار تستخدم؟", [], ["تطبيق سطح المكتب"]))
-    out, fake = respond_node("ايه", [searching("watermark on iPad"), DONE, AIMessage(content="أي إصدار تستخدم؟")], [hit("Guide")],
+def test_a_ticket_turn_never_searches(respond_node):
+    out, fake = respond_node("version 17, and how do I save a draft?", [AIMessage(content="When did it start?")],
                              next_="details")
-    assert out["reply"].say == "أي إصدار تستخدم؟" and out["offered"] is False and out["reply"].sources == []
-    assert "without stating anything about the product" in sent(fake)[-1].content
-    assert out["corrections"] == ["retried: unsupported", "reply not grounded"]
-
-
-def test_a_ticket_turn_reply_that_uses_no_passage_is_kept(model, respond_node):
-    model.add(*answer("answered", "Which version do you use?"))
-    out, _ = respond_node("version 17", [searching("anything"), DONE], [hit("Guide")], next_="details")
-    assert out["reply"].say == "Which version do you use?" and out["corrections"] == [] and out["offered"] is False
+    assert len(fake.calls) == 1 and fake.bound == [None] and out.get("last_retrieval") is None
+    assert out["reply"].say == "When did it start?" and out["offered"] is False
 
 
 def router_state(email="ole5@example.com", phase="none", messages=("hi",)):
@@ -456,12 +440,10 @@ def test_initial_state_has_the_router_fields():
 @pytest.fixture
 def new_path(monkeypatch, model):
     """The graph with a scripted router, tool model, searches and structured calls. send() runs one turn and returns
-    the state and the system prompt respond_agent was given. On details and change the search node calls the
-    tool model too; when the first scripted reply is not a search, a reply with no search is put before it."""
+    the state and the system prompt respond_agent was given."""
     from ole5_chat import llm
     from ole5_chat.agent import prompt
     from ole5_chat.agent.contracts import route_schema
-    from ole5_chat.agent.respond_agent import SEARCHES
     from ole5_chat.knowledge import tool
     found, fake, prompts = [], ToolModel(), []
     monkeypatch.setattr(tool, "search", lambda question, product: found.pop(0))
@@ -471,8 +453,6 @@ def new_path(monkeypatch, model):
 
     def send(sid, message, next_, replies, retrievals=(), groundings=()):
         model.add(route_schema(sessions.get(sid)["phase"])(next=next_), *groundings)
-        if next_ in SEARCHES and not (replies and replies[0].tool_calls):
-            replies = [AIMessage(content=""), *replies]
         fake.replies.extend(replies)
         found.extend(retrievals)
         state = sessions.send(sid, message)
@@ -705,7 +685,7 @@ def test_a_stale_next_does_not_skip_the_router(new_path, model):
     assert state["created_tickets"] == [] and state["phase"] == "collect" and state["ticket_draft"].rounds == 1
 
 
-def test_search_runs_on_question_and_details_and_respond_never_binds_a_tool(new_path):
+def test_search_runs_only_on_question_and_respond_never_binds_a_tool(new_path):
     from ole5_chat import llm
     sid = chat()
     unanswered(new_path, sid, "Does it run on Linux?")
@@ -713,8 +693,8 @@ def test_search_runs_on_question_and_details_and_respond_never_binds_a_tool(new_
     new_path(sid, "version 17", "details", [AIMessage(content="Anything else?")])
     new_path(sid, "nothing else", "done", [AIMessage(content="Submit it?")], groundings=[GOOD])
     fake = llm.tool_client
-    assert fake.choices == ["required", "auto", None, None, "auto", None, None]
-    assert [bool(b) for b in fake.bound] == [True, True, False, False, True, False, False]
+    assert fake.choices == ["required", "auto", None, None, None, None]
+    assert [bool(b) for b in fake.bound] == [True, True, False, False, False, False]
 
 
 def test_a_json_reply_is_retried_as_a_chat_message(new_path):
@@ -781,22 +761,13 @@ def test_the_cancel_task_is_the_last_message(new_path):
         NOTE + "The customer cancelled the ticket.")
 
 
-def test_a_question_in_a_details_turn_is_searched_and_answered(new_path):
-    sid = chat()
-    collecting(new_path, sid)
-    state, _ = new_path(sid, "version 17. also, how do I save a draft?", "details", [searching("How to save a draft?"), DONE],
-                        [hit("Guide")], answer("answered", "Press Save as draft. When did it start?", ["Guide"]))
-    assert state["sources"] == ["Guide"] and state["messages"][-1].text.startswith("Press Save as draft.")
-    assert state["phase"] == "collect" and [p.text for p in state["pending"]] == ["Does it run on Linux?"]
-
-
 def test_a_details_turn_without_a_question_does_not_search(new_path):
     from ole5_chat import llm
     sid = chat()
     collecting(new_path, sid)
     first = len(llm.tool_client.calls)
     state, _ = new_path(sid, "version 17", "details", [AIMessage(content="When did it start?")])
-    assert len(llm.tool_client.calls) == first + 2 and state["sources"] == []
+    assert len(llm.tool_client.calls) == first + 1 and state["sources"] == []
 
 
 URGENT_ISSUE = "nobody in our organization can sign in"

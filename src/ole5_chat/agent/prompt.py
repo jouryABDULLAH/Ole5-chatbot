@@ -169,8 +169,7 @@ TASKS = {
     "details": "Ask what else the support team needs to act on: {issue}. A few things at a time, skipping what the "
                "customer already said. If the team has enough, ask instead whether there is anything else they'd like "
                "to add. Ask about what the customer sees and did. Don't name a screen, template, setting or option "
-               "unless a passage names it. If the customer also asked a question in this message, answer it first "
-               "from the passages, then continue. Nothing has been created yet; the ticket is "
+               "unless a passage names it. Nothing has been created yet; the ticket is "
                "created only when they submit the summary. Don't say a ticket is opened, created or being opened. "
                "Don't ask again a question you already asked; if the customer didn't answer it, they don't know.",
     "open_question": "Ask whether there is anything else they'd like to add about: {issue}. Nothing else.",
@@ -179,8 +178,7 @@ TASKS = {
                "ticket for: {issue}. "
                "Don't say the ticket is created, opened or being opened. Don't repeat the summary.",
     "changed": "The ticket summary was updated as the customer asked and is shown again. Say what changed in one line "
-               "and ask whether to submit the ticket for: {issue}. If the customer also asked a question in this message, "
-               "answer it first from the passages, then continue.",
+               "and ask whether to submit the ticket for: {issue}.",
     "created": "The ticket {number} was created. Tell the customer its number and that the support team will reply by "
                "email. Nothing more.",
     "cancelled": "The customer cancelled the ticket. Acknowledge it in one line and say they can contact support at any "
@@ -203,19 +201,9 @@ def respond(state: ChatState, language: str) -> str:
                  task=state.get("task") or RESPOND_TASK, note=state.get("note") or "")
 
 
-SEARCH_RULES = {
-    "question": "The message asks something or reports a problem: search for it.",
-    "own_issue": "The customer is answering the assistant about a ticket. The ticket's problem was already searched: "
-                 "never search it again. Search only if this message asks a new product question in its own words. "
-                 "\"I don't know\", \"no\", \"nothing else\", a detail, a file or a change to the summary are answers: "
-                 "reply without a tool call.",
-}
-
-
-def search(state: ChatState, question: bool) -> str:
+def search(state: ChatState) -> str:
     config = products.load(state["identity"].product)
-    rule = SEARCH_RULES["question" if question else "own_issue"]
-    return _fill("search", product_name=config.name, rule=rule, max_searches=str(get_settings().kb_max_searches))
+    return _fill("search", product_name=config.name, max_searches=str(get_settings().kb_max_searches))
 
 
 def ground() -> str:
