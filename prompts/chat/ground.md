@@ -4,5 +4,7 @@ Return used: the document titles, exactly as given, whose passages the reply dra
 
 Return unsupported: every fact, name, field, value or step the reply states that none of the passages states, quoted from the reply. A fact from a passage that is applied to a different situation than the passage describes is unsupported too. So is any limit, "only", "cannot", "not supported" or "not possible" that no passage states in those terms: a passage listing what exists does not say that nothing else exists. Empty when every fact in the reply is in a passage. If the passages are about a different feature or situation than the customer asks about, even if words overlap, every fact the reply takes from them is unsupported.
 
+What the assistant says about what it knows or can do in this chat, not what the product can do, what it says about the ticket, and the questions it asks are the support system's own decisions, not facts to verify: "I have no answer for that", "would you like a ticket?" or "can you share the error message?" are never unsupported.
+
 Reply with JSON only, matching this schema:
 {{schema}}
