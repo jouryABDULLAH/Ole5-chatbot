@@ -297,19 +297,24 @@ class VoiceSession:
             return
         await self.send_json({"type": "heard", "text": heard.text, "language": heard.language or self.language,
                               "over_bot": over_bot})
-        await self._words(heard.text, heard.language, over_bot=over_bot)
+        await self._words(heard.text, heard.language, over_bot=over_bot, seconds=heard.seconds)
 
-    async def _words(self, text: str, language: str | None, *, over_bot: bool = False, typed: bool = False) -> None:
+    async def _words(self, text: str, language: str | None, *, over_bot: bool = False, typed: bool = False,
+                     seconds: float | None = None) -> None:
         command = None if typed else rules.command(text, talking=self.speaker.busy)
         # Speech that began in the assistant's question and went on after it is the answer to it.
         answering = over_bot and self.speaker.last_said.rstrip().endswith(QUESTION_END)
         if over_bot:
+            command = command or rules.interrupting(text)
             if command == "stop":
                 await self.stop()
                 return
+            if command == "wait":
+                await self._rule("wait")
+                return
             reason = None if answering else (
                 "backchannel" if rules.is_backchannel(text) or rules.is_thanks(text) or rules.is_fragment(text)
-                else "echo" if self._echo(text) else None)
+                or rules.is_short_sound(text, seconds) else "echo" if self._echo(text) else None)
             if reason:
                 await self.send_json({"type": "ignored", "reason": reason})
                 return

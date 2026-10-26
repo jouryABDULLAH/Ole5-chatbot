@@ -362,7 +362,7 @@
       try {
         await loadScript(HERE + "voice.js");
         link = this.voice = new window.T2Voice.VoiceLink({
-          api: this.api, sessionId: this.view.session_id, bargeIn: new URLSearchParams(location.search).has("barge"),
+          api: this.api, sessionId: this.view.session_id, halfDuplex: new URLSearchParams(location.search).has("halfduplex"),
           on: { event: (m) => this.voiceEvent(m), stage: (s) => { this.stage = s; this.updateVoiceBar(); },
                 speech: (on) => { if (this.stage !== "speaking" && (on || this.stage === "hearing")) { this.stage = on ? "hearing" : "listening"; this.updateVoiceBar(); } },
                 closed: () => { this.voice = null; this.busy = false; this.error = this.t.voiceLost; this.render(); } } });

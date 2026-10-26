@@ -39,7 +39,8 @@ class FakeOle5:
         text = self.heard.pop(0)
         if isinstance(text, Exception):
             raise text
-        return Heard(text=text, language=script_language(text), raw=text, seconds=1.0, ms=5, forced=None)
+        seconds = 1.0 if len(text.split()) <= 2 else 2.5  # a word or two is a short segment; a sentence is longer
+        return Heard(text=text, language=script_language(text), raw=text, seconds=seconds, ms=5, forced=None)
 
     async def speech(self, text, language):
         self.spoken.append(text)
@@ -669,3 +670,51 @@ def test_khalas_stops_the_assistant_only_while_it_talks():
 
     run(fake, scenario, autoplay=False)
     assert [t for t, _, _ in fake.sent] == ["خلاص"]
+
+
+def test_stop_said_over_the_assistant_with_its_echo_stops_it():
+    fake = FakeOle5(heard=["افتح إعدادات المستخدم وقف"])
+    fake.frame_delay = 0.2
+
+    async def scenario(voice, page):
+        voice._speak_reply("افتح إعدادات المستخدم، ثم اختر التوقيع من القائمة، ثم اضغط حفظ في أسفل الشاشة.", "ar", [],
+                           turn=None)
+        await until(lambda: page.said("reply"))
+        voice.utterance({"over_bot": True}, WAV)
+        await until(lambda: page.events("stop_audio"))
+        await idle(voice, page)
+
+    page = run(fake, scenario, autoplay=False)
+    assert fake.sent == [] and page.events("tts_end")[-1]["cancelled"] is True
+
+
+def test_wait_said_over_the_assistant_stops_it_and_waits():
+    fake = FakeOle5(heard=["لحظة لحظة"])
+    fake.frame_delay = 0.2
+
+    async def scenario(voice, page):
+        voice._speak_reply("شرح طويل عن الإعدادات والقوائم والشاشات المختلفة في النظام.", "ar", [], turn=None)
+        await until(lambda: page.said("reply"))
+        voice.utterance({"over_bot": True}, WAV)
+        await until(lambda: line("wait") in page.said())
+
+    page = run(fake, scenario, autoplay=False)
+    assert page.events("stop_audio") and fake.sent == []
+
+
+def test_a_short_unknown_sound_over_the_assistant_is_ignored_and_a_no_interrupts():
+    fake = FakeOle5(heard=["تاما", "لا"], replies=["حسناً."])
+    fake.frame_delay = 0.2
+
+    async def scenario(voice, page):
+        voice._speak_reply("شرح طويل عن الإعدادات والقوائم والشاشات المختلفة في النظام.", "ar", [], turn=None)
+        await until(lambda: page.said("reply"))
+        voice.utterance({"over_bot": True}, WAV)
+        await until(lambda: page.events("ignored"))
+        assert not page.events("stop_audio")
+        voice.utterance({"over_bot": True}, WAV)
+        await until(lambda: fake.sent)
+
+    page = run(fake, scenario, autoplay=False)
+    assert page.events("ignored")[0]["reason"] == "backchannel" and page.events("stop_audio")
+    assert [t for t, _, _ in fake.sent] == ["لا"]

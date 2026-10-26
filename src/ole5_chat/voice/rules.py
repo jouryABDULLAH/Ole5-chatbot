@@ -39,7 +39,7 @@ COMMANDS = {
 STOP_WHILE_TALKING = _norm("خلاص", "خلاص خلاص", "enough", "that's enough")
 POLITE = _norm("لو سمحت", "من فضلك", "please", "ok", "okay", "اوكي", "تمام", "طيب", "يا", "now", "الحين")
 # Acknowledgements: listening sounds, never a decision on their own.
-ACK = _norm("تمام", "تامام", "طيب", "اوكي", "اوكيه", "اوك", "حسنا", "زين", "ماشي", "اها", "اه", "امم", "مم", "ممم", "ok", "okay",
+ACK = _norm("تمام", "تامام", "تاما", "طيب", "اوكي", "اوكيه", "اوك", "حسنا", "زين", "ماشي", "اها", "اه", "امم", "مم", "ممم", "ok", "okay",
             "okey", "alright", "all right", "hmm", "mhm", "mhmm", "mm hmm", "uh huh", "tama", "tamam")
 # A plain yes: an answer to a direct question.
 YES = _norm("نعم", "ايه", "اي", "ايوه", "ايوا", "اكيد", "naam", "aywa", "yes", "yeah", "yep", "sure", "of course",
@@ -87,6 +87,30 @@ def command(text: str, talking: bool = False) -> str | None:
                                                                   for t in found):
             return name
     return None
+
+
+def interrupting(text: str) -> str | None:
+    """stop or wait when an utterance said over the assistant contains that command anywhere: the microphone may have
+    caught some of the assistant's own words with it ("... كلمة المرور وقف"). Only stop and wait: repeat's words
+    ("read", "again") are too common to be heard in passing."""
+    found = tokens(text)
+    for name in ("stop", "wait"):
+        extra = STOP_WHILE_TALKING if name == "stop" else frozenset()
+        if any(t in COMMANDS[name] or t in extra for t in found):
+            return name
+    return None
+
+
+SHORT_SOUND_S = 1.6  # a one- or two-word segment, the detector's padding included
+
+
+def is_short_sound(text: str, seconds: float | None) -> bool:
+    """A very short utterance over the assistant that is not a command and not a no: a listening sound Whisper wrote
+    some other way ("تاما", "Time out." for "تمام"). A real interruption with content is longer; "stop", "wait" and
+    "لا" still interrupt."""
+    found = tokens(text)
+    return (seconds is not None and seconds < SHORT_SOUND_S and 0 < len(found) <= 2
+            and not any(t in NEGATION for t in found) and command(text, talking=True) is None)
 
 
 def is_backchannel(text: str) -> bool:

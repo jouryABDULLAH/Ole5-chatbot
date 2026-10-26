@@ -21,6 +21,7 @@ from groq import AsyncGroq
 
 from ole5_chat.agent.validate import script_language
 from ole5_chat.config import get_settings
+from ole5_chat.voice import rules
 from ole5_chat.voice.rules import TASHKEEL
 
 log = logging.getLogger(__name__)
@@ -41,6 +42,7 @@ ONLY_MARKS = re.compile(r"^[\W_]*$")
 HINTS = {"ar": "نظام Ole5 ودعم RiCH", "en": "Ole5, RiCH"}
 HINT_WORDS = {"نظام", "ole5", "ودعم", "دعم", "rich", "و"}
 SESSION_LEAD = 0.3  # added to the conversation language's confidence (mean log-probability) when the scripts differ
+SHORT_SESSION_LEAD = 0.5
 
 
 @dataclass
@@ -120,8 +122,15 @@ async def _whisper(wav: bytes, language: str, hint: str | None, api: AsyncGroq |
     return _Take(language, raw, clean(raw, hint or ""), confidence)
 
 
-def choose(takes: list[_Take], session_language: str) -> _Take:
-    """The take to keep (see the module docstring)."""
+def _known(text: str) -> bool:
+    found = rules.tokens(text)
+    return bool(found) and all(t in rules.PHRASES for t in found)
+
+
+def choose(takes: list[_Take], session_language: str, short: bool = False) -> _Take:
+    """The take to keep (see the module docstring). A short clip is one or two words, almost always a command, an
+    acknowledgement or a yes or no: a take made only of those phrases beats one that is not ("تمام" over the
+    assistant came back from the English call as "Time out."), and the conversation's language leads by more."""
     usable = [t for t in takes if t.text]
     if len(usable) < 2:
         return usable[0] if usable else takes[0]
@@ -129,7 +138,12 @@ def choose(takes: list[_Take], session_language: str) -> _Take:
     if len(scripts) == 1 and None not in scripts:
         script = scripts.pop()
         return next(t for t in usable if t.language == script)
-    return max(usable, key=lambda t: t.confidence + (SESSION_LEAD if t.language == session_language else 0.0))
+    if short:
+        known = [t for t in usable if _known(t.text)]
+        if len(known) == 1:
+            return known[0]
+    lead = SHORT_SESSION_LEAD if short else SESSION_LEAD
+    return max(usable, key=lambda t: t.confidence + (lead if t.language == session_language else 0.0))
 
 
 async def transcribe(wav: bytes, session_language: str) -> Heard:
@@ -145,7 +159,7 @@ async def transcribe(wav: bytes, session_language: str) -> Heard:
         log.warning("voice  one speech-to-text call failed: %s", failed)
     if not takes:
         raise results[0]
-    kept = choose(takes, session_language)
+    kept = choose(takes, session_language, short)
     ms = int((time.perf_counter() - started) * 1000)
     log.info("voice  stt seconds=%.2f ms=%d kept=%s %s", seconds, ms, kept.language,
              " | ".join(f"{t.language}:{t.confidence:.2f}:{t.raw!r}" for t in takes))

@@ -89,6 +89,15 @@ def test_when_the_scripts_differ_the_more_confident_take_wins_with_a_lead_for_th
     assert asyncio.run(stt.transcribe(wav(1.5), "en")).text == "What gift?"
 
 
+def test_in_a_short_clip_a_known_phrase_beats_an_unknown_one(monkeypatch):
+    # The user's "تمام" said over the assistant: the English call heard "Time out." with more confidence.
+    fake_whisper(monkeypatch, {"ar": ("تمام", -0.65), "en": ("Time out.", -0.2)})
+    assert asyncio.run(stt.transcribe(wav(1.1), "ar")).text == "تمام"
+    # A longer clip goes by confidence as before.
+    fake_whisper(monkeypatch, {"ar": ("تمام كذا يعني", -0.9), "en": ("Time out of the system", -0.2)})
+    assert asyncio.run(stt.transcribe(wav(2.5), "ar")).text == "Time out of the system"
+
+
 def test_a_take_made_only_of_hint_words_is_dropped(monkeypatch):
     fake_whisper(monkeypatch, {"ar": ("نظام Ole5", -0.61), "en": ("Yes.", -0.91)})
     assert asyncio.run(stt.transcribe(wav(2.1), "ar")).text == "Yes."

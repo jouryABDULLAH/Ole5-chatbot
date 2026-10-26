@@ -95,3 +95,25 @@ def test_the_script_check_allows_names_in_the_other_script():
     assert script_problem("Open the Settings screen and press Save.", "ar").startswith("The reply is in English.")
     assert script_problem("افتح الإعدادات ثم اضغط حفظ.", "en").startswith("The reply is in Arabic.")
     assert script_language("ok") is None
+
+
+@pytest.mark.parametrize("text, name", [("كلمة المرور وقف", "stop"), ("open the settings stop", "stop"), ("وقف وقف", "stop"),
+                                        ("لحظة لحظة عندي سؤال", "wait"), ("then press save wait", "wait")])
+def test_a_stop_or_wait_heard_with_the_assistants_echo_still_interrupts(text, name):
+    assert rules.interrupting(text) == name
+
+
+@pytest.mark.parametrize("text", ["I already read that", "say it again", "تمام", "كيف أغير كلمة المرور"])
+def test_other_words_over_the_assistant_are_not_an_interruption_command(text):
+    assert rules.interrupting(text) is None
+
+
+@pytest.mark.parametrize("text", ["تاما", "Time out.", "hmm yes", "ممم"])
+def test_a_very_short_sound_over_the_assistant_is_a_listening_sound(text):
+    assert rules.is_short_sound(text, 1.1)
+
+
+@pytest.mark.parametrize("text, seconds", [("لا", 1.0), ("Stop.", 1.0), ("وقف", 1.2), ("no the mobile app", 1.4),
+                                           ("Time out.", 2.0), ("تاما", None)])
+def test_commands_a_no_and_longer_speech_over_the_assistant_are_not_listening_sounds(text, seconds):
+    assert not rules.is_short_sound(text, seconds)

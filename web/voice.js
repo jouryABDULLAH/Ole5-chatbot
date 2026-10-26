@@ -4,10 +4,12 @@
    The microphone stays open while voice is on, with the browser's echo cancellation. A speech detector (Silero VAD,
    vad-web 0.0.31) cuts each utterance; it is sent as a 16 kHz WAV over the session's WebSocket. The assistant's speech
    comes back as 40 ms frames of 24 kHz PCM between tts_start and tts_end and is played without gaps. Speech that starts
-   while the assistant is talking (and not in its last 0.6 s) is "over the assistant": in half-duplex mode (the default
-   until barge-in is tuned) it is dropped when the assistant is still talking as it ends, and sent marked over_bot when
-   it went on past the assistant's last word (an answer to its question). The server is told when speech starts, so it
-   can join a sentence split by a pause. Protocol: VOICE_PLAN.md section 5. */
+   while the assistant is talking (and not in its last 0.6 s) is "over the assistant": the assistant's volume drops at
+   once and the utterance is sent marked over_bot; the server decides (stop, wait and repeat act; "تمام", "ok" and the
+   assistant's own echo are ignored and the volume comes back; other words stop it and are answered). With ?halfduplex
+   in the page URL, speech over the assistant is dropped instead, unless it went on past the assistant's last word.
+   The server is told when speech starts, so it can join a sentence split by a pause. Protocol: VOICE_PLAN.md
+   section 5. */
 (() => {
   const VAD_CDN = "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.31/dist/";
   const ORT_CDN = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/";  // must match vad-web 0.0.31
@@ -15,7 +17,8 @@
   const VAD = { model: "v5", positiveSpeechThreshold: 0.5, negativeSpeechThreshold: 0.35, redemptionMs: 850,
                 preSpeechPadMs: 300, minSpeechMs: 160 };
   const TAIL_S = 0.6;          // speech starting in the assistant's last 0.6 s is an answer, not an interruption
-  const BARGE_IN_MS = 1200;    // speech over the assistant this long stops it (barge-in mode only)
+  const JUDGED_MS = 2500;      // after speech over the assistant, it stays quiet this long for the server's verdict
+  const INTERRUPT_REDEMPTION_MS = 500;   // speech over the assistant ends sooner: "stop" acts ~0.35 s faster
 
   const scripts = {};
   function loadScript(src) {
@@ -96,9 +99,10 @@
       for what the assistant is doing (listening, thinking, searching, speaking), speech(bool) while the customer
       talks, closed(reason) when the connection ends without being stopped. */
   class VoiceLink {
-    constructor({ api, sessionId, on, bargeIn = false }) {
-      this.api = api; this.sessionId = sessionId; this.on = on; this.bargeIn = bargeIn;
-      this.item = null; this.stage = "listening"; this.stopped = false; this.overBot = false; this.bargeTimer = null;
+    constructor({ api, sessionId, on, halfDuplex = false }) {
+      this.api = api; this.sessionId = sessionId; this.on = on; this.halfDuplex = halfDuplex;
+      this.item = null; this.stage = "listening"; this.stopped = false; this.overBot = false; this.unduckTimer = null;
+      this.speaking = false;   // the customer is talking now
       this.hush = false;   // after a local stop: drop the assistant's audio until the server's stop_audio
     }
 
@@ -143,20 +147,29 @@
     // ---- the customer's speech ----
 
     speechStart() {
+      this.speaking = true;
       this.overBot = this.player.remaining() > TAIL_S;
       this.send({ type: "speech", on: true });
       this.on.speech?.(true);
-      if (this.overBot && this.bargeIn) {
+      if (this.overBot && !this.halfDuplex) {   // the customer is heard at once: the assistant gets quieter
+        clearTimeout(this.unduckTimer);
         this.player.duck();
-        this.bargeTimer = setTimeout(() => { this.bargeTimer = null; this.interrupt("barge_in"); }, BARGE_IN_MS);
+        this.vad.setOptions({ redemptionMs: INTERRUPT_REDEMPTION_MS });
       }
     }
 
-    speechDone() {
-      clearTimeout(this.bargeTimer); this.bargeTimer = null;
-      this.player.unduck();
+    /** Speech ended. The assistant's volume comes back now, or after `judgedMs` when the server is still deciding
+        whether the speech over it was an interruption. */
+    speechDone(judgedMs = 0) {
+      this.speaking = false;
+      this.vad.setOptions({ redemptionMs: VAD.redemptionMs });
       this.on.speech?.(false);
+      clearTimeout(this.unduckTimer);
+      if (judgedMs) this.unduckTimer = setTimeout(() => this.player.unduck(), judgedMs);
+      else this.player.unduck();
     }
+
+    unduck() { clearTimeout(this.unduckTimer); if (!this.speaking) this.player.unduck(); }
 
     /** The detector heard a sound too short to be speech. */
     misfire() {
@@ -168,11 +181,12 @@
     speechEnd(audio) {
       const overBot = this.overBot;
       this.overBot = false;
-      this.speechDone();
-      if (overBot && !this.bargeIn && this.player.playing) {   // half-duplex: all of it was over the assistant
+      if (overBot && this.halfDuplex && this.player.playing) {   // half-duplex: all of it was over the assistant
+        this.speechDone();
         this.send({ type: "speech", on: false });
         return;
       }
+      this.speechDone(overBot && !this.halfDuplex ? JUDGED_MS : 0);
       this.send({ type: "utterance", over_bot: overBot, ms: Math.round(audio.length / 16) });
       this.send(encodeWav(audio));
     }
@@ -183,6 +197,7 @@
       if (m.type === "tts_start") {
         this.item = { id: m.id, kind: m.kind, dropped: this.hush };
         if (!this.hush) this.showStage("speaking");
+        if (m.kind !== "reply" || !this.player.playing) this.unduck();   // something new to say: full volume
       } else if (m.type === "tts_end") {
         const item = this.item;
         if (item && item.id === m.id) {
@@ -195,6 +210,8 @@
       } else if (m.type === "status") {
         this.stage = m.stage;
         this.showStage();
+      } else if (m.type === "ignored") {
+        this.unduck();   // a backchannel or the assistant's own echo: carry on at full volume
       }
       this.on.event?.(m);
     }
@@ -222,7 +239,7 @@
     stop() {
       if (this.stopped) return;
       this.stopped = true;
-      clearTimeout(this.bargeTimer);
+      clearTimeout(this.unduckTimer);
       try { this.vad && this.vad.destroy(); } catch {}
       if (this.stream) for (const t of this.stream.getTracks()) t.stop();
       if (this.player) this.player.close();
