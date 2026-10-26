@@ -39,6 +39,19 @@ def tool_client(temperature: float) -> ChatGroq:
     return ChatGroq(model=s.groq_model, api_key=s.groq_api_key.get_secret_value(), temperature=temperature)
 
 
+def invoke(convo: list[BaseMessage], tool=None, tool_choice: str | None = None) -> AIMessage:
+    """One plain model call, retried warmer if Groq rejects it. Only the search node binds a tool."""
+    error = "no attempt made"
+    for temperature in (0, 0.3):
+        try:
+            client = tool_client(temperature)
+            return (client.bind_tools([tool], tool_choice=tool_choice) if tool else client).invoke(convo)
+        except BadRequestError as exc:
+            error = str(exc)[:400]
+            log.warning("llm  rejected by Groq at temperature %s: %s", temperature, error)
+    raise ModelFailed(error)
+
+
 def _client(temperature: float):
     return tool_client(temperature).bind(response_format={"type": "json_object"})
 

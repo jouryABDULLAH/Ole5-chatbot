@@ -222,7 +222,7 @@ def search(state: ChatState) -> str:
 
 
 def ground() -> str:
-    from ole5_chat.agent.respond_agent import Grounding
+    from ole5_chat.agent.respond import Grounding
     return _fill("ground", schema=schema_text(Grounding))
 
 

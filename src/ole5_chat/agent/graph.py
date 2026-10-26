@@ -7,7 +7,8 @@ from langgraph.graph import END, START, StateGraph
 
 from ole5_chat import products
 from ole5_chat.agent import handlers
-from ole5_chat.agent.respond_agent import respond_agent, search
+from ole5_chat.agent.respond import respond_agent
+from ole5_chat.agent.search import search
 from ole5_chat.agent.router import router
 from ole5_chat.agent.state import ChatState
 

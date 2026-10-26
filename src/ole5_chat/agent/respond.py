@@ -1,9 +1,4 @@
-"""The search node and the respond node.
-
-search: on a question turn the model writes the searches, one per reply, and code runs them. Every other turn passes
-through: a ticket turn is an answer about the ticket, and a question asked during a ticket is routed to question.
-
-respond_agent: writes the reply, with no tool.
+"""The respond node: respond_agent writes the reply, with no tool.
 - DIRECT passages: answer from them with a status and the documents used (the sources, kept only if DIRECT). A
   grounding call names any statement no passage makes.
 - A question with no DIRECT passage: the no-answer wording.
@@ -15,25 +10,21 @@ import logging
 import re
 from typing import Literal
 
-from groq import BadRequestError
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel
 
 from ole5_chat import llm
 from ole5_chat.agent import prompt
 from ole5_chat.agent.contracts import Reply
+from ole5_chat.agent.search import QUESTIONS
 from ole5_chat.agent.state import ChatState
 from ole5_chat.agent.validate import NAMES, SORRY, language_of, language_problem
-from ole5_chat.config import get_settings
-from ole5_chat.knowledge.contracts import Retrieval, Verdict, merge
-from ole5_chat.knowledge.tool import make_search_tool
+from ole5_chat.knowledge.contracts import Retrieval
 
 log = logging.getLogger(__name__)
 
 NOTE = "Note from the system, not the customer: "
 LANGUAGE_RETRIES = 2
-# Turns answered as a question: the only ones that search and can offer a ticket.
-QUESTIONS = ("question",)
 CHINESE = re.compile(r"[一-鿿㐀-䶿]")
 STATUS = ("Reply with JSON only, matching this schema: {schema}\nreply is your message to the customer. status is "
           "answered when the passages answer what the customer asked, partial when they answer only part of it and the "
@@ -51,53 +42,6 @@ class Answer(BaseModel):
 
 class Grounding(BaseModel):
     unsupported: list[str]
-
-
-# The search node.
-
-def _invoke(convo: list[BaseMessage], tool=None, tool_choice: str | None = None) -> AIMessage:
-    """One model call, retried warmer if Groq rejects it. Only the search node binds a tool."""
-    error = "no attempt made"
-    for temperature in (0, 0.3):
-        try:
-            client = llm.tool_client(temperature)
-            return (client.bind_tools([tool], tool_choice=tool_choice) if tool else client).invoke(convo)
-        except BadRequestError as exc:
-            error = str(exc)[:400]
-            log.warning("respond_agent  rejected by Groq at temperature %s: %s", temperature, error)
-    raise llm.ModelFailed(error)
-
-
-def search(state: ChatState) -> dict:
-    if state.get("next") not in QUESTIONS:
-        return {}
-    sink: list[Retrieval] = []
-    tool = make_search_tool(state["identity"].product, sink)
-    convo = [SystemMessage(content=prompt.search(state)), *state["messages"]]
-    cap = get_settings().kb_max_searches
-    # The model makes one tool call per reply, so it sees each result and searches again until it stops or hits the cap.
-    while len(sink) < cap:
-        try:
-            reply = _invoke(convo, tool, "auto" if sink else "required")
-        except llm.ModelFailed as exc:
-            log.warning("search  model failed: %s", str(exc)[:300])
-            if sink:
-                break
-            failed = Retrieval(query="", verdict=Verdict.NOT_IN_KB, error=f"search call failed: {exc}")
-            return {"last_retrieval": failed.as_json()}
-        calls = [c for c in reply.tool_calls if c["name"] == tool.name][:cap - len(sink)]
-        if not calls:
-            break
-        convo.append(reply)
-        for call in calls:
-            result = tool.invoke(call)
-            if sink[-1].error:
-                # RAGent2's own model call sometimes fails; one more try usually gets through.
-                sink.pop()
-                result = tool.invoke(call)
-            convo.append(result)
-    log.info("search  next=%s searches=%d", state.get("next"), len(sink))
-    return {"last_retrieval": merge(sink).as_json() if sink else None}
 
 
 # Writing the reply.
@@ -122,7 +66,7 @@ def _say(convo: list[BaseMessage], note: str | None = None) -> str:
     """Adds the note, if any, then one plain model reply to the conversation."""
     if note:
         convo.append(HumanMessage(content=NOTE + note))
-    reply = _invoke(convo)
+    reply = llm.invoke(convo)
     convo.append(reply)
     return reply.text
 

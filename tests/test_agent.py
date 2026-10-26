@@ -108,7 +108,7 @@ def passage(document, relation="DIRECT"):
 def respond_node(monkeypatch):
     """Runs the search node then respond_agent on one customer message, with scripted tool-model replies and scripted search results."""
     from ole5_chat import llm
-    from ole5_chat.agent import handlers, respond_agent
+    from ole5_chat.agent import handlers, respond, search
     from ole5_chat.knowledge import tool
 
     def run(message, replies, retrievals=(), next_="question"):
@@ -119,8 +119,8 @@ def respond_node(monkeypatch):
         state = sessions.get(chat())
         state = {**state, "messages": [*state["messages"], HumanMessage(content=message)], "next": next_}
         state["task"] = handlers.chat(state)["task"] if next_ in ("question", "talk") else None
-        searched = respond_agent.search(state)
-        out = respond_agent.respond_agent({**state, **searched})
+        searched = search.search(state)
+        out = respond.respond_agent({**state, **searched})
         return {**searched, **out}, fake
 
     return run
@@ -137,7 +137,7 @@ def searching(*questions):
 
 def answer(status, reply, sources=(), unsupported=()):
     """What respond writes from DIRECT passages, with the sources it names, and the grounding call's verdict on it."""
-    from ole5_chat.agent.respond_agent import Answer, Grounding
+    from ole5_chat.agent.respond import Answer, Grounding
     return [Answer(status=status, reply=reply, sources=list(sources)), Grounding(unsupported=list(unsupported))]
 
 
@@ -804,7 +804,7 @@ def task_sent(new_path, *args, **kwargs):
 
 
 def test_the_task_is_the_last_message_off_the_plain_chat_turn(new_path):
-    from ole5_chat.agent.respond_agent import NOTE
+    from ole5_chat.agent.respond import NOTE
     sid = chat()
     plain = task_sent(new_path, sid, "thanks", "talk", [AIMessage(content="You're welcome.")])
     assert plain == "thanks"
@@ -826,7 +826,7 @@ def test_the_task_is_the_last_message_off_the_plain_chat_turn(new_path):
 
 def test_the_task_follows_the_passages_and_the_no_answer_note_follows_both(new_path):
     from ole5_chat import llm
-    from ole5_chat.agent.respond_agent import NOTE
+    from ole5_chat.agent.respond import NOTE
     sid = chat()
     unanswered(new_path, sid, "Does it run on Linux?")
     unanswered(new_path, sid, "Can I export to Excel?")
@@ -837,7 +837,7 @@ def test_the_task_follows_the_passages_and_the_no_answer_note_follows_both(new_p
 
 
 def test_the_cancel_task_is_the_last_message(new_path):
-    from ole5_chat.agent.respond_agent import NOTE
+    from ole5_chat.agent.respond import NOTE
     sid = chat()
     collecting(new_path, sid)
     assert task_sent(new_path, sid, "cancel it", "cancel", [AIMessage(content="Cancelled.")]).startswith(
@@ -857,7 +857,7 @@ URGENT_ISSUE = "nobody in our organization can sign in"
 
 
 def test_urgent_goes_straight_to_the_summary(new_path, model):
-    from ole5_chat.agent.respond_agent import NOTE
+    from ole5_chat.agent.respond import NOTE
     sid = chat()
     last = task_sent(new_path, sid, URGENT_ISSUE, "urgent", [AIMessage(content="It is urgent; the summary is ready.")],
                      groundings=[GOOD])
@@ -932,7 +932,7 @@ def test_post_check_never_classifies(model):
 
 @pytest.mark.parametrize("phase", ["offer_ticket", "collect", "confirm"])
 def test_a_queued_issue_goes_back_to_the_current_ticket(new_path, phase):
-    from ole5_chat.agent.respond_agent import NOTE
+    from ole5_chat.agent.respond import NOTE
     sid = chat()
     if phase == "offer_ticket":
         unanswered(new_path, sid, "Does it run on Linux?")
