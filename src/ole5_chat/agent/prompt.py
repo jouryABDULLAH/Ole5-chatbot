@@ -75,7 +75,7 @@ OLE5_EXAMPLES = {
     ("offer_ticket", "talk"): ['"مين أنت؟"'],
     ("collect", "details"): ['"تطلع رسالة Access denied"', '"ما أعرف"', '"[attached: screen.png]"'],
     ("collect", "done"): ['"هذا كل شيء"', '"لا" (when the assistant asked whether there is anything else)',
-                          '"التطبيق يقفل لحاله بعد التحديث، وهذا اللي أعرفه"'],
+                          '"التطبيق يقفل لحاله بعد التحديث، وهذا اللي أعرفه"', '"ما عندي شي ثاني، افتح التذكرة"'],
     ("collect", "cancel"): ['"خلاص ألغ التذكرة"'],
     ("collect", "question"): ['"ايش يعني درجة السرية؟"'],
     ("collect", "talk"): ['"ليش تحتاج هالمعلومة؟"'],
