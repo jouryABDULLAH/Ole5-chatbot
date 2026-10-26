@@ -98,6 +98,18 @@ def test_in_a_short_clip_a_known_phrase_beats_an_unknown_one(monkeypatch):
     assert asyncio.run(stt.transcribe(wav(2.5), "ar")).text == "Time out of the system"
 
 
+def test_a_known_yes_beats_its_transliteration_in_a_longer_clip(monkeypatch):
+    # The user's "نعم أرسلها" played into the browser: the English call wrote "Naam, Ersilha." and was more confident.
+    fake_whisper(monkeypatch, {"ar": ("نعم أرسلها", -0.6), "en": ("Naam, Ersilha.", -0.1)})
+    assert asyncio.run(stt.transcribe(wav(2.0), "ar")).text == "نعم أرسلها"
+
+
+def test_the_transliteration_is_a_submit_too():
+    from ole5_chat.voice import rules
+    assert rules.explicit_submit("Naam, Ersilha.") and rules.confirm_kind("Naam, Ersilha.") == "submit"
+    assert rules.explicit_submit("Naam, er Silha?")
+
+
 def test_a_take_made_only_of_hint_words_is_dropped(monkeypatch):
     fake_whisper(monkeypatch, {"ar": ("نظام Ole5", -0.61), "en": ("Yes.", -0.91)})
     assert asyncio.run(stt.transcribe(wav(2.1), "ar")).text == "Yes."
@@ -186,7 +198,7 @@ NUMBER = "T-MOCK-20261026153000-0001"
      "تم إنشاء تذكرتك، وسيتواصل معك فريق الدعم عبر البريد الإلكتروني. "
      "رقم التذكرة ظاهر على شاشتك، وينتهي بـ صفر صفر صفر واحد."),
     (f"رقم تذكرتك هو {NUMBER}. سيرد عليك فريق الدعم عبر البريد.",
-     "سيرد عليك فريق الدعم عبر البريد. رقم التذكرة ظاهر على شاشتك، وينتهي بـ صفر صفر صفر واحد."),
+     "رقم التذكرة ظاهر على شاشتك، وينتهي بـ صفر صفر صفر واحد. سيرد عليك فريق الدعم عبر البريد."),
 ])
 def test_the_ticket_number_is_replaced_by_where_to_find_it_in_arabic(text, spoken):
     assert speakable.speakable(text, "ar", [NUMBER]) == spoken
@@ -194,10 +206,10 @@ def test_the_ticket_number_is_replaced_by_where_to_find_it_in_arabic(text, spoke
 
 @pytest.mark.parametrize("text, spoken", [
     (f"Your ticket number is {NUMBER}. The support team will reply by email.",
-     "The support team will reply by email. Your ticket number is on your screen, ending in zero zero zero one."),
+     "Your ticket number is on your screen, ending in zero zero zero one. The support team will reply by email."),
     (f"Your ticket has been created with number {NUMBER}. We will email you.",
-     "Your ticket has been created. We will email you. Your ticket number is on your screen, ending in zero zero "
-     "zero one."),
+     "Your ticket has been created. Your ticket number is on your screen, ending in zero zero zero one. We will "
+     "email you."),
 ])
 def test_the_ticket_number_is_replaced_by_where_to_find_it_in_english(text, spoken):
     assert speakable.speakable(text, "en", [NUMBER]) == spoken
@@ -240,3 +252,14 @@ def test_a_sentence_longer_than_the_limit_is_cut_at_commas():
     parts = speakable.segments(sentence)
     assert len(parts) > 1 and all(len(p) <= speakable.SEGMENT_CHARS for p in parts)
     assert " ".join(parts) == sentence
+
+
+def test_the_number_sentence_stays_before_the_next_issues_question():
+    reply = (f"The ticket was created. Your ticket number is {NUMBER}. The support team will reply by email. You also "
+             "mentioned the archive button. Would you like a ticket for that?")
+    spoken = speakable.speakable(reply, "en", [NUMBER])
+    assert spoken.endswith("Would you like a ticket for that?")
+    assert spoken.index("on your screen") < spoken.index("archive button")
+    arabic = speakable.speakable(f"تم إنشاء التذكرة. رقم تذكرتك هو {NUMBER}. هل تريد أن أفتح تذكرة للمشكلة الأخرى؟", "ar",
+                                 [NUMBER])
+    assert arabic.endswith("هل تريد أن أفتح تذكرة للمشكلة الأخرى؟") and "ظاهر على شاشتك" in arabic

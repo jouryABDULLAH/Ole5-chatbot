@@ -128,9 +128,10 @@ def _known(text: str) -> bool:
 
 
 def choose(takes: list[_Take], session_language: str, short: bool = False) -> _Take:
-    """The take to keep (see the module docstring). A short clip is one or two words, almost always a command, an
-    acknowledgement or a yes or no: a take made only of those phrases beats one that is not ("تمام" over the
-    assistant came back from the English call as "Time out."), and the conversation's language leads by more."""
+    """The take to keep (see the module docstring). A short clip, or an utterance of three words or fewer, is
+    almost always a command, an acknowledgement or a yes or no: a take made only of those phrases beats one that is
+    not ("تمام" over the assistant came back from the English call as "Time out."). In a short clip the
+    conversation's language also leads by more."""
     usable = [t for t in takes if t.text]
     if len(usable) < 2:
         return usable[0] if usable else takes[0]
@@ -138,10 +139,14 @@ def choose(takes: list[_Take], session_language: str, short: bool = False) -> _T
     if len(scripts) == 1 and None not in scripts:
         script = scripts.pop()
         return next(t for t in usable if t.language == script)
-    if short:
+    if short or all(len(rules.tokens(t.text)) <= 3 for t in usable):
+        # A word or three is almost always a command, an acknowledgement or a yes or no: the take made of those wins
+        # ("نعم أرسلها" over the English call's "Naam, Ersilha.", heard in the browser for a 2 s clip).
         known = [t for t in usable if _known(t.text)]
         if len(known) == 1:
             return known[0]
+        if len(known) > 1:  # both are known phrases: the one in the conversation's language, in its own script
+            return next((t for t in known if t.language == session_language), known[0])
     lead = SHORT_SESSION_LEAD if short else SESSION_LEAD
     return max(usable, key=lambda t: t.confidence + (lead if t.language == session_language else 0.0))
 

@@ -150,9 +150,7 @@ silence prompt. Filler words are never rule words.
 script (Arabic or Latin letters). Clips under 1 s are transcribed with the session language forced. A detected
 language other than Arabic or English is retried with the session language. It is always exactly `ar` or `en`.
 
-**Style** (voice overlay): short spoken sentences, at most two short questions per turn, steps signposted ("first…
-then…"), no lists, markdown, links or sources. D13: the spoken reply changes form, not content; long answers are split
-into sentences for speech, and the full text is also on screen.
+**Style** (voice overlay): short spoken sentences in the passages' own order and words (no added "first… then…": D34), at most two short questions per turn, the question last, no markdown, links or sources. D13: the spoken reply changes form, not content; long answers are split into sentences for speech, and the full text is also on screen.
 
 **Confirm table** (D4). Text is normalized first. The graph-side guard enforces the same rule.
 

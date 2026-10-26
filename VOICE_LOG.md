@@ -36,6 +36,10 @@ Newest entries at the bottom of each section. Times are Riyadh time (AST).
 | D28 | 2026-10-26 | Voice searches use a lighter RAGent2 profile (8 passages, 8 graded at once, 2 rounds, its own 60 s limit; sharing the chat instance's Qdrant client and embedder) and a 35 s cap; past the cap the turn answers as for a question with no answer and offers a ticket, instead of the apology. Turn deadline 55 s; up to three progress lines. Text chat keeps its settings. | Measured today: answerable searches 20–28 s light vs 20–45 s plain; no-answer searches 33–84 s in both. With the 30 s cap and the apology, 8 of 15 voice turns apologized (chat: 0) | User, from measurements |
 | D29 | 2026-10-26 | Male voices: `abdullah` for Arabic, `troy` for English (replacing noura and autumn, D14). | User's choice from samples; both heard back 0.97–1.00; all 30 fixed lines verified | User |
 | D30 | 2026-10-26 | Spoken interruptions are on by default (replaces D23's half-duplex): speech over the assistant lowers its volume at once and is always sent; the server decides — stop and wait (heard anywhere in the utterance) act, a backchannel, the assistant's echo or a very short sound (≤ 2 words, < 1.6 s, not a command or a no) is ignored and the volume comes back, other words stop it and are answered. While the customer talks over the assistant the speech detector waits 500 ms instead of 850 ms for the end. In a short clip, a transcript made only of known phrases beats one that is not. `?halfduplex` brings back D23. | The user's real-microphone try: "Stop" and "وقف" did nothing (half-duplex dropped them). After the change, on the user's recordings: "Stop." stops ~1 s after the word, "وقف" too; "تمام" (heard "تاما", "Time out.") is ignored | User report; fix by Claude |
+| D31 | 2026-10-26 | CP2 voice mode in Ole5 (text chat unchanged): the confirm step is read back from the draft in the reply's language (title and summary restated, priority, Arabic priority word) and ends with fixed closing words, «…ولإرسالها قل: نعم أرسلها. هل تريد إرسالها الآن؟» / "…to send it, say: yes, submit. Would you like it submitted now?" — a closing question with no yes or send word, so the assistant's echo cannot answer it. "just to confirm" ends the same way. A change is said back as what really changed (worked out in code); a failed change or a failed submit never invites a submit; the ticket number's sentence stays where it was said. | Design reviewed by three critics and a verifier before coding: 31 findings, 22 real, all folded in | Proposed by Claude, from the review |
+| D32 | 2026-10-26 | Graph-side yes guard (D4) on spoken voice turns only: the router's yes stands only when the words are an explicit submit — a yes or send word (not a polite word alone), no negation, and nothing else but words with no content ("نعم أرسلها، شكراً", "Yes, go ahead and submit it" pass; "yes but make it high", "تمام كذا" do not). Otherwise nothing is created and the customer is asked again (the fixed line when they said nothing else, so D15 counts it). The Submit button and D15 arrive confirmed; typed messages and the text chat are not guarded. | Typed text cannot be misheard; a strict word list refused clear yeses and looped | Proposed by Claude, from the review |
+| D33 | 2026-10-26 | At the confirm step, speech over the assistant is never a decision: an acknowledgement over the read-back is ignored (and does not count for D15), a yes is asked again. D15 counts only an acknowledgement right after "just to confirm" has played (within 30 s, nothing said in between); thanks alone goes to Ole5 (it can mean "no thanks"). A yes or acknowledgement held during a turn is dropped when that turn ends at the confirm step. The browser now says which item was audible when speech over the assistant began, and the server checks speech starting within 1 s after the assistant for echo. | A test run created the urgent ticket from a "نعم أرسلها" said before its summary existed; review: D15 survived wait/repeat, thanks twice submitted | Proposed by Claude |
+| D34 | 2026-10-26 | Spoken replies keep the passages' own order and words: no added "first… then…" and no turning alternatives into steps (replaces the plan's "steps signposted"). | With signposting, the grounding check rejected the first draft of 3–4 of 10 voice answers ("أولاً، افتح المراسلة… ثم إما…" ordered what the passages give as alternatives); without it, 0 of 10 (chat: 3) | Proposed by Claude, from the data |
 | D27 | 2026-10-26 | Rule exchanges (stop, wait, repeat, are you there, "I'll come to that") are shown as a caption in the voice bar, not in the transcript; the "just to confirm" exchange is written into the conversation history. A message typed while voice is on goes over the socket and is answered aloud. The language switches only on an utterance of 3+ words in the other script. | Keeps the transcript equal to Ole5's history; a product name said alone ("Outlook") must not switch the reply language | Proposed by Claude |
 
 ## Open items
@@ -52,7 +56,7 @@ Newest entries at the bottom of each section. Times are Riyadh time (AST).
 |---|---|---|---|
 | 0 Setup | done | 15:30 | plan, spikes, mic lab |
 | 1 Hands-free half-duplex end to end | done | 17:55 | tag `voice-cp1`; 311 tests; real-KB browser check passed |
-| 2 Ole5 voice mode | not started | | |
+| 2 Ole5 voice mode | done | 21:55 | tag `voice-cp2`; 413 tests; both demo scenarios pass live; grounding gate passes |
 | 3 No dead air | not started | | |
 | 4 Hands-free + barge-in | not started | | |
 | 5 Quality pass + rehearsal | not started | | |
@@ -148,3 +152,24 @@ Newest entries at the bottom of each section. Times are Riyadh time (AST).
   user's recordings: "Stop." and "وقف" over a long answer stop it (stop_audio 1.7–1.9 s after the clip starts, about
   1 s after the word); "تمام" over it is ignored and the volume comes back. Live speech-to-text check 33/36 (only the
   two pause halves and "500" in digits). Tests: 334 passed, 1 skipped.
+- 2026-10-26 20:00 — **CP2 design review** (three critics, then a verifier, before any code): 31 findings, 22 real,
+  folded into the design (D31–D33): an allowlist yes guard instead of the strict word rule; the read-back built in
+  code in one language, ending on a closing question with no trigger word; the browser says what was audible when
+  speech over the assistant began; D15 only right after "just to confirm"; held and split utterances through the
+  confirm table. A baseline run of the demo scenarios on the old code also showed a held "نعم أرسلها" creating the
+  urgent ticket before its summary was read (fixed).
+- 2026-10-26 21:00 — **CP2 code review** (four reviewers, a skeptic per finding): 28 findings; the 16 most severe
+  verified, 16 confirmed, none refuted; all 28 fixed with tests. The main ones: the echo check right after playback
+  dropped a prompt "نعم أرسلها" (the closing words contain it) — echo is now matched in order, three or more words from
+  the end of what was said; D15 stayed armed after a stop, and after an apology; "changed" could claim a change
+  classify had only reworded; words after "stop" were forwarded normalized, and "التطبيق توقف فجأة" counted as a stop
+  (a stop now counts at the start of an utterance, or later only when the other words are the assistant's echo);
+  failed submits were counted across tickets; the urgent sentence came after the closing words.
+- 2026-10-26 21:45 — **CP2 live checks.** Both demo scenarios pass end to end on the real knowledge base with the
+  user's recordings (`scripts/try_voice.py flow`): English no-answer → offer → details → read-back → a bare "Okay."
+  re-confirmed → "Yes, submit" → ticket, number spoken; Arabic urgent → read-back at once (priority حرجة) → "نعم
+  ارسلها" → ticket. Browser (fake microphone): the same urgent flow; "Naam er Silha." (Whisper's Latin spelling of
+  "نعم أرسلها" for the replayed clip) now counts as a yes and does not switch the conversation to English;
+  interruptions still work ("تمام" ignored, "وقف" stops in ~1.5 s). **Grounding gate (plan 8.3) passes:** 10 turns per
+  channel — voice answered 6, offered 4, apologised 0, grounding retries 0, median 15.5 s; chat 6, 4, 0, 3, 24.6 s.
+  Live speech-to-text check 33/36. Tests: 413 passed, 1 skipped.

@@ -52,7 +52,7 @@
       this.gain = this.ctx.createGain(); this.gain.connect(this.ctx.destination);
       this.rate = sampleRate; this.lead = leadSec;
       this.nextTime = 0; this.sources = new Set(); this.carry = null; this.timers = new Set();
-      this.onIdle = null;
+      this.onIdle = null; this.idleAt = -1e9;   // when the last audio stopped (performance.now())
     }
     get playing() { return this.sources.size > 0; }
     /** Seconds of audio still to play. */
@@ -72,7 +72,10 @@
       if (this.nextTime < now + 0.005) this.nextTime = now + this.lead;   // first frame, or fell behind: re-prime
       src.start(this.nextTime); this.nextTime += buf.duration;
       this.sources.add(src);
-      src.onended = () => { this.sources.delete(src); if (!this.sources.size && this.onIdle) this.onIdle(); };
+      src.onended = () => {
+        this.sources.delete(src);
+        if (!this.sources.size) { this.idleAt = performance.now(); if (this.onIdle) this.onIdle(); }
+      };
     }
     /** Calls back when everything pushed so far has played. */
     whenPlayed(callback) {
@@ -82,12 +85,13 @@
     }
     /** Silence now, with a 5 ms fade so there is no click. */
     stop() {
-      const now = this.ctx.currentTime, g = this.gain.gain;
+      const now = this.ctx.currentTime, g = this.gain.gain, had = this.sources.size > 0;
       g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(0, now + 0.005);
       for (const s of this.sources) { s.onended = null; try { s.stop(now + 0.006); } catch {} }
       this.sources.clear(); this.nextTime = 0; this.carry = null;
       for (const t of this.timers) clearTimeout(t); this.timers.clear();
       g.setValueAtTime(1, now + 0.01);
+      if (had) this.idleAt = performance.now();
       if (this.onIdle) this.onIdle();
     }
     duck(level = 0.25) { const g = this.gain.gain; g.cancelScheduledValues(this.ctx.currentTime); g.setTargetAtTime(level, this.ctx.currentTime, 0.03); }
@@ -103,6 +107,8 @@
       this.api = api; this.sessionId = sessionId; this.on = on; this.halfDuplex = halfDuplex;
       this.item = null; this.stage = "listening"; this.stopped = false; this.overBot = false; this.unduckTimer = null;
       this.speaking = false;   // the customer is talking now
+      this.marks = [];         // the assistant's items in play order: { id, end } (end in audio-clock seconds, once known)
+      this.overId = null;      // the item that was audible when the customer started talking over it
       this.hush = false;   // after a local stop: drop the assistant's audio until the server's stop_audio
     }
 
@@ -149,6 +155,9 @@
     speechStart() {
       this.speaking = true;
       this.overBot = this.player.remaining() > TAIL_S;
+      // How long after the assistant's last sound this speech began: the server checks a quick start for echo.
+      this.sinceBot = this.player.playing ? 0 : Math.round(performance.now() - this.player.idleAt);
+      this.overId = this.overBot ? this.audibleId() : null;
       this.send({ type: "speech", on: true });
       this.on.speech?.(true);
       if (this.overBot && !this.halfDuplex) {   // the customer is heard at once: the assistant gets quieter
@@ -187,7 +196,8 @@
         return;
       }
       this.speechDone(overBot && !this.halfDuplex ? JUDGED_MS : 0);
-      this.send({ type: "utterance", over_bot: overBot, ms: Math.round(audio.length / 16) });
+      this.send({ type: "utterance", over_bot: overBot, ms: Math.round(audio.length / 16), over_id: this.overId,
+                  since_bot_ms: this.sinceBot < 5000 ? this.sinceBot : null });
       this.send(encodeWav(audio));
     }
 
@@ -196,13 +206,18 @@
     event(m) {
       if (m.type === "tts_start") {
         this.item = { id: m.id, kind: m.kind, dropped: this.hush };
+        if (!this.hush) this.marks.push({ id: m.id, end: null });
         if (!this.hush) this.showStage("speaking");
         if (m.kind !== "reply" || !this.player.playing) this.unduck();   // something new to say: full volume
       } else if (m.type === "tts_end") {
         const item = this.item;
         if (item && item.id === m.id) {
           this.item = null;
+          const mark = this.marks.find((x) => x.id === m.id);
+          if (mark) mark.end = this.player.nextTime;
           if (!m.cancelled && !item.dropped) this.player.whenPlayed(() => this.send({ type: "played", id: m.id }));
+          else this.marks = this.marks.filter((x) => x.id !== m.id);
+          if (!this.player.playing) this.showStage();   // an item with no audio must not leave "speaking" up
         }
       } else if (m.type === "stop_audio") {
         this.silence();
@@ -223,6 +238,14 @@
     silence() {
       if (this.item) this.item.dropped = true;
       this.player.stop();
+      this.marks = [];
+    }
+
+    /** The id of the assistant's item being heard now: the server judges speech over it by what it was saying. */
+    audibleId() {
+      const now = this.player.ctx.currentTime;
+      this.marks = this.marks.filter((x) => x.end === null || x.end > now);
+      return this.marks.length ? this.marks[0].id : null;
     }
 
     /** The Stop button: silence at once, and the server drops what it was about to say. Audio already on its way is

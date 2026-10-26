@@ -81,7 +81,7 @@ def send(session_id: str, text: str, attachment_ids: list[str] = (), *, channel:
         log.info("message  session=%s channel=%s %r", session_id[:8], channel, text)
         # next cleared: after a turn that failed past the router, this message must not go straight to a handler.
         turn = {"messages": [HumanMessage(content=text)], "next": None, "channel": channel,
-                "heard_language": heard_language}
+                "heard_language": heard_language, "confirmed": False, "reconfirmed": False}
         with using_session(session_id), llm.voice_turn(channel == "voice"):
             return _run(session_id, turn, on_event)
 
@@ -127,7 +127,8 @@ def submit(session_id: str, *, channel: str = "chat", said: str | None = None, h
     customer's words, added to the history in the same turn."""
     with _lock(session_id), using_session(session_id), llm.voice_turn(channel == "voice"):
         check(get(session_id))
-        turn = {"next": "yes", "channel": channel, "heard_language": heard_language}
+        turn = {"next": "yes", "channel": channel, "heard_language": heard_language, "confirmed": True,
+                "reconfirmed": False}
         if said:
             log.info("message  session=%s channel=%s submit %r", session_id[:8], channel, said)
             turn["messages"] = [HumanMessage(content=said)]

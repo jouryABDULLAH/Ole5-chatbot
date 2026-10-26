@@ -29,6 +29,8 @@ class FakeOle5:
         self.gate: threading.Event | None = None
         self.frame_delay = 0.0  # seconds per speech frame, to catch an item while it is being said
         self.stale: str | None = None  # an older turn's reply landing just before this turn's words
+        self.after: dict = {}  # state fields the next turn sets (e.g. reconfirmed by the graph's guard)
+        self.refuse_submit = False
         self.speech_fails: set[str] = set()  # texts whose speech request fails
 
     def backend(self) -> Backend:
@@ -63,7 +65,8 @@ class FakeOle5:
             raise reply
         added = ([AIMessage(content=self.stale)] if self.stale else []) + \
             ([HumanMessage(content=said)] if said else []) + [AIMessage(content=reply)]
-        self.state = {**self.state, "messages": [*self.state["messages"], *added]}
+        self.state = {**self.state, "messages": [*self.state["messages"], *added], **self.after}
+        self.after = {}
         return self.state
 
     def send(self, sid, text, *, channel, heard_language, on_event):
@@ -71,6 +74,9 @@ class FakeOle5:
         return self._turn(text, on_event)
 
     def submit(self, sid, *, channel, said, heard_language, on_event):
+        if self.refuse_submit:
+            from ole5_chat.tickets.submit import SubmitRefused
+            raise SubmitRefused("there is no ticket summary to submit")
         self.submitted.append((said, channel))
         self.submit_languages = [*getattr(self, "submit_languages", []), heard_language]
         return self._turn(said, on_event)
@@ -608,7 +614,7 @@ def test_an_answer_that_began_in_the_assistants_question_counts():
         voice._speak_reply("هل تريد أن أفتح لك تذكرة؟", "ar", [], turn=None)
         await until(lambda: page.said("reply"))
         await idle(voice, page)
-        voice.utterance({"over_bot": True}, WAV)
+        voice.utterance({"over_bot": True, "over_id": page.events("tts_start")[-1]["id"]}, WAV)
         await until(lambda: len(page.said("reply")) == 2)
 
     run(fake, scenario)
@@ -718,3 +724,269 @@ def test_a_short_unknown_sound_over_the_assistant_is_ignored_and_a_no_interrupts
     page = run(fake, scenario, autoplay=False)
     assert page.events("ignored")[0]["reason"] == "backchannel" and page.events("stop_audio")
     assert [t for t, _, _ in fake.sent] == ["لا"]
+
+
+def test_a_yes_said_before_the_summary_existed_is_not_applied_to_it():
+    fake = FakeOle5(heard=["ولا موظف عندنا يقدر يسجل دخول", "نعم أرسلها"], replies=["الملخص جاهز. هل أرسله؟"])
+    fake.gate = threading.Event()
+
+    async def scenario(voice, page):
+        voice.utterance({}, WAV)
+        await until(lambda: voice.turn is not None)
+        voice.utterance({}, WAV)  # said while the urgent turn still runs
+        await until(lambda: voice.held is not None)
+        fake.state = {**fake.state, "phase": "confirm"}  # the turn prepared the summary
+        fake.gate.set()
+        await until(lambda: page.said("reply"))
+        await idle(voice, page)
+
+    run(fake, scenario)
+    assert [t for t, _, _ in fake.sent] == ["ولا موظف عندنا يقدر يسجل دخول"] and fake.submitted == []
+
+
+def test_a_question_held_across_the_summary_is_still_answered():
+    fake = FakeOle5(heard=["ولا موظف عندنا يقدر يسجل دخول", "كم ياخذ الرد عادة؟"], replies=["الملخص جاهز.", "خلال يوم."])
+    fake.gate = threading.Event()
+
+    async def scenario(voice, page):
+        voice.utterance({}, WAV)
+        await until(lambda: voice.turn is not None)
+        voice.utterance({}, WAV)
+        await until(lambda: voice.held is not None)
+        fake.state = {**fake.state, "phase": "confirm"}
+        fake.gate.set()
+        await until(lambda: len(page.said("reply")) == 2)
+        await idle(voice, page)
+
+    run(fake, scenario)
+    assert [t for t, _, _ in fake.sent][1] == "كم ياخذ الرد عادة؟"
+
+
+# ---- the confirm step, CP2 ----
+
+READ_BACK = ("تذكرتك عن تعطل التطبيق عند فتح صندوق الوارد، وأولويتها متوسطة. إن أردت تعديل شيء فأخبرني، ولإرسالها قل: "
+             "نعم أرسلها. هل تريد إرسالها الآن؟")
+
+
+async def read_back(voice, page):
+    voice._speak_reply(READ_BACK, "ar", [], turn=None)
+    await until(lambda: len(page.said("reply")) >= 2)
+
+
+def test_over_the_read_back_an_acknowledgement_is_ignored_and_does_not_count_for_d15():
+    fake = FakeOle5(phase="confirm", heard=["تمام"])
+    fake.frame_delay = 0.2
+
+    async def scenario(voice, page):
+        await read_back(voice, page)
+        first = page.events("tts_start")[0]["id"]
+        voice.utterance({"over_bot": True, "over_id": first}, WAV)
+        await until(lambda: page.events("ignored"))
+
+    page = run(fake, scenario, autoplay=False)
+    assert not page.events("stop_audio") and fake.notes == [] and fake.sent == []
+
+
+def test_a_yes_over_the_read_back_is_asked_again_even_over_its_closing_question():
+    fake = FakeOle5(phase="confirm", heard=["ايوه تمام ارسلها"])
+
+    async def scenario(voice, page):
+        await read_back(voice, page)
+        last = page.events("tts_start")[-1]["id"]
+        voice.utterance({"over_bot": True, "over_id": last}, WAV)
+        await until(lambda: line("just_confirm") in page.said())
+
+    page = run(fake, scenario, autoplay=False)
+    assert page.events("stop_audio") and fake.sent == [] and fake.submitted == []
+
+
+def test_the_read_backs_own_submit_phrase_heard_over_it_is_ignored_not_asked_again():
+    # Laptop speakers: the microphone catches "قل: نعم أرسلها". Asking again would say the phrase again, in a loop.
+    fake = FakeOle5(phase="confirm", heard=["نعم أرسلها", "نعم أرسلها"])
+
+    async def scenario(voice, page):
+        await read_back(voice, page)
+        last = page.events("tts_start")[-1]["id"]
+        voice.utterance({"over_bot": True, "over_id": last}, WAV)
+        voice.utterance({"over_bot": True, "over_id": last}, WAV)
+        await until(lambda: len(page.events("ignored")) == 2)
+
+    page = run(fake, scenario, autoplay=False)
+    assert not page.events("stop_audio") and line("just_confirm") not in page.said() and fake.sent == []
+
+
+def test_a_prompt_yes_just_after_the_read_back_is_an_answer_not_echo():
+    fake = FakeOle5(phase="confirm", heard=["نعم أرسلها"], replies=["تم إنشاء التذكرة."])
+
+    async def scenario(voice, page):
+        await read_back(voice, page)
+        await idle(voice, page)
+        voice.utterance({"over_bot": False, "since_bot_ms": 300}, WAV)
+        await until(lambda: fake.sent)
+
+    run(fake, scenario)
+    assert fake.sent[0][0] == "نعم أرسلها"
+
+
+def test_stop_disarms_d15():
+    fake = FakeOle5(phase="confirm", heard=["تمام", "وقف", "تمام"])
+
+    async def scenario(voice, page):
+        voice.utterance({}, WAV)
+        await until(lambda: line("just_confirm") in page.said())
+        voice.utterance({"over_bot": True}, WAV)
+        await until(lambda: page.events("stop_audio"))
+        await asyncio.sleep(0.2)
+        voice.utterance({}, WAV)
+        await asyncio.sleep(0.3)
+        await idle(voice, page)
+
+    page = run(fake, scenario)
+    assert fake.submitted == [] and page.said().count(line("just_confirm")) == 2
+
+
+def test_an_apology_after_the_guard_does_not_arm_d15():
+    fake = FakeOle5(phase="confirm", heard=["صحيح", "تمام"],
+                    replies=["عذراً، حدث خطأ من جهتنا. يرجى المحاولة مرة أخرى."])
+    fake.after = {"reconfirmed": True}
+
+    async def scenario(voice, page):
+        voice.utterance({}, WAV)
+        await until(lambda: page.said("reply"))
+        await idle(voice, page)
+        voice.utterance({}, WAV)
+        await asyncio.sleep(0.3)
+        await idle(voice, page)
+
+    run(fake, scenario)
+    assert fake.submitted == [] and len(fake.notes) == 1  # the "تمام" got "just to confirm", not a submit
+
+
+def test_a_yes_over_a_filler_during_a_turn_at_confirm_is_not_asked_mid_turn():
+    fake = FakeOle5(phase="confirm", heard=["غير الأولوية إلى عالية", "ايوه تمام ارسلها"], replies=["تم التعديل."])
+    fake.events = [{"type": "search_started"}]
+    fake.gate = threading.Event()
+
+    async def scenario(voice, page):
+        voice.utterance({}, WAV)
+        await until(lambda: page.said("filler"))
+        voice.utterance({"over_bot": True}, WAV)
+        await until(lambda: page.events("ignored"))
+        fake.gate.set()
+        await until(lambda: page.said("reply"))
+
+    page = run(fake, scenario, autoplay=False)
+    assert line("just_confirm") not in page.said() and fake.submitted == []
+
+
+def test_d15_does_not_survive_wait_or_repeat():
+    for command in ("لحظة", "عيد"):
+        fake = FakeOle5(phase="confirm", heard=["تمام", command, "تمام"])
+
+        async def scenario(voice, page):
+            voice.last_reply = [voice.speaker.say("reply", READ_BACK, "ar")]
+            await idle(voice, page)
+            for _ in range(3):
+                voice.utterance({}, WAV)
+                await asyncio.sleep(0.2)
+                await idle(voice, page)
+
+        run(fake, scenario)
+        assert fake.submitted == [] and len(fake.notes) == 2, command
+
+
+def test_thanks_twice_at_confirm_goes_to_ole5_and_submits_nothing():
+    fake = FakeOle5(phase="confirm", heard=["شكراً", "شكراً"], replies=["عفواً. هل تريد إرسالها الآن؟", "عفواً."])
+
+    async def scenario(voice, page):
+        for _ in range(2):
+            voice.utterance({}, WAV)
+            await asyncio.sleep(0.2)
+            await idle(voice, page)
+
+    run(fake, scenario)
+    assert [t for t, _, _ in fake.sent] == ["شكراً", "شكراً"] and fake.submitted == []
+
+
+def test_after_the_guard_asked_again_an_acknowledgement_submits():
+    fake = FakeOle5(phase="confirm", heard=["صحيح", "تمام"], replies=[line("just_confirm"), "تم إنشاء التذكرة."])
+    fake.after = {"reconfirmed": True}
+
+    async def scenario(voice, page):
+        voice.utterance({}, WAV)
+        await until(lambda: page.said("reply"))
+        await idle(voice, page)
+        voice.utterance({}, WAV)
+        await until(lambda: fake.submitted)
+
+    run(fake, scenario)
+    assert fake.submitted == [("تمام", "voice")]
+
+
+def test_a_yes_split_by_a_pause_is_joined_and_sent():
+    fake = FakeOle5(phase="confirm", heard=["نعم", "أرسلها"], replies=["تم إنشاء التذكرة."])
+
+    async def scenario(voice, page):
+        voice.utterance({}, WAV)
+        voice.speech(True)
+        await until(lambda: voice.partial is not None)
+        voice.utterance({}, WAV)
+        await until(lambda: fake.sent)
+
+    run(fake, scenario)
+    assert fake.sent[0][0] == "نعم أرسلها"
+
+
+def test_stop_with_more_words_over_the_assistant_answers_the_rest():
+    fake = FakeOle5(heard=["وقف، الأولوية غلط"], replies=["ما الأولوية الصحيحة؟"])
+    fake.frame_delay = 0.2
+
+    async def scenario(voice, page):
+        voice._speak_reply("شرح طويل عن الإعدادات والقوائم والشاشات المختلفة في النظام.", "ar", [], turn=None)
+        await until(lambda: page.said("reply"))
+        voice.utterance({"over_bot": True}, WAV)
+        await until(lambda: fake.sent)
+
+    page = run(fake, scenario, autoplay=False)
+    assert page.events("stop_audio") and fake.sent[0][0] == "الأولوية غلط"  # as said, not normalized
+
+
+def test_the_assistants_echo_just_after_it_spoke_is_ignored():
+    fake = FakeOle5(heard=["افتح إعدادات المستخدم ثم التوقيع"])
+
+    async def scenario(voice, page):
+        voice._speak_reply("افتح إعدادات المستخدم ثم التوقيع.", "ar", [], turn=None)
+        await idle(voice, page)
+        voice.utterance({"over_bot": False, "since_bot_ms": 300}, WAV)
+        await until(lambda: page.events("ignored"))
+
+    page = run(fake, scenario)
+    assert page.events("ignored")[0]["reason"] == "echo" and fake.sent == []
+
+
+def test_a_refused_spoken_submit_is_said_not_only_shown():
+    fake = FakeOle5(phase="confirm", heard=["تمام", "تمام"])
+    fake.refuse_submit = True
+
+    async def scenario(voice, page):
+        voice.utterance({}, WAV)
+        await asyncio.sleep(0.2)
+        await idle(voice, page)
+        voice.utterance({}, WAV)
+        await until(lambda: line("cannot_submit") in page.said())
+
+    page = run(fake, scenario)
+    assert page.events("error")
+
+
+
+def test_a_yes_in_latin_letters_does_not_switch_the_conversation_to_english():
+    fake = FakeOle5(phase="confirm", heard=["Naam, er Silha?"], replies=["تم إنشاء التذكرة."])
+
+    async def scenario(voice, page):
+        voice.utterance({}, WAV)
+        await until(lambda: fake.sent)
+        assert voice.language == "ar"
+
+    run(fake, scenario)
+    assert fake.sent[0][1] == "ar"

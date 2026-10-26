@@ -36,6 +36,8 @@ PROGRESS = ("still_checking", "still_looking", "still_checking")
 JOIN_GRACE_S = 0.15  # after a transcript, how long to look for the customer speaking again before starting the turn
 JOIN_LIMIT_S = 15.0  # a partial sentence waits at most this long for the rest
 QUESTION_END = ("?", "؟")
+ECHO_AFTER_MS = 1000  # speech starting this soon after the assistant's audio ended is checked for echo too
+D15_WINDOW_S = 30.0  # an acknowledgement counts as yes (D15) only this soon after "just to confirm" finished
 GREETED: set[str] = set()  # sessions whose greeting was already spoken, so a reconnect does not repeat it
 
 
@@ -73,6 +75,18 @@ class Item:
     complete: bool = False
 
 
+def _run(words: list[str], said: list[str]) -> int:
+    """The longest run of words that appears, in the same order and back to back, in both lists."""
+    best = 0
+    for i in range(len(words)):
+        for j in range(len(said)):
+            n = 0
+            while i + n < len(words) and j + n < len(said) and words[i + n] == said[j + n]:
+                n += 1
+            best = max(best, n)
+    return best
+
+
 async def _frames(pcm: bytes) -> AsyncIterator[bytes]:
     for frame in tts.frames_of(pcm):
         yield frame
@@ -90,6 +104,8 @@ class Speaker:
         self.current: Item | None = None
         self.unplayed: dict[str, Item] = {}  # streamed (or streaming) and not yet reported played by the browser
         self.recent: list[tuple[float, str]] = []  # (when, text) of what was said, for the echo filter
+        self.items: dict[str, Item] = {}  # the latest items by id, for what the browser says it was playing
+        self.played_ids: set[str] = set()  # items the browser reported played to the end (a purge adds none)
         self._task = asyncio.create_task(self._run(), name="voice-speaker")
 
     @property
@@ -99,6 +115,9 @@ class Speaker:
 
     def say(self, kind: str, text: str, language: str, *, turn: int | None = None, pcm: bytes | None = None) -> Item:
         item = Item(f"s{next(self._ids)}", kind, text, language, turn, pcm)
+        self.items[item.id] = item
+        if len(self.items) > 100:
+            self.items.pop(next(iter(self.items)))
         self._queue.append(item)
         self._wake.set()
         return item
@@ -110,6 +129,8 @@ class Speaker:
     @property
     def last_said(self) -> str:
         return self.recent[-1][1] if self.recent else ""
+
+
 
     async def purge(self, always: bool = False) -> bool:
         """Silence now: nothing waiting, the item being streamed stopped, and the browser told to drop what it holds
@@ -125,6 +146,7 @@ class Speaker:
 
     def played(self, item_id: str) -> None:
         self.unplayed.pop(item_id, None)
+        self.played_ids.add(item_id)
 
     async def close(self) -> None:
         for task in (self._playing, self._task):
@@ -186,9 +208,10 @@ class VoiceSession:
         self.muted: set[int] = set()  # turns whose reply is shown and not spoken
         self.searched: set[int] = set()
         self.held: tuple[str, str | None] | None = None
-        self.partial: tuple[str, str | None, float] | None = None  # the first half of a sentence split by a pause
+        # The first half of a sentence split by a pause: text, language, when, and whether it began over the assistant.
+        self.partial: tuple[str, str | None, float, bool] | None = None
         self.talking = False  # the browser's speech detector hears the customer now
-        self.confirm_asked = False  # "just to confirm" was said and not yet answered (D15)
+        self.confirm_ask: Item | None = None  # the "just to confirm" just said, which an acknowledgement answers (D15)
         self.last_reply: list[Item] = []
         self._inbox: asyncio.Queue = asyncio.Queue()
         self._tasks: set[asyncio.Task] = set()
@@ -227,6 +250,7 @@ class VoiceSession:
         if self.turn is not None:
             self.muted.add(self.turn_no)
         self.partial = None
+        self.confirm_ask = None  # "just to confirm" was cut off: an acknowledgement after this is not a yes (D15)
         await self.speaker.purge(always=True)
         await self._status()
 
@@ -272,7 +296,7 @@ class VoiceSession:
                 elif job[0] == "submit":
                     await self._submit_button()
                 elif job[0] == "flush":
-                    self._flush_partial()
+                    await self._flush_partial()
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -297,78 +321,168 @@ class VoiceSession:
             return
         await self.send_json({"type": "heard", "text": heard.text, "language": heard.language or self.language,
                               "over_bot": over_bot})
-        await self._words(heard.text, heard.language, over_bot=over_bot, seconds=heard.seconds)
+        since = meta.get("since_bot_ms")
+        await self._words(heard.text, heard.language, over_bot=over_bot, seconds=heard.seconds,
+                          since_bot_ms=since if isinstance(since, (int, float)) else None,
+                          over_id=str(meta.get("over_id") or ""))
 
     async def _words(self, text: str, language: str | None, *, over_bot: bool = False, typed: bool = False,
-                     seconds: float | None = None) -> None:
-        command = None if typed else rules.command(text, talking=self.speaker.busy)
-        # Speech that began in the assistant's question and went on after it is the answer to it.
-        answering = over_bot and self.speaker.last_said.rstrip().endswith(QUESTION_END)
-        if over_bot:
-            command = command or rules.interrupting(text)
-            if command == "stop":
+                     seconds: float | None = None, since_bot_ms: float | None = None, over_id: str = "",
+                     began_over_bot: bool = False) -> None:
+        """One utterance (or typed message), in order: interruptions, echo, rules, a turn in flight, the join of a
+        split sentence, the confirm table, then Ole5. over_id: the item the browser was playing when speech over the
+        assistant began. began_over_bot: a rejoined sentence whose first half was said over the assistant."""
+        if typed:  # typed in voice mode: no speech rules and no confirm table; Ole5 judges it as in the text chat
+            if self.turn is not None:
+                self._hold(text, None)
+                await self._say_line("held")
+            else:
+                self.confirm_ask = None
+                self._start("send", text, None)
+            return
+        command = rules.command(text, talking=self.speaker.busy)
+        if over_bot or self.speaker.busy:
+            lead = None if command else rules.interrupting(text)
+            inside = None if command or lead else rules.command_inside(text)
+            if inside and not (inside[1] and self._echo(inside[1])):
+                inside = None  # "التطبيق توقف فجأة": a sentence about something that stopped, not a stop
+            if command in ("stop", "wait"):
+                name, rest = command, ""
+            elif lead:
+                name, rest = lead
+            elif inside:
+                name, rest = inside[0], ""
+            else:
+                name, rest = None, ""
+            meant = rest and not rules.content_free(rest) and not self._echo(rest)
+            if name == "stop":
                 await self.stop()
+                if meant:
+                    await self._words(rest, language)  # "وقف، الأولوية غلط": what came after the stop is answered
                 return
-            if command == "wait":
-                await self._rule("wait")
+            if name == "wait":
+                if meant:
+                    await self.speaker.purge()
+                    await self._words(rest, language)  # "لحظة، الأولوية غلط": the words after "wait" are the point
+                else:
+                    await self._rule("wait")
                 return
-            reason = None if answering else (
+        if over_bot:
+            if self._phase() == "confirm" and await self._confirm_over_bot(text):
+                return
+            # Speech that began in the assistant's closing question and went on after it is the answer to it; it is
+            # still checked for the assistant's own words in order, which a real short answer never matches.
+            reason = ("echo" if self._echo(text, min_words=3) else None) if self._answering(over_id) else (
                 "backchannel" if rules.is_backchannel(text) or rules.is_thanks(text) or rules.is_fragment(text)
                 or rules.is_short_sound(text, seconds) else "echo" if self._echo(text) else None)
             if reason:
                 await self.send_json({"type": "ignored", "reason": reason})
                 return
             await self.speaker.purge()  # real words over the assistant: it stops, and they are answered below
+        elif since_bot_ms is not None and since_bot_ms < ECHO_AFTER_MS and not command and self._echo_tail(text):
+            await self.send_json({"type": "ignored", "reason": "echo"})  # the tail of its own voice, just after it
+            return
         if command:
             if command == "stop":
                 self.partial = None
             await self._rule(command)
             return
-        language = None if typed else self._language(text, language)
+        language = self._language(text, language)
         if self.turn is not None:
             if rules.is_backchannel(text) or rules.is_fragment(text) or rules.is_thanks(text):
                 await self.send_json({"type": "ignored", "reason": "backchannel"})
                 return
             first = not self.held
-            self.held = (f"{self.held[0]} {text}" if self.held else text, language)
+            self._hold(text, language)
             if first:
                 await self._say_line("held")
             return
-        if not typed:
-            text, language = self._joined(text, language)
-            if await self._still_talking():
-                self.partial = (text, language, time.monotonic())
-                self._spawn(self._flush_later(self.partial))
-                return
-        if not typed and rules.is_fragment(text):
-            await self._say_line("just_confirm" if self._phase() == "confirm" else "unclear")
+        text, language, began_over_bot = self._joined(text, language, over_bot or began_over_bot)
+        if await self._still_talking():
+            self.partial = (text, language, time.monotonic(), began_over_bot)
+            self._spawn(self._flush_later(self.partial))
             return
-        if not typed and self._phase() == "confirm":
-            kind = rules.confirm_kind(text)
-            if kind == "ack" and self.confirm_asked:
-                self.confirm_asked = False
-                self._start("submit", text, language)  # D15: a second acknowledgement is a yes
+        if self._phase() == "confirm":
+            if await self._confirm(text, began_over_bot):
                 return
-            if kind == "ack":
-                self.confirm_asked = True
-                line = rules.line("just_confirm", self.language)
-                state = await asyncio.to_thread(self.backend.note, self.id, text, line)
-                await self._push_view(state)
-                self.speaker.say("line", line, self.language, pcm=await self._cached(line))
-                return
-            if kind == "unclear" or (kind == "submit" and over_bot):  # D4: a yes over the read-back is asked again
-                await self._say_line("just_confirm")
-                return
-        self.confirm_asked = False
+        elif rules.is_fragment(text):
+            await self._say_line("unclear")
+            return
+        self.confirm_ask = None
         self._start("send", text, language)
 
-    def _joined(self, text: str, language: str | None) -> tuple[str, str | None]:
+    async def _confirm_over_bot(self, text: str) -> bool:
+        """Speech over the assistant at the confirm step is never a decision (D4): an acknowledgement or a fragment is
+        a listening sound and is ignored (it does not count for D15); a yes is asked again. True when handled."""
+        kind = rules.confirm_kind(text)
+        if kind in ("ack", "unclear"):
+            await self.send_json({"type": "ignored", "reason": "backchannel"})
+            return True
+        if kind == "submit" and (self._echo(text) or self.turn is not None):
+            # Its own "قل: نعم أرسلها" came back through the microphone (asking again would say it again), or a turn
+            # is running and could not take the answer: ignored. A real yes is said again after the question.
+            await self.send_json({"type": "ignored", "reason": "echo" if self.turn is None else "backchannel"})
+            return True
+        if kind == "submit":
+            await self.speaker.purge()
+            await self._ask_again()
+            return True
+        return False
+
+    async def _confirm(self, text: str, began_over_bot: bool) -> bool:
+        """The confirm table (VOICE_PLAN.md section 6) for an utterance after the read-back. True when handled here;
+        a yes, a change, a question or a no goes on to Ole5."""
+        kind = rules.confirm_kind(text)
+        if kind == "submit" and began_over_bot:  # D4: a yes that began over the read-back is asked again
+            await self._ask_again()
+            return True
+        if kind == "ack" and self._d15_ready():
+            self.confirm_ask = None
+            self._start("submit", text, self.language)  # D15: an acknowledgement right after "just to confirm" is a yes
+            return True
+        if kind == "ack":
+            await self._ask_again(said=text)
+            return True
+        if kind == "unclear":
+            await self._ask_again()
+            return True
+        return False
+
+    async def _ask_again(self, said: str | None = None) -> None:
+        """Says "just to confirm…". said: the customer's acknowledgement, written into the history with the line."""
+        line = rules.line("just_confirm", self.language)
+        if said:
+            state = await asyncio.to_thread(self.backend.note, self.id, said, line)
+            await self._push_view(state)
+        self.confirm_ask = self.speaker.say("line", line, self.language, pcm=await self._cached(line))
+
+    def _answering(self, over_id: str) -> bool:
+        """The speech began over the assistant's closing question: the last thing its reply (or a fixed line) said,
+        ending in a question mark. Then it is the answer, not an interruption."""
+        item = self.speaker.items.get(over_id)
+        if item is None or not item.text.rstrip().endswith(QUESTION_END):
+            return False
+        return item.kind == "line" or bool(self.last_reply and item is self.last_reply[-1])
+
+    def _d15_ready(self) -> bool:
+        """"Just to confirm" was the last thing said, it has played to the end, and not long ago."""
+        item = self.confirm_ask
+        if item is None or not self.speaker.recent:
+            return False
+        at, said = self.speaker.recent[-1]
+        return (said == item.text and item.id in self.speaker.played_ids
+                and time.monotonic() - at < D15_WINDOW_S)
+
+    def _hold(self, text: str, language: str | None) -> None:
+        self.held = (f"{self.held[0]} {text}" if self.held else text, language)
+
+    def _joined(self, text: str, language: str | None, over_bot: bool) -> tuple[str, str | None, bool]:
         """The text with the first half of a split sentence before it, if one is waiting."""
         if not self.partial:
-            return text, language
-        first, first_language, _ = self.partial
+            return text, language, over_bot
+        first, first_language, _, first_over_bot = self.partial
         self.partial = None
-        return f"{first} {text}", language or first_language
+        return f"{first} {text}", language or first_language, over_bot or first_over_bot
 
     async def _still_talking(self) -> bool:
         if not self.talking:
@@ -380,19 +494,16 @@ class VoiceSession:
         if self.partial is partial:
             self._inbox.put_nowait(("flush",))
 
-    def _flush_partial(self) -> None:
-        """The rest of a split sentence never came: the first half is sent on its own."""
+    async def _flush_partial(self) -> None:
+        """The rest of a split sentence never came: the first half goes on alone, through the same rules."""
         if not self.partial or self.talking:
             return
-        text, language, _ = self.partial
+        text, language, _, began_over_bot = self.partial
         self.partial = None
-        if self.turn is not None:
-            self.held = (f"{self.held[0]} {text}" if self.held else text, language)
-        else:
-            self.confirm_asked = False
-            self._start("send", text, language)
+        await self._words(text, language, began_over_bot=began_over_bot)
 
     async def _rule(self, command: str) -> None:
+        self.confirm_ask = None  # D15 counts only an acknowledgement right after "just to confirm"
         if command == "stop":
             await self.stop()
         elif command == "wait":
@@ -412,7 +523,7 @@ class VoiceSession:
         if self.turn is not None:
             await self.send_json({"type": "error", "text": "Still working on the last message."})
             return
-        self.confirm_asked = False
+        self.confirm_ask = None
         self._start("button", None, None)
 
     # ---- one Ole5 turn ----
@@ -443,6 +554,7 @@ class VoiceSession:
         def on_event(event: dict) -> None:
             loop.call_soon_threadsafe(self._graph_event, no, event)
 
+        phase_before = self._phase()
         await self.send_json({"type": "turn", "text": text})
         await self._status("thinking")
         progress = asyncio.create_task(self._progress(no))
@@ -470,9 +582,14 @@ class VoiceSession:
             reply = "\n".join(m.text for m in messages[before:] if m.type == "ai").strip()
             numbers = [t["ticket_number"] for t in state.get("created_tickets") or []]
             self._speak_reply(reply, script_language(reply) or language or self.language, numbers, turn=no)
+            asked = rules.normalize(rules.line("just_confirm", script_language(reply) or self.language))
+            if state.get("reconfirmed") and state.get("phase") == "confirm" and self.last_reply and \
+                    rules.normalize(reply).endswith(asked):
+                self.confirm_ask = self.last_reply[-1]  # the graph's guard asked "just to confirm" (D15 counts it)
         except SubmitRefused as exc:
             outcome = "refused"
             await self.send_json({"type": "error", "text": str(exc)})
+            await self._say_line("cannot_submit")
         except Exception:
             outcome = "failed"
             log.exception("voice  turn %d failed", no)
@@ -488,18 +605,25 @@ class VoiceSession:
             # No await between clearing the turn and starting the held one: an utterance handled in between would
             # start a turn of its own.
             self.turn = None
-            following = self._start_held() if not self.closed else False
+            following = self._start_held(phase_before) if not self.closed else False
             if not self.closed:
                 if not shown:  # the page shows the customer's words with a "writing" mark until a view arrives
                     await self._push_view()
                 if not following:
                     await self._status()
 
-    def _start_held(self) -> bool:
+    def _start_held(self, phase_before: str) -> bool:
+        """Sends what the customer said during the turn. At the confirm step a yes, an acknowledgement or a fragment
+        said during the turn is dropped: it was said before the reply that asks to submit, and a yes must answer a
+        summary the customer heard (D4). Seen in a test run: a held "نعم أرسلها" created the urgent ticket before its
+        summary was read. phase_before: kept for the log."""
         if not self.held:
             return False
         text, language = self.held
         self.held = None
+        if self._phase() == "confirm" and rules.confirm_kind(text) in ("submit", "ack", "unclear"):
+            log.info("voice  held %r dropped: said before the reply that asks to submit", text)
+            return False
         self._start("send", text, language)
         return True
 
@@ -543,22 +667,38 @@ class VoiceSession:
 
     def _language(self, text: str, found: str | None) -> str:
         """The conversation's language after this utterance (sticky): it follows the letters of what was said, but a
-        short utterance in the other script (a product or screen name said on its own) does not switch it."""
-        if found and found != self.language and len(text.split()) >= 3:
+        short utterance in the other script (a product or screen name said on its own) does not switch it, and nor
+        does a yes, an acknowledgement or a command, which Whisper sometimes writes in Latin letters ("Naam, er
+        Silha?" for "نعم أرسلها")."""
+        if found and found != self.language and len(text.split()) >= 3 and not rules.content_free(text) \
+                and rules.command(text, talking=True) is None:
             self.language = found
         return self.language
 
     def _phase(self) -> str:
         return self.backend.get(self.id)["phase"]
 
-    def _echo(self, text: str) -> bool:
-        """The microphone picked up the assistant: most of the words heard are words it just said."""
+    def _echo(self, text: str, min_words: int = 2) -> bool:
+        """The microphone picked up the assistant: most of the words heard come, in the same order, from something
+        it said in the last minute. A customer's own words share a word or two with it at most, out of order."""
         words = rules.normalize(text).split()
-        if len(words) < 2:
+        if len(words) < min_words:
             return False
         now = time.monotonic()
-        said = set(" ".join(rules.normalize(t) for at, t in self.speaker.recent if now - at < ECHO_WINDOW_S).split())
-        return sum(w in said for w in words) / len(words) >= 0.7
+        need = max(min_words, round(len(words) * 0.7))
+        return any(_run(words, rules.normalize(t).split()) >= need
+                   for at, t in self.speaker.recent if now - at < ECHO_WINDOW_S)
+
+    def _echo_tail(self, text: str) -> bool:
+        """Speech that began just after the assistant stopped can only carry its last words: three or more, in order,
+        from the end of the last thing it said. "نعم أرسلها" after "…قل: نعم أرسلها." is an answer, not an echo."""
+        words = rules.normalize(text).split()
+        if len(words) < 3 or not self.speaker.recent:
+            return False
+        if self._phase() == "confirm" and rules.confirm_kind(text) in ("submit", "ack"):
+            return False
+        last = rules.normalize(self.speaker.recent[-1][1]).split()
+        return _run(words, last[-(len(words) + 3):]) >= max(3, round(len(words) * 0.8))
 
     async def _cached(self, text: str) -> bytes | None:
         try:

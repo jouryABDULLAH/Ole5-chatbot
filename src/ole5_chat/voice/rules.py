@@ -41,24 +41,31 @@ POLITE = _norm("لو سمحت", "من فضلك", "please", "ok", "okay", "اوك
 # Acknowledgements: listening sounds, never a decision on their own.
 ACK = _norm("تمام", "تامام", "تاما", "طيب", "اوكي", "اوكيه", "اوك", "حسنا", "زين", "ماشي", "اها", "اه", "امم", "مم", "ممم", "ok", "okay",
             "okey", "alright", "all right", "hmm", "mhm", "mhmm", "mm hmm", "uh huh", "tama", "tamam")
-# A plain yes: an answer to a direct question.
-YES = _norm("نعم", "ايه", "اي", "ايوه", "ايوا", "اكيد", "naam", "aywa", "yes", "yeah", "yep", "sure", "of course",
-            "please", "من فضلك", "لو سمحت")
-SUBMIT = _norm("ارسل", "ارسلها", "ارسله", "ارسلي", "ارسلوها", "قدم", "قدمها", "قدمه", "submit", "send", "erselha",
-               "irsilha")
+# A plain yes: an answer to a direct question. Polite words alone ("لو سمحت", "please") are not a yes.
+YES = _norm("نعم", "ايه", "اي", "ايوه", "ايوا", "اكيد", "موافق", "naam", "aywa", "yes", "yeah", "yep", "sure",
+            "of course")
+SUBMIT = _norm("ارسل", "ارسلها", "ارسله", "ارسلي", "ارسلوها", "قدم", "قدمها", "قدمه", "افتحها", "افتح التذكره",
+               "سجلها", "اعتمدها", "submit", "send", "confirm", "create", "go ahead",
+               # the English take of "أرسلها", seen in the browser: "Naam, Ersilha."
+               "erselha", "irsilha", "ersilha", "arsilha", "arselha", "irselha", "ersilaha", "er silha", "ar silha",
+               "ir silha")
 # Thanks said over the assistant is a listening sound too; said on its own it goes to Ole5 like any message.
 THANKS = _norm("شكرا", "شكرا لك", "شكرا جزيلا", "مشكور", "يعطيك العافيه", "thank you", "thanks", "thank you very much",
                "thanks a lot")
 # Words that may sit around a submit word at the confirm step without changing it: "yes, submit it now please".
 CONFIRM_FILLER = _norm("it", "the", "ticket", "now", "go", "ahead", "do", "that", "التذكره", "الحين", "الان", "يا",
                        "اياها", "لي")
+# Words that carry no content of their own next to a yes at the confirm step: "نعم أرسلها، شكراً", "Yes, go ahead and
+# submit it", "يلا ارسلها الله يعافيك". A yes with any other word ("yes but make it high") is not an explicit submit.
+CONTENT_FREE = _norm("and", "you", "can", "i", "want", "to", "is", "correct", "right", "that s right", "for me", "خلاص", "يلا",
+                     "والله", "صحيح", "الله يعافيك", "يعطيك العافيه", "ابي", "ابغى", "و", "للدعم", "to support")
 NEGATION = _norm("لا", "لاء", "مو", "ما", "بلاش", "الغ", "الغها", "الغي", "la", "no", "not", "don", "dont", "don t",
                  "never", "cancel")
 # Short words that are words, not Whisper fragments.
 KNOWN_SHORT = _norm("hi", "oh", "اوه", "بس", "هل", "من", "في", "و", "يا", "is", "it", "me", "my", "on", "to")
 
 PHRASES = frozenset().union(*COMMANDS.values(), STOP_WHILE_TALKING, POLITE, ACK, YES, SUBMIT, THANKS, CONFIRM_FILLER,
-                            NEGATION)
+                            CONTENT_FREE, NEGATION)
 LONGEST = max(len(p.split()) for p in PHRASES)
 
 
@@ -89,16 +96,49 @@ def command(text: str, talking: bool = False) -> str | None:
     return None
 
 
-def interrupting(text: str) -> str | None:
-    """stop or wait when an utterance said over the assistant contains that command anywhere: the microphone may have
-    caught some of the assistant's own words with it ("... كلمة المرور وقف"). Only stop and wait: repeat's words
-    ("read", "again") are too common to be heard in passing."""
+def _command_word(phrase: str, enough: bool = True) -> str | None:
+    """stop or wait for a command phrase. enough: "خلاص" counts as a stop (it does when said alone)."""
+    if phrase in COMMANDS["stop"] or (enough and phrase in STOP_WHILE_TALKING):
+        return "stop"
+    return "wait" if phrase in COMMANDS["wait"] else None
+
+
+def interrupting(text: str) -> tuple[str, str] | None:
+    """(stop or wait, what was said after it) when an utterance said over the assistant starts with that command:
+    "وقف، الأولوية غلط", "Stop, I meant the archive screen". The rest is kept as written. Only stop and wait:
+    repeat's words ("read", "again") are too common."""
+    words, i, found, real = text.split(), 0, None, False
+    while i < len(words):
+        for n in (3, 2, 1):
+            if i + n > len(words):
+                continue
+            phrase = normalize(" ".join(words[i:i + n]))
+            if n == 1 and not phrase:  # punctuation on its own
+                i += 1
+                break
+            name = _command_word(phrase)
+            if name or phrase in POLITE:
+                found = found or name
+                real = real or _command_word(phrase, enough=False) is not None
+                i += n
+                break
+        else:
+            break  # not a command, a polite word or punctuation: what was meant starts here
+    rest = " ".join(words[i:]).strip(" ،,.!?؟")
+    if found is None or (rest and not real):
+        return None  # "خلاص ارسلها" is "fine, send it", not a stop
+    return found, rest
+
+
+def command_inside(text: str) -> tuple[str, str] | None:
+    """(stop or wait, the other words) when a stop or wait word is anywhere in the utterance: "كلمة المرور وقف" is
+    the assistant's own words caught by the microphone, then the customer's stop. The caller decides whether the
+    other words are that echo; "التطبيق توقف فجأة" (the app stopped suddenly) is not, and is no command."""
     found = tokens(text)
-    for name in ("stop", "wait"):
-        extra = STOP_WHILE_TALKING if name == "stop" else frozenset()
-        if any(t in COMMANDS[name] or t in extra for t in found):
-            return name
-    return None
+    name = next((n for n in (_command_word(t, enough=False) for t in found) if n), None)
+    if name is None:
+        return None
+    return name, " ".join(t for t in found if not _command_word(t) and t not in POLITE)
 
 
 SHORT_SOUND_S = 1.6  # a one- or two-word segment, the detector's padding included
@@ -122,23 +162,39 @@ def is_backchannel(text: str) -> bool:
 ConfirmKind = Literal["submit", "ack", "unclear", "other"]
 
 
+def explicit_submit(text: str) -> bool:
+    """A clear yes to submitting: at least one yes or submit word (a polite word alone is not one), no negation, and
+    nothing else but words with no content of their own (thanks, polite words, "it", "now", "go ahead", "صحيح"...).
+    The graph's guard (D4) and the confirm table both use it."""
+    found = tokens(text)
+    allowed = YES | SUBMIT | ACK | THANKS | POLITE | CONFIRM_FILLER | CONTENT_FREE
+    return (any(t in YES or t in SUBMIT for t in found) and not any(t in NEGATION for t in found)
+            and all(t in allowed for t in found))
+
+
+def content_free(text: str) -> bool:
+    """Only acknowledgements, yes words, thanks and fillers: nothing to change or ask."""
+    found = tokens(text)
+    allowed = YES | SUBMIT | ACK | THANKS | POLITE | CONFIRM_FILLER | CONTENT_FREE
+    return bool(found) and all(t in allowed for t in found)
+
+
 def confirm_kind(text: str) -> ConfirmKind:
     """The confirm table (VOICE_PLAN.md section 6) for an utterance at the confirm step, after the read-back.
 
-    submit: only yes, submit, acknowledgement and filler words ("it", "now"), at least one of them a yes or a submit
-    word, and no negation. ack: only acknowledgements and thanks. unclear: a one- or two-letter fragment such as
-    Whisper's "E" for "ايه". other: anything with content ("نعم بس غير الأولوية", "cancel", a question), for Ole5."""
+    submit: explicit_submit. ack: only acknowledgements (and thanks with one). unclear: a one- or two-letter fragment such as Whisper's "E"
+    for "ايه", or only polite words. other: anything with content ("نعم بس غير الأولوية", "cancel", a question), and
+    thanks on its own, which can mean "no thanks": for Ole5 to route."""
     found = tokens(text)
     if not found:
         return "unclear"
     if any(t in NEGATION for t in found):
         return "other"
-    if all(t in ACK or t in THANKS for t in found):
-        return "ack"
-    if all(t in YES or t in SUBMIT or t in ACK or t in CONFIRM_FILLER for t in found) and \
-            any(t in YES or t in SUBMIT for t in found):
+    if all(t in ACK or t in THANKS for t in found) and any(t in ACK for t in found):
+        return "ack"  # "ok thanks" is an acknowledgement; thanks alone is not
+    if explicit_submit(text):
         return "submit"
-    if is_fragment(text):
+    if is_fragment(text) or all(t in POLITE for t in found):
         return "unclear"
     return "other"
 
@@ -167,13 +223,18 @@ LINES = {
     "speech_failed": {"ar": "عذراً، تعذّر عليّ قراءة الرد بصوتي. تجده مكتوباً على الشاشة.",
                       "en": "Sorry, I couldn't read the answer out. You'll find it on your screen."},
     "unclear": {"ar": "عذراً، لم أسمع ذلك جيداً. هل تعيده من فضلك؟", "en": "Sorry, I didn't catch that. Could you say it again?"},
-    "just_confirm": {"ar": "للتأكيد: هل أرسل التذكرة الآن؟ قل: نعم أرسلها، أو لا.",
-                     "en": "Just to confirm: shall I submit the ticket now? Say: yes, submit, or no."},
+    # Ends on a question with no yes or send word in it: the assistant's own echo of its last words cannot answer it.
+    "just_confirm": {"ar": "للتأكيد: لإرسال التذكرة قل: نعم أرسلها، أو قل لا. هل تريد إرسالها الآن؟",
+                     "en": "Just to confirm: to send the ticket, say: yes, submit, or say no. Would you like it "
+                           "submitted now?"},
     "held": {"ar": "سأجيب عن ذلك بعد قليل.", "en": "I'll come to that right after this."},
     "wait": {"ar": "حسناً، أنا في انتظارك.", "en": "Of course, take your time."},
     "there": {"ar": "نعم، أنا معك.", "en": "Yes, I'm here."},
     "there_busy": {"ar": "نعم، ما زلت أتحقق من سؤالك.", "en": "Yes, I'm still checking your question."},
     "nothing_to_repeat": {"ar": "لم أقل شيئاً بعد. كيف أقدر أساعدك؟", "en": "I haven't said anything yet. How can I help?"},
+    "cannot_submit": {"ar": "عذراً، لا يمكن إرسال التذكرة بهذا الشكل. أخبرني بما تريد تغييره، أو اسألني عن أي شيء.",
+                      "en": "Sorry, I can't send the ticket like this. Tell me what you'd like to change, or ask me "
+                            "anything."},
 }
 
 

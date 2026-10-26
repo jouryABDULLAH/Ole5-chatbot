@@ -17,6 +17,8 @@ THEN = {"ar": "، ثم ", "en": ", then "}
 # "أولي فايف" (mic lab, 2026-10-26).
 PRONOUNCE = {"ar": [(re.compile(r"\bole\s?5\b", re.IGNORECASE), "أولي فايف")], "en": []}
 SEGMENT_CHARS = 220
+MARK = "\u0000"  # where the on-screen sentence goes, while the text is rebuilt
+SENTENCE_DONE = re.compile(r"[.!?؟\n]\s*$")
 
 LINK = re.compile(r"!?\[([^\]]*)\]\([^)]*\)")
 URL = re.compile(r"https?://\S+")
@@ -52,8 +54,9 @@ def _digits(number: str, language: str) -> str:
 
 def _ticket_numbers(text: str, numbers: list[str], language: str) -> str:
     """The ticket number leaves the reply: in English "ticket {N}" becomes "the ticket"; elsewhere the number goes with
-    the words that introduce it, and a clause left with nothing else ("Your ticket number is {N}.") is dropped. One
-    sentence saying where the number is and how it ends is added at the end."""
+    the words that introduce it, and a clause left with nothing else ("Your ticket number is {N}.") is dropped. A
+    sentence saying where the number is and how it ends takes its place, at the end of the number's sentence, so a
+    question that follows (the next issue's offer) is still the last thing said."""
     found = [n for n in numbers if n and n in text]
     if not found:
         return text
@@ -61,23 +64,30 @@ def _ticket_numbers(text: str, numbers: list[str], language: str) -> str:
         quoted = QUOTED.format(re.escape(number))
         noun = re.compile(TICKET_NOUN.pattern.format(quoted), re.IGNORECASE)
         lead = re.compile(NUMBER_LEAD[language] + quoted, re.IGNORECASE)
-        kept = []
+        kept: list[str] = []
+        place, pending = None, False  # place: where in kept the on-screen sentence goes
         for part in re.split(r"(?<=[.!?؟؛،,\n])", text):
-            if number not in part:
+            if number in part:
+                said = noun.sub(lambda m: f"{m.group(1) or 'the '}ticket", part) if language == "en" else part
+                said = lead.sub("", said)
+                if {w.lower() for w in CONTENT_LEFT.findall(said)} - NOT_CONTENT[language]:
+                    kept.append(said)
+                pending = pending or place is None
+            else:
                 kept.append(part)
-                continue
-            if language == "en":
-                part = noun.sub(lambda m: f"{m.group(1) or 'the '}ticket", part)
-            part = lead.sub("", part)
-            if {w.lower() for w in CONTENT_LEFT.findall(part)} - NOT_CONTENT[language]:
-                kept.append(part)
-        text = "".join(kept)
+            if pending and SENTENCE_DONE.search(part):
+                place, pending = len(kept), False
+        if place is None:
+            place = len(kept)
+        text = "".join([*kept[:place], MARK, *kept[place:]])
+    on_screen = ON_SCREEN[language].format(digits=_digits(found[-1], language))
+    text = text.replace(MARK, f" {on_screen} ", 1).replace(MARK, " ")
     text = re.sub(r"\s+([.!?؟،,])", r"\1", text)
     text = re.sub(r"([،,])\s*([.!?؟])", r"\2", text)
     text = re.sub(r"\s{2,}", " ", text).strip(" ،,")
     if text and not ENDS_SENTENCE.search(text):
         text += "."
-    return f"{text} {ON_SCREEN[language].format(digits=_digits(found[-1], language))}".strip()
+    return text
 
 
 def speakable(text: str, language: str, ticket_numbers: list[str] = ()) -> str:

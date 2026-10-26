@@ -108,10 +108,13 @@ def router(state: ChatState) -> str:
     phase = state["phase"]
     pending = state.get("pending") or []
     last = next((m.text for m in reversed(state["messages"]) if m.type == "ai"), "none")
-    return _fill("router", product_name=config.name, phase_description=PHASES[phase],
+    text = _fill("router", product_name=config.name, phase_description=PHASES[phase],
                  issue=pending[0].text if pending else "none", last_assistant=last,
                  options="\n\n".join(_option(config, phase, o) for o in OPTIONS[phase]),
                  schema=schema_text(route_schema(phase)))
+    if spoken(state):
+        text = text.replace("Reply with JSON only", f"{VOICE_ROUTER}\n\nReply with JSON only", 1)
+    return text
 
 
 def language() -> str:
@@ -195,10 +198,101 @@ CURRENT = {
 QUEUED_URGENT = " Because the new issue is urgent, also say they can cancel the current one to start it now."
 
 
+# The voice channel (VOICE_PLAN.md section 6). A voice turn keeps every rule above about what a reply says; these change
+# how it is said, and the confirm step's wording, since the customer may not be looking at the screen.
+
+VOICE_STYLE = """## This reply is spoken
+
+The customer is talking to you by voice: your reply is read aloud by a speech engine and also shown on screen.
+- Keep exactly the content the rules above put in the reply: the same steps, conditions and causes from DIRECT
+  passages, nothing added and nothing dropped. Only the form changes.
+- Short spoken sentences, in the order the passages give. Don't add ordering words such as "first" or "then"
+  (أولاً، ثم) that the passages don't use, and don't turn different ways of doing something into steps.
+- One step per line is fine, since a line break becomes a pause; no bullet or number markers.
+- Write screen and menu names exactly as the passages do, arrows included: the speech engine reads an arrow as "then".
+  No brackets or slashes outside names.
+- At most two short questions, and a question goes last.
+- Don't name the documents or sources; they are shown on screen."""
+
+VOICE_ROUTER = ("The customer is speaking: their messages are speech-to-text transcripts and may have misheard or "
+                "missing words. Judge what they meant. While the summary is shown, yes needs a clear yes or an "
+                "instruction to send it (نعم، ايه، ايوه، اكيد، موافق، أرسلها، افتحها، yes, sure, submit, send, go "
+                "ahead, confirm); an acknowledgement without one (\"تمام كذا\", \"اوكي زين\", \"ok, sounds good\") is "
+                "talk, not yes and not question.")
+
+PRIORITY_AR = {"Low": "منخفضة", "Medium": "متوسطة", "High": "عالية", "Critical": "حرجة"}
+# The last words of every reply that asks to submit, said word for word. The closing question has no yes or send word
+# in it, so the assistant's own echo of its last words cannot answer it.
+VOICE_CLOSE = {
+    "ar": "إن أردت تعديل شيء فأخبرني، ولإرسالها قل: نعم أرسلها. هل تريد إرسالها الآن؟",
+    "en": "If anything needs changing, tell me; to send it, say: yes, submit. Would you like it submitted now?",
+}
+VOICE_SUBMIT_PHRASE = {"ar": "نعم أرسلها", "en": "yes, submit"}
+VOICE_NUMBER = {"ar": "رقم تذكرتك هو {number}.", "en": "Your ticket number is {number}."}
+VOICE_ARABIC = (" Speak formal Arabic: restate the summary in your own Arabic words, keeping product, screen and error "
+                "names as written, address the customer directly, and don't quote the English.")
+VOICE_READ_BACK = ("Read the summary back in two or three short spoken sentences, in your own words and without labels "
+                   "such as \"title\" or \"details\": what the ticket is about ({about}) and its priority, "
+                   "{priority}{urgent}.")
+VOICE_END = " Then end with exactly these words: \"{close}\""
+VOICE_TASKS = {
+    "confirm": "The ticket summary is ready and shown on screen. Nothing has been created yet; the ticket is created only "
+               "when they submit. " + VOICE_READ_BACK + VOICE_END + " Don't say the ticket is created, opened or being "
+               "opened.",
+    "urgent_ready": "This is urgent, so the ticket was prepared right away without the usual questions: {issue}. Nothing "
+                    "has been created yet. Say that in one sentence. Then " + VOICE_READ_BACK[0].lower()
+                    + VOICE_READ_BACK[1:] + VOICE_END,
+    "changed": "The ticket summary now differs from before only in: {change}. Compare that with what the customer asked: "
+               "say in one sentence what of their request is now on the summary, and if part of it is not there, say "
+               "that part was not changed. Then "
+               "read the rest of the summary back in one or two short sentences in your own words, without repeating "
+               "the change: what the ticket is about ({about}) and its priority, {priority}{urgent}." + VOICE_END,
+    "unchanged": "The customer asked to change the ticket summary, but nothing on it changed: it is still about {about}, "
+                 "with priority {priority}{urgent}. If what they asked for is already on the summary, say it already "
+                 "reads that way, and end with exactly these words: \"{close}\" Otherwise say in one sentence that the "
+                 "change could not be made, and ask them to say exactly what to change; then don't ask them to submit.",
+    "change_failed": "The change could not be made; the summary on screen is unchanged. Say so in one short sentence and "
+                     "ask them to say the change again. Don't ask them to submit.",
+    "submit_failed": "The ticket could not be created because of a problem on our side; the summary on screen is "
+                     "unchanged. Say so in one sentence, and that they can say \"{phrase}\" to try again.",
+    "submit_failed_again": "The ticket could not be created again. Apologise once, say it can't be created right now, and "
+                           "suggest trying again later. Don't ask them to submit.",
+    "created": "The ticket {number} was created. Say it was created in one sentence, then give the number in a sentence of "
+               "its own written exactly \"{number_sentence}\", then say the support team will reply by email.",
+    "reconfirm_line": "Nothing has been submitted. Reply with exactly this sentence and nothing else: \"{line}\"",
+    "reconfirm": "Nothing has been submitted and nothing on the summary was changed: the customer's reply did not clearly "
+                 "say to submit. If they asked to change something, say it has not been changed yet and ask them to say "
+                 "the change on its own. If they asked a question, answer it from this conversation." + VOICE_END,
+    "current_confirm": "the summary for {issue} is still shown." + VOICE_END,
+}
+VOICE_CREATED_ALONE = " Nothing more."
+VOICE_CREATED_THEN = " Nothing more about this ticket. Then, separately:"
+VOICE_FEW_QUESTIONS = " Ask about one or two things only, each as its own short question; keep the rest for your next reply."
+
+
+def voice(state: ChatState) -> bool:
+    return state.get("channel") == "voice"
+
+
+def spoken(state: ChatState) -> bool:
+    """A voice turn the customer spoke (a typed message in voice mode has no heard language)."""
+    return voice(state) and state.get("heard_language") is not None
+
+
+def voice_language(state: ChatState) -> str:
+    """The language the reply will be in: what speech-to-text heard; for a typed message the letters it was typed in
+    (as respond_agent will judge it); else the last reply's, else the customer's."""
+    from ole5_chat.agent.validate import script_language
+    typed = next((m.text for m in reversed(state["messages"]) if m.type == "human"), "") if state["messages"] else ""
+    found = state.get("heard_language") or script_language(typed) or state.get("language") or state["identity"].language
+    return found if found in VOICE_CLOSE else "en"
+
+
 def respond(state: ChatState, language: str) -> str:
     config = products.load(state["identity"].product)
-    return _fill("respond", persona=_persona(config, language), language=NAMES[language],
+    text = _fill("respond", persona=_persona(config, language), language=NAMES[language],
                  task=state.get("task") or RESPOND_TASK, note=state.get("note") or "")
+    return f"{text.rstrip()}\n\n{VOICE_STYLE}\n" if voice(state) else text
 
 
 def search(state: ChatState) -> str:

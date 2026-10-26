@@ -5,6 +5,9 @@
                                                  spoken and heard back by Whisper to catch dropped words
   python scripts/try_voice.py kb [REPEATS]       the demo questions through the real graph and knowledge base, timed,
                                                  on the voice channel and the chat channel
+  python scripts/try_voice.py flow [NAME]        whole conversations (the demo scenarios) through the real voice
+                                                 session: the user's recordings, real speech to text, the real graph
+                                                 and knowledge base; every step printed. Speech output is skipped.
 
 RECORDINGS defaults to ../voice-lab/recordings (recordings.json and the WAV files the lab saved). The kb check runs
 on a temporary copy of sheets/ with the mock ticket API, and traces are off.
@@ -127,6 +130,105 @@ async def check_tts() -> None:
                   f"audio  heard back {similar(back.text, part):.2f}\n   said:  {part}\n   heard: {back.text}")
 
 
+# Demo scenarios (VOICE_PLAN.md section 10) as steps: a recording (by mic-lab phrase id) or typed text, and the phase
+# expected after it. Typed text stands in where no recording exists.
+FLOWS = {
+    "en_ticket": [("rec", "s2_en_crash", "offer_ticket"), ("rec", "w_yes", "collect"), ("rec", "s2_en_detail", "collect"),
+                  ("typed", "That's all I know.", "confirm"), ("rec", "w_ok", "confirm"),
+                  ("rec", "s2_en_yes", "none")],
+    "ar_urgent": [("rec", "s3_urgent", "confirm"), ("rec", "s3_send", "none")],
+}
+
+
+class Page:
+    """What the browser would receive; every item counts as played at once."""
+
+    def __init__(self):
+        self.out, self.session = [], None
+
+    async def json(self, data):
+        self.out.append(data)
+        if data["type"] == "tts_end" and not data["cancelled"]:
+            asyncio.get_running_loop().call_soon(self.session.played, data["id"])
+
+    async def audio(self, data):
+        pass
+
+
+async def run_flow(name: str, steps: list, folder: Path, email: str) -> bool:
+    from ole5_chat import sessions
+    from ole5_chat.voice.session import Backend, VoiceSession
+
+    async def no_speech(text, language):
+        yield b"\x00\x00" * 960
+
+    async def no_cached(text, language):
+        return b"\x00\x00" * 960
+
+    entries = json.loads((folder / "recordings.json").read_text(encoding="utf-8"))
+    files = {}
+    for e in entries:
+        if e["kind"].startswith("vad"):
+            files.setdefault(e["phrase"], folder / e["file"])
+    sid, _ = sessions.start(email)
+    page = Page()
+    voice = VoiceSession(sid, page.json, page.audio, Backend(speech=no_speech, cached=no_cached))
+    page.session = voice
+    await voice.start()
+    ok = True
+    print(f"\n=== {name} ===")
+    try:
+        for kind, what, want in steps:
+            mark, began = len(page.out), time.perf_counter()
+            if kind == "rec":
+                voice.utterance({"over_bot": False}, files[what].read_bytes())
+            else:
+                voice.typed(what)
+            for _ in range(300):  # the step has been heard (or, typed, has started a turn or been held)
+                if any(m["type"] in ("heard", "ignored", "turn") for m in page.out[mark:]) or voice.held:
+                    break
+                await asyncio.sleep(0.1)
+            await asyncio.sleep(0.3)
+            for _ in range(1200):  # up to 120 s for the turn and what it says
+                if voice.turn is None and voice._inbox.empty() and not voice.speaker.busy and voice.partial is None:
+                    break
+                await asyncio.sleep(0.1)
+            seen = page.out[mark:]
+            heard = next((m["text"] for m in seen if m["type"] == "heard"), what if kind == "typed" else "?")
+            said = [f"[{m['kind']}] {m['text']}" for m in seen if m["type"] == "tts_start"]
+            phase = sessions.get(sid)["phase"]
+            tickets = [t["ticket_number"] for t in sessions.get(sid)["created_tickets"]]
+            good = phase == want
+            ok &= good
+            print(f"\n{'ok ' if good else 'BAD'} customer ({kind}): {heard}   [{time.perf_counter() - began:.1f}s, "
+                  f"phase {phase}, want {want}{', tickets ' + str(tickets) if tickets else ''}]")
+            for line in said:
+                print(f"    {line}")
+    finally:
+        await voice.close()
+    return ok
+
+
+def check_flow(name: str | None, folder: Path) -> None:
+    temp = Path(tempfile.mkdtemp(prefix="ole5-voice-"))
+    shutil.copytree(ROOT / "sheets", temp / "sheets")
+    os.environ.update(SHEETS_DIR=str(temp / "sheets"), TICKET_API_URL="", ATTACHMENTS_DIR=str(temp / "uploads"))
+    from ole5_chat import sheets
+    from ole5_chat.config import get_settings
+    from ole5_chat.knowledge import retriever
+    get_settings.cache_clear()
+    s = get_settings()
+    if s.kb_backend == "ragent2":
+        began = time.perf_counter()
+        retriever.warm(sorted(set(s.kb_tenants.values())))
+        print(f"knowledge base ready in {time.perf_counter() - began:.0f} s", flush=True)
+    email = next(str(r["email"]) for r in sheets.customers()
+                 if str(r.get("product") or "").upper() == "OLE5" and str(r.get("active") or "").lower() == "yes")
+    chosen = {name: FLOWS[name]} if name else FLOWS
+    results = {n: asyncio.run(run_flow(n, steps, folder, email)) for n, steps in chosen.items()}
+    print("\n" + "  ".join(f"{n}: {'pass' if r else 'FAIL'}" for n, r in results.items()))
+
+
 def wav_of(pcm: bytes, rate: int) -> bytes:
     import io
     import wave
@@ -184,7 +286,8 @@ def check_kb(repeats: int) -> None:
                 searches = next((e["searches"] for e in events if e["type"] == "search_done"), None)
                 rows.append({"rep": rep, "channel": channel, "question": text, "seconds": round(total, 1),
                              "search_started": round(marks.get("search_started", 0), 1), "searches": searches,
-                             "phase": state["phase"], "sources": state["sources"], "reply": reply})
+                             "phase": state["phase"], "sources": state["sources"], "reply": reply,
+                             "corrections": state["corrections"]})
                 print(f"[{rep}] {channel:5} {total:5.1f}s search@{marks.get('search_started', 0):4.1f}s "
                       f"searches={searches} phase={state['phase']:12} sources={len(state['sources'])}  {text[:40]}\n"
                       f"        {reply[:160]!r}", flush=True)
@@ -194,8 +297,15 @@ def check_kb(repeats: int) -> None:
     print(f"\nsaved {out}")
     for channel in ("voice", "chat"):
         times = sorted(r["seconds"] for r in rows if r["channel"] == channel)
-        offers = sum(r["phase"] == "offer_ticket" for r in rows if r["channel"] == channel)
-        print(f"{channel}: median {times[len(times) // 2]} s, max {times[-1]} s, offers {offers}/{len(times)}")
+        mine = [r for r in rows if r["channel"] == channel]
+        offers = sum(r["phase"] == "offer_ticket" for r in mine)
+        answered = sum(bool(r["sources"]) for r in mine)
+        sorry = sum(r["reply"].startswith(("Sorry", "عذراً")) for r in mine)
+        retries = sum(sum(c.startswith("retried") for c in r["corrections"]) for r in mine)
+        ungrounded = sum("reply not grounded" in r["corrections"] for r in mine)
+        print(f"{channel}: median {times[len(times) // 2]} s, max {times[-1]} s, answered {answered}, "
+              f"offers {offers}, apologies {sorry}, grounding retries {retries}, not grounded {ungrounded} "
+              f"of {len(mine)}")
 
 
 if __name__ == "__main__":
@@ -206,5 +316,7 @@ if __name__ == "__main__":
         asyncio.run(check_tts())
     elif mode == "kb":
         check_kb(int(sys.argv[2]) if len(sys.argv) > 2 else 3)
+    elif mode == "flow":
+        check_flow(sys.argv[2] if len(sys.argv) > 2 else None, ROOT.parent / "voice-lab" / "recordings")
     else:
         sys.exit(__doc__)

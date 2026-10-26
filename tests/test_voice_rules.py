@@ -97,10 +97,24 @@ def test_the_script_check_allows_names_in_the_other_script():
     assert script_language("ok") is None
 
 
-@pytest.mark.parametrize("text, name", [("كلمة المرور وقف", "stop"), ("open the settings stop", "stop"), ("وقف وقف", "stop"),
-                                        ("لحظة لحظة عندي سؤال", "wait"), ("then press save wait", "wait")])
-def test_a_stop_or_wait_heard_with_the_assistants_echo_still_interrupts(text, name):
-    assert rules.interrupting(text) == name
+@pytest.mark.parametrize("text, found", [
+    ("وقف، الأولوية غلط", ("stop", "الأولوية غلط")), ("وقف وقف", ("stop", "")), ("Okay, stop.", ("stop", "")),
+    ("لحظة لحظة عندي سؤال", ("wait", "عندي سؤال")),
+    ("Stop. The version is 3.2, not 3.1", ("stop", "The version is 3.2, not 3.1")),  # the rest kept as written
+    ("خلاص", ("stop", "")), ("خلاص خلاص", ("stop", ""))])
+def test_a_stop_or_wait_at_the_start_interrupts_and_keeps_what_came_after(text, found):
+    assert rules.interrupting(text) == found
+
+
+@pytest.mark.parametrize("text", ["التطبيق توقف فجأة", "it stopped working", "خلاص ارسلها", "نعم خلاص أرسلها"])
+def test_a_stop_word_later_in_a_sentence_or_khalas_with_more_is_not_an_interruption(text):
+    assert rules.interrupting(text) is None
+
+
+def test_a_stop_word_after_the_assistants_words_is_found_inside():
+    assert rules.command_inside("كلمة المرور وقف") == ("stop", "كلمه المرور")
+    assert rules.command_inside("then press save wait") == ("wait", "then press save")
+    assert rules.command_inside("نعم خلاص أرسلها") is None  # "خلاص" inside a sentence is "fine"
 
 
 @pytest.mark.parametrize("text", ["I already read that", "say it again", "تمام", "كيف أغير كلمة المرور"])
@@ -117,3 +131,26 @@ def test_a_very_short_sound_over_the_assistant_is_a_listening_sound(text):
                                            ("Time out.", 2.0), ("تاما", None)])
 def test_commands_a_no_and_longer_speech_over_the_assistant_are_not_listening_sounds(text, seconds):
     assert not rules.is_short_sound(text, seconds)
+
+
+
+@pytest.mark.parametrize("text", ["نعم أرسلها، شكراً", "Yes, submit. Thank you.", "ارسلها يعطيك العافية", "نعم صحيح",
+                                  "yes, that is correct", "نعم أرسلها للدعم", "اي والله ارسلها", "Yes, go ahead and submit it",
+                                  "Yes, you can submit it", "Go ahead", "Confirm", "Create it", "خلاص ارسلها", "يلا ارسلها",
+                                  "ايه ارسلها الله يعافيك", "موافق", "افتحها", "yes please", "نعم من فضلك"])
+def test_an_explicit_submit_may_carry_words_with_no_content(text):
+    assert rules.explicit_submit(text) and rules.confirm_kind(text) == "submit"
+
+
+@pytest.mark.parametrize("text", ["yes but make it high", "نعم بس خل الأولوية عالية", "تمام كذا", "لو سمحت", "please",
+                                  "لا لا ارسلها", "Know.", "ok", "تمام تمام"])
+def test_anything_else_is_not_an_explicit_submit(text):
+    assert not rules.explicit_submit(text)
+
+
+def test_thanks_alone_at_confirm_goes_to_ole5_and_polite_words_alone_are_unclear():
+    assert rules.confirm_kind("شكراً") == "other" and rules.confirm_kind("thank you") == "other"
+    assert rules.confirm_kind("ok thanks") == "ack"
+    assert rules.confirm_kind("لو سمحت") == "unclear" and rules.confirm_kind("please") == "unclear"
+
+
