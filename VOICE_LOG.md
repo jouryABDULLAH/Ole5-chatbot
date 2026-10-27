@@ -53,6 +53,7 @@ Newest entries at the bottom of each section. Times are Riyadh time (AST).
 | D45 | 2026-10-27 | Mute (CP4): a Mute/Unmute button in the voice bar and the M key (by key position, so an Arabic keyboard works; not while typing) stop the speech detector; the assistant can still be heard and stopped; the server is told, for D44. Push-to-talk is not brought back (D23). | A presenter over Meet can talk to the audience without the assistant answering | Proposed by Claude |
 | D46 | 2026-10-27 | A clip of 2.5 s or more whose kept transcript is less sure than -0.7 (Whisper's mean log-probability) is not acted on: «عذراً، لم أسمع ذلك جيداً. هل تعيده من فضلك؟». Shorter clips are judged as before. | In the browser check, a replayed Arabic question came back as "Kæf og erjist möraslaði fannig nígama?" (-0.85, even from the Arabic call) and was answered in English. On all 36 of the user's recordings, real speech of 2 s or more kept -0.55 or better; one-word commands go down to -1.07 | Proposed by Claude, from the data |
 | D47 | 2026-10-27 | Hesitations («امم», "hmm", "umm") are listening sounds but not acknowledgements: at the confirm step they are asked again and never count as the D15 yes; the assistant's own acknowledgement words («فهمت», "Got it", «يسعدني ذلك», "Certainly") are listening sounds only, never the customer's yes. | D15 is "a second bare تمام/اوكي/ok"; the review found «امم» after "just to confirm" submitted the ticket, and «فهمت» would have too | From the code review |
+| D48 | 2026-10-27 | The speech detector is served from `web/vendor`: vad-web 0.0.31 (bundle, AudioWorklet, Silero v5 model) and onnxruntime-web 1.22.0 (`.mjs`, `.wasm`), five files, 13.6 MB, byte for byte jsdelivr's (sizes and SHA-256 checked by `tests/test_voice_vendor.py`; `-text` in `.gitattributes`). `voice.js` uses them when a HEAD check finds all five, with the scripts served as JavaScript, and otherwise, or when the local bundle, model or onnxruntime fails to load, the same versions on the CDN (each bundle carries its own onnxruntime, so the retry starts clean; the worklet is covered by the HEAD check only). The server sets the types for `.js`, `.mjs`, `.wasm` and `.onnx`. | The demo should not depend on the CDN being reachable. On this laptop Python mapped `.mjs` to `text/plain`, which a module import refuses | Vendoring and committing approved by the user, the worklet (a fifth file) too |
 | D27 | 2026-10-26 | Rule exchanges (stop, wait, repeat, are you there, "I'll come to that") are shown as a caption in the voice bar, not in the transcript; the "just to confirm" exchange is written into the conversation history. A message typed while voice is on goes over the socket and is answered aloud. The language switches only on an utterance of 3+ words in the other script. | Keeps the transcript equal to Ole5's history; a product name said alone ("Outlook") must not switch the reply language | Proposed by Claude |
 
 ## Open items
@@ -73,7 +74,7 @@ Newest entries at the bottom of each section. Times are Riyadh time (AST).
 | 2 Ole5 voice mode | done | 21:55 | tag `voice-cp2`; 413 tests; both demo scenarios pass live; grounding gate passes |
 | 3 No dead air | done | 00:50 | tag `voice-cp3`; first sound median 1.6 s, max 1.8 s (was 3.9 / 7.2); see Progress |
 | 4 Hands-free + barge-in | done | 00:50 | most of it came early (D23, D30, CP2); added the silence prompt (D44) and mute (D45); in the `voice-cp3` commit |
-| 5 Quality pass + rehearsal | done | 01:50 | tag `voice-demo`; section 10 passed twice; VAD assets not yet vendored (needs the user's OK) |
+| 5 Quality pass + rehearsal | done | 01:50 | tag `voice-demo`; section 10 passed twice; VAD assets vendored after it (D48, 06:30), the tag moved |
 
 ## Demo runbook
 
@@ -88,11 +89,13 @@ Newest entries at the bottom of each section. Times are Riyadh time (AST).
      venv/Scripts/python.exe -m uvicorn ole5_chat.main:app --app-dir src --host 127.0.0.1 --port 8000 \
      > ../voice-lab/server8000.log 2>&1
    ```
-4. Wait for `voice  fixed lines ready` in the log: every fixed line is made and heard back once (new ones take a
-   minute).
+4. Wait for `voice  fixed lines ready` (every fixed line is made and heard back once; new ones take a minute) **and**
+   `kb  ready` in the log. The knowledge base took 4 minutes after a restart at 06:12; a question asked before it is
+   ready is cut off at 35 s and answered "no answer".
 5. Chrome (not Edge) at `http://localhost:8000` (the microphone needs localhost or HTTPS, not the LAN address). Sign in
    with the demo customer's email, turn the microphone on, and ask one question in Arabic and one in English: the first
-   search and the first Groq calls of the day are slow.
+   search and the first Groq calls of the day are slow. F12 → Console should show no `voice:` warning (the speech
+   detector then came from `web/vendor`, not the CDN).
 6. Headset on. In Meet, share the Chrome tab with its audio.
 
 **During:**
@@ -107,7 +110,10 @@ Newest entries at the bottom of each section. Times are Riyadh time (AST).
 
 **If something goes wrong:** the text chat keeps working with the microphone off. Restart the server (step 3). Fall back
 to the last tagged build: `git checkout voice-cp3` (or `voice-cp2`). The log's `voice  latency` and
-`voice  heard silence` lines show where the time went.
+`voice  heard silence` lines show where the time went. The speech detector comes from `web/vendor` (DevTools →
+Network shows `/vendor/...`); if those files cannot be used, the browser console says which file (`voice: not usable`)
+and `voice: speech detector from the CDN`, and the CDN copy is used, so jsdelivr must then be reachable. The tags from
+before D48 (`voice-cp3`, `voice-cp2`) always load it from the CDN.
 
 ## Progress
 
@@ -273,4 +279,17 @@ to the last tagged build: `git checkout voice-cp3` (or `voice-cp2`). The log's `
   details → read-back → "Okay." asked again → "Yes, submit" → ticket. With the rehearsals above, the five demo scenarios
   have passed twice on the app code of 85f210e. **Tag `voice-demo`.** Not done: the VAD files are still loaded from the
   jsdelivr CDN (vendoring them needs the user's go-ahead to download four files, ~4.1 MB); O4.
+- 2026-10-27 06:55 — **Speech detector vendored (D48).** Five files, not four: vad-web loads its AudioWorklet from the
+  model's folder, so that one was added with the user's OK. 13.6 MB on disk (the "~4.1 MB" was the CDN's compressed
+  transfer); sizes and SHA-256 equal jsdelivr's listing. Browser checks with a fake microphone: all five from
+  `/vendor`, nothing from jsdelivr, the detector ready 0.9-1.7 s after the click, an Arabic question heard («حسناً.»
+  0.8 s after it ended) and answered. A missing worklet or wasm → `voice: not usable <file> 404` and the CDN; a
+  broken local wasm that passes the check → the local start fails and the CDN bundle starts clean; the microphone
+  turned off while starting → no voice session (it used to open one and use up the greeting). On the way: after a
+  restart the knowledge base took 4 minutes, and the question asked before then was cut off at 35 s → runbook step 4
+  now waits for `kb  ready`. Review (3 lenses, each finding checked by 2 skeptics): 13 findings, none breaking;
+  taken: the reasons logged, the stop while starting, comments and D48 precise about the worklet, a test that pins
+  the local-first order and file lists (5 broken edits, all caught), hosting and licence notes in
+  `web/vendor/README.md`. Not done: the licence texts and `bundle.min.js.LICENSE.txt` (another download). 461 tests
+  pass, 1 skipped. The `voice-demo` tag moves to this commit; the rehearsed one before it is b150ade.
 

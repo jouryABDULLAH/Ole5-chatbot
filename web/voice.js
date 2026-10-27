@@ -2,7 +2,8 @@
    build step; exposes window.T2Voice.
 
    The microphone stays open while voice is on, with the browser's echo cancellation. A speech detector (Silero VAD,
-   vad-web 0.0.31) cuts each utterance; it is sent as a 16 kHz WAV over the session's WebSocket. The assistant's speech
+   vad-web 0.0.31, served from web/vendor with the CDN as the fallback) cuts each utterance; it is sent as a 16 kHz WAV
+   over the session's WebSocket. The assistant's speech
    comes back as 40 ms frames of 24 kHz PCM between tts_start and tts_end and is played without gaps. Speech that starts
    while the assistant is talking (and not in its last 0.6 s) is "over the assistant": the assistant's volume drops at
    once and the utterance is sent marked over_bot; the server decides (stop, wait and repeat act; "تمام", "ok" and the
@@ -11,8 +12,16 @@
    The server is told when speech starts, so it can join a sentence split by a pause. Protocol: VOICE_PLAN.md
    section 5. */
 (() => {
-  const VAD_CDN = "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.31/dist/";
-  const ORT_CDN = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/";  // must match vad-web 0.0.31
+  // The speech detector's files: web/vendor next to this file first (VOICE_LOG.md D48), then the same versions on the
+  // CDN. Absolute URLs: onnxruntime import()s its .mjs relative to the bundle, not the page.
+  const HERE = new URL(".", document.currentScript?.src || location.href).href;
+  const VAD_SOURCES = [
+    { vad: HERE + "vendor/vad-web-0.0.31/", ort: HERE + "vendor/onnxruntime-web-1.22.0/" },
+    { vad: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.31/dist/",
+      ort: "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/" },   // onnxruntime must match vad-web 0.0.31
+  ];
+  const VAD_FILES = { vad: ["bundle.min.js", "vad.worklet.bundle.min.js", "silero_vad_v5.onnx"],
+                      ort: ["ort-wasm-simd-threaded.mjs", "ort-wasm-simd-threaded.wasm"] };
   // Tuned on the user's recordings (VOICE_LOG.md, CP0): every one-word answer was caught.
   const VAD = { model: "v5", positiveSpeechThreshold: 0.5, negativeSpeechThreshold: 0.35, redemptionMs: 850,
                 preSpeechPadMs: 300, minSpeechMs: 160 };
@@ -29,6 +38,26 @@
       document.head.append(s);
     });
     return scripts[src];
+  }
+
+  /** The sources to try, in order: the local copy only when every file is there and its scripts come as JavaScript
+      (the worklet and the onnxruntime module are refused otherwise), then the CDN. */
+  async function vadSources() {
+    const [local, cdn] = VAD_SOURCES;
+    const usable = (url) => fetch(url, { method: "HEAD" }).then((r) => {
+      const ok = r.ok && (!/\.m?js$/.test(url) || /javascript/.test(r.headers.get("content-type") || ""));
+      if (!ok) console.warn("voice: not usable", url, r.status, r.headers.get("content-type"));
+      return ok;
+    }, (err) => { console.warn("voice: not usable", url, err); return false; });
+    const urls = [...VAD_FILES.vad.map((f) => local.vad + f), ...VAD_FILES.ort.map((f) => local.ort + f)];
+    return (await Promise.all(urls.map(usable))).every(Boolean) ? [local, cdn] : [cdn];
+  }
+
+  /** A source's vad-web library. Each bundle carries its own onnxruntime, so after a failed start on one source the
+      next one starts clean. */
+  async function vadLibrary(source) {
+    await loadScript(source.vad + "bundle.min.js");
+    return (source.lib ||= window.vad);
   }
 
   /** Float32 samples (-1..1) to WAV file bytes, mono PCM16. */
@@ -123,19 +152,38 @@
       this.player.onIdle = () => this.showStage();
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
-      await loadScript(VAD_CDN + "bundle.min.js");
-      this.vad = await window.vad.MicVAD.new({
-        ...VAD, startOnLoad: false, baseAssetPath: VAD_CDN, onnxWASMBasePath: ORT_CDN,
-        getStream: async () => this.stream, pauseStream: async () => {}, resumeStream: async () => this.stream,
-        onSpeechStart: () => this.speechStart(),
-        onVADMisfire: () => this.misfire(),
-        onSpeechEnd: (audio) => this.speechEnd(audio),
-      });
+      this.vad = await this.detector();
+      if (this.stopped) return;   // turned off while starting: no voice session (it would take the greeting)
       await this.connect();
       if (this.stopped) return;
       await this.vad.start();
       // The detector runs: show where things stand (with no greeting to play, the bar stayed on "Starting").
       this.showStage();
+    }
+
+    /** The speech detector on the microphone stream, from the first source whose library, model and onnxruntime load.
+        The worklet loads later, in vad.start(), so only vadSources() checks it. */
+    async detector() {
+      let error;
+      for (const source of await vadSources()) {
+        if (this.stopped) throw new Error("voice stopped");
+        try {
+          const lib = await vadLibrary(source);
+          const vad = await lib.MicVAD.new({
+            ...VAD, startOnLoad: false, baseAssetPath: source.vad, onnxWASMBasePath: source.ort,
+            getStream: async () => this.stream, pauseStream: async () => {}, resumeStream: async () => this.stream,
+            onSpeechStart: () => this.speechStart(),
+            onVADMisfire: () => this.misfire(),
+            onSpeechEnd: (audio) => this.speechEnd(audio),
+          });
+          if (source !== VAD_SOURCES[0]) console.warn("voice: speech detector from the CDN, web/vendor was not usable");
+          return vad;
+        } catch (err) {
+          error = err;
+          console.warn(`voice: speech detector from ${source.vad} did not start`, err);
+        }
+      }
+      throw error;
     }
 
     connect() {
