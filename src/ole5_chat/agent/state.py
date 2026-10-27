@@ -27,6 +27,8 @@ class TicketDraft(BaseModel):
     collected: dict[str, str] = {}
     missing: list[str] = []
     unknown: list[str] = []
+    collected_customer: dict[str, str] = {}
+    unknown_customer: list[str] = []
     classified: bool = False
     rounds: int = 0
     confidence: Literal["high", "medium", "low"] | None = None

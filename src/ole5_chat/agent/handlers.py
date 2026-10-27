@@ -146,7 +146,9 @@ def submit(state: ChatState) -> dict:
     draft = state["ticket_draft"]
     ticket = {**ticket, "title": draft.title, "summary": draft.summary, "title_customer": draft.title_customer,
               "summary_customer": draft.summary_customer, "queue": draft.queue, "type": draft.type,
-              "subtype": draft.subtype, "priority": draft.priority,
+              "subtype": draft.subtype, "priority": draft.priority, "collected": draft.collected,
+              "unknown": draft.unknown, "collected_customer": draft.collected_customer,
+              "unknown_customer": draft.unknown_customer,
               "attachments": [f["file_name"] for f in state["attachments"]], "message_index": len(state["messages"])}
     done_state = {**state, "ticket_draft": None, "corrections": state["corrections"] + corrections}
     update, fragment = next_issue(done_state, state["pending"][1:])

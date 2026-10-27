@@ -45,7 +45,9 @@ def classify(state: ChatState) -> dict:
                         "customer gave, and ask them to send their last message again.",
                 "corrections": state["corrections"] + [f"classify refused: {'; '.join(problems)}"]}
     draft = state["ticket_draft"].model_copy(update={**fields, "collected": result.collected, "missing": result.missing,
-                                                     "unknown": result.unknown, "classified": True})
+                                                     "unknown": result.unknown, "classified": True,
+                                                     "collected_customer": result.collected_customer,
+                                                     "unknown_customer": result.unknown_customer})
     log.info("classify  checked queue=%s type=%s subtype=%s priority=%s urgent=%s reason=%r",
              draft.queue, draft.type, draft.subtype, draft.priority, draft.urgent, _short(draft.reason or ""))
     return {"ticket_draft": draft}

@@ -55,3 +55,6 @@ class Classification(BaseModel):
     collected: dict[str, str] = {}
     missing: list[str] = []
     unknown: list[str] = []
+    # collected and unknown again in the customer's language, for the card.
+    collected_customer: dict[str, str] = {}
+    unknown_customer: list[str] = []

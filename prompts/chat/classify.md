@@ -23,6 +23,8 @@ When the customer asked to change a field on the summary, use the value they ask
 - collected: every fact the support team needs that the customer gave anywhere in the conversation about this issue: error text, screens, dates, versions, names, numbers, files sent (a line '[attached: name]'). Short English names with their values. Not the customer's name or contact details.
 - missing: what the team still needs and nobody knows yet. Empty when enough is known.
 - unknown: what the customer said they don't know or don't have. A refusal with no specifics ('I don't know anything else', 'that's all I have') moves everything still missing to unknown. List the details the customer doesn't have, never their words of refusal ('I don't know anything else' is not an item).
+- collected_customer: the same entries, names and values in the customer's language, formal, no dialect.
+- unknown_customer: the same items in the customer's language. When the customer wrote in English, both are the same as collected and unknown.
 
 {{values}}
 {{team_scopes}}
