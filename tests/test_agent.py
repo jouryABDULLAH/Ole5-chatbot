@@ -7,13 +7,15 @@ from ole5_chat import llm, sessions
 from ole5_chat.agent.contracts import Classification
 from ole5_chat.agent.validate import check_ticket
 from ole5_chat.knowledge.contracts import Evidence, Retrieval, Verdict
+from ole5_chat.tickets import client as ticket_api
 from ole5_chat.values import catalog
 
 # The real llm.structured, taken before the autouse model fixture replaces it with the scripted one.
 REAL_STRUCTURED = llm.structured
 GOOD = Classification(queue="Ole5 Technical", type="Mobile App Issue", subtype="Application crash",
                       reason="Issue - app crashes on Inbox", priority="Medium", title="App crash",
-                      summary="The app crashes on the Inbox screen.", confidence="high", queue_reason="tech")
+                      summary="The app crashes on the Inbox screen.", title_customer="تعطل التطبيق",
+                      summary_customer="يتعطل التطبيق عند فتح شاشة الوارد.", confidence="high", queue_reason="tech")
 
 
 def chat(email="ole5@example.com"):
@@ -740,9 +742,14 @@ def test_yes_creates_the_ticket(new_path):
     sid = chat()
     confirming(new_path, sid)
     state, prompt_text = new_path(sid, "submit it", "yes", [AIMessage(content="Created.")])
-    number = state["created_tickets"][-1]["ticket_number"]
+    created = state["created_tickets"][-1]
+    number = created["ticket_number"]
     assert number.startswith("T-MOCK-") and state["ticket_draft"] is None
     assert (state["phase"], state["pending"]) == ("none", [])
+    # The card keeps the customer's language; the ticket sent to the API is in English.
+    assert (created["title"], created["title_customer"]) == ("App crash", "تعطل التطبيق")
+    sent = ticket_api.ticket_client().calls[-2][1]["Ticket"]
+    assert (sent["Title"], sent["Queue"]) == ("App crash", "Ole5 Technical")
     assert f"The ticket {number} was created." in prompt_text and "This needs the support team" not in prompt_text
 
 

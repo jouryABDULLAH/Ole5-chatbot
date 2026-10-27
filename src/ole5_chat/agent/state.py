@@ -22,6 +22,8 @@ class TicketDraft(BaseModel):
     urgent_reason: str | None = None
     title: str | None = None
     summary: str | None = None
+    title_customer: str | None = None
+    summary_customer: str | None = None
     collected: dict[str, str] = {}
     missing: list[str] = []
     unknown: list[str] = []

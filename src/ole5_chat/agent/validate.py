@@ -86,5 +86,6 @@ def check_ticket(c: Classification, catalog: Catalog) -> tuple[dict, list[str]]:
 
     fields = {"queue": queue, "type": type_, "subtype": subtype, "reason": reason, "priority": priority,
               "urgent": c.urgent, "urgent_reason": urgent_reason if c.urgent else None, "title": c.title,
-              "summary": c.summary, "confidence": c.confidence, "queue_reason": c.queue_reason}
+              "summary": c.summary, "title_customer": c.title_customer, "summary_customer": c.summary_customer,
+              "confidence": c.confidence, "queue_reason": c.queue_reason}
     return fields, problems

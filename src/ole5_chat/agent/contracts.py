@@ -47,6 +47,9 @@ class Classification(BaseModel):
     urgent_reason: str | None = None
     title: str | None = None
     summary: str | None = None
+    # The same two in the customer's language, shown on the card; the ticket itself is sent in English.
+    title_customer: str | None = None
+    summary_customer: str | None = None
     confidence: Literal["high", "medium", "low"] | None = None
     queue_reason: str | None = None
     collected: dict[str, str] = {}

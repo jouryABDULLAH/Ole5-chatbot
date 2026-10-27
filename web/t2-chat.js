@@ -299,7 +299,8 @@
     card(fields, files, submitted = null) {
       const rows = el("dl");
       for (const key of ["title", "summary", "queue", "type", "subtype", "priority"]) {
-        const value = fields[key];
+        // Title and summary in the customer's language when classify wrote them; the ticket itself is in English.
+        const value = fields[key + "_customer"] || fields[key];
         rows.append(el("dt", {}, this.t.fields[key]),
                     el("dd", { class: value ? null : "missing", dir: "auto" }, value || this.t.notSet));
       }

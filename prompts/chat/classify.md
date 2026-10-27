@@ -17,6 +17,8 @@ When the customer asked to change a field on the summary, use the value they ask
 - urgent: true when the ticket needs someone now, not in the normal order: a system or service down, many users unable to work, data lost or exposed, a deadline hours away. Judge it from the impact described, as for priority: the customer calling it urgent is not enough, and a polite ticket can be urgent. When true, urgent_reason says why in one line; it is sent to the people on call, so write it for them. Otherwise false and no reason.
 - title: short, specific, in English.
 - summary: what the customer is asking, in one or two sentences, in English.
+- title_customer: the title again, in the customer's language (the language of their messages). Formal, no dialect. Same meaning, not a longer version.
+- summary_customer: the summary again, in the customer's language, formal, one or two sentences. When the customer wrote in English, both are the same as title and summary.
 - confidence: high when the conversation answers what the team needs directly and the customer gave enough detail. medium when you had to judge how far the details reach, or when the conversation left you reading between the lines. low when you are guessing: an unclear service, a queue you could not place, an answer resting on one thin passage.
 - collected: every fact the support team needs that the customer gave anywhere in the conversation about this issue: error text, screens, dates, versions, names, numbers, files sent (a line '[attached: name]'). Short English names with their values. Not the customer's name or contact details.
 - missing: what the team still needs and nobody knows yet. Empty when enough is known.

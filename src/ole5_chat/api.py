@@ -56,6 +56,8 @@ class CreatedTicket(BaseModel):
     ticket_number: str
     title: str | None = None
     summary: str | None = None
+    title_customer: str | None = None
+    summary_customer: str | None = None
     queue: str | None = None
     type: str | None = None
     subtype: str | None = None
