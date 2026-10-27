@@ -7,9 +7,9 @@
       email: "Email", cont: "Continue", checking: "Checking",
       placeholder: "Write a message", send: "Send", writing: "Writing a reply",
       source: "Source", sources: "Sources",
-      summary: "Ticket summary", submit: "Submit ticket", submitting: "Submitting", submitted: "Ticket {number} submitted",
+      summary: "Ticket summary", submit: "Submit ticket", submitting: "Submitting", submitted: "Ticket {number} submitted", submittedButton: "Submitted",
       fields: { queue: "Queue", type: "Type", subtype: "Subtype", priority: "Priority", title: "Title", summary: "Summary",
-                attachments: "Attachments" },
+                attachments: "Attachments", collected: "Collected", unknown: "Not given by the customer" },
       notSet: "Not set", failed: "The message was not sent. Try again.",
       unreachable: "The chat service cannot be reached. Check that it is running, then try again.",
       restart: "Start a new chat",
@@ -23,9 +23,9 @@
       email: "البريد الإلكتروني", cont: "متابعة", checking: "جارٍ التحقق",
       placeholder: "اكتب رسالتك", send: "إرسال", writing: "جارٍ كتابة الرد",
       source: "المصدر", sources: "المصادر",
-      summary: "ملخص التذكرة", submit: "إرسال التذكرة", submitting: "جارٍ الإرسال", submitted: "تم إرسال التذكرة {number}",
+      summary: "ملخص التذكرة", submit: "إرسال التذكرة", submitting: "جارٍ الإرسال", submitted: "تم إرسال التذكرة {number}", submittedButton: "تم الإرسال",
       fields: { queue: "القائمة", type: "النوع", subtype: "النوع الفرعي", priority: "الأولوية", title: "العنوان", summary: "الملخص",
-                attachments: "المرفقات" },
+                attachments: "المرفقات", collected: "ما تم جمعه", unknown: "لم يحدده العميل" },
       notSet: "غير محدد", failed: "لم تُرسل الرسالة. حاول مرة أخرى.",
       unreachable: "تعذّر الوصول إلى خدمة المحادثة. تأكد من تشغيلها ثم حاول مرة أخرى.",
       restart: "بدء محادثة جديدة",
@@ -305,10 +305,21 @@
                     el("dd", { class: value ? null : "missing", dir: "auto" }, value || this.t.notSet));
       }
       if (files.length) rows.append(el("dt", {}, this.t.fields.attachments), el("dd", { dir: "auto" }, files.join("\n")));
+      // What the customer gave for the ticket, one line each, and what they said they don't have. (missing is empty
+      // on the card: when the customer is done, what was still missing becomes unknown.)
+      const items = Object.entries(Object.keys(fields.collected_customer || {}).length ? fields.collected_customer
+                                                                                       : (fields.collected || {}));
+      if (items.length) rows.append(el("dt", {}, this.t.fields.collected),
+                                    el("dd", { dir: "auto" }, items.map(([k, v]) => `${k}: ${v}`).join("\n")));
+      const unknown = (fields.unknown_customer || []).length ? fields.unknown_customer : (fields.unknown || []);
+      if (unknown.length) rows.append(el("dt", {}, this.t.fields.unknown),
+                                      el("dd", { class: "missing", dir: "auto" }, unknown.join("\n")));
       if (submitted) {
         return el("div", { class: "card done" },
                   el("h3", {}, el("span", { html: ICON_CHECK }), this.t.submitted.replace("{number}", submitted.ticket_number)),
-                  rows);
+                  rows,
+                  el("div", { class: "actions" },
+                     el("button", { class: "primary", type: "button", disabled: true }, this.t.submittedButton)));
       }
       return el("div", { class: "card" }, el("h3", {}, this.t.summary), rows,
         el("div", { class: "actions" },

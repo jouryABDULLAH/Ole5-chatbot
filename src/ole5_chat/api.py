@@ -1,5 +1,6 @@
 """HTTP API of the chat service: start a session with an email, send messages, attach files, read the conversation back, submit the ticket, serve the attached files and the knowledge base documents a source names, list the customer's tickets."""
 
+import re
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Response, UploadFile
@@ -62,6 +63,10 @@ class CreatedTicket(BaseModel):
     type: str | None = None
     subtype: str | None = None
     priority: str | None = None
+    collected: dict[str, str] = {}
+    unknown: list[str] = []
+    collected_customer: dict[str, str] = {}
+    unknown_customer: list[str] = []
     attachments: list[str] = []
     message_index: int
 
@@ -188,7 +193,13 @@ def read_attachment(att_id: str) -> FileResponse:
 KB_PAGE = """<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>{title}</title>
 <style>body{{max-width:860px;margin:40px auto;padding:0 20px;font-family:"IBM Plex Sans Arabic",system-ui,sans-serif;
 line-height:1.8;color:#1E2A2C}}h1,h2,h3{{line-height:1.4}}code{{background:#EAF1EE;padding:1px 5px;border-radius:4px}}
-table{{border-collapse:collapse}}td,th{{border:1px solid #DCE3E0;padding:6px 10px}}</style></head><body>{body}</body></html>"""
+table{{border-collapse:collapse}}td,th{{border:1px solid #DCE3E0;padding:6px 10px}}
+.chunk{{padding:4px 16px;margin:8px 0;border-radius:8px;border-inline-start:3px solid #0E5A4C;background:#EAF1EE}}
+.chunk:nth-child(even){{background:#F3F6F5;border-inline-start-color:#9FBDB5}}</style></head><body>{body}</body></html>"""
+
+# The export marks where each indexed chunk starts, on its own line. The page shows the chunks as tinted blocks
+# instead of printing the marker, so a reader sees what the search returns as one passage.
+CHUNK_MARK = re.compile(r"^_chunk_\d+_\s*$", re.MULTILINE)
 
 
 def _documents(product: str) -> list:
@@ -214,7 +225,9 @@ def read_document(product: str, title: str) -> HTMLResponse:
     path = next((f for f in _documents(product) if f.stem == title), None)
     if path is None:
         raise HTTPException(status_code=404, detail="Document not found")
-    body = MarkdownIt().render(path.read_text(encoding="utf-8"))
+    render = MarkdownIt().render
+    head, *chunks = CHUNK_MARK.split(path.read_text(encoding="utf-8"))
+    body = render(head) + "".join(f'<section class="chunk">{render(c)}</section>' for c in chunks if c.strip())
     return HTMLResponse(KB_PAGE.format(title=title, body=body))
 
 

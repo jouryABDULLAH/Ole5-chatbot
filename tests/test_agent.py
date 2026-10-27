@@ -15,7 +15,9 @@ REAL_STRUCTURED = llm.structured
 GOOD = Classification(queue="Ole5 Technical", type="Mobile App Issue", subtype="Application crash",
                       reason="Issue - app crashes on Inbox", priority="Medium", title="App crash",
                       summary="The app crashes on the Inbox screen.", title_customer="تعطل التطبيق",
-                      summary_customer="يتعطل التطبيق عند فتح شاشة الوارد.", confidence="high", queue_reason="tech")
+                      summary_customer="يتعطل التطبيق عند فتح شاشة الوارد.", confidence="high", queue_reason="tech",
+                      collected={"screen": "Inbox"}, unknown=["app version"],
+                      collected_customer={"الشاشة": "الوارد"}, unknown_customer=["نسخة التطبيق"])
 
 
 def chat(email="ole5@example.com"):
@@ -702,7 +704,7 @@ def test_details_count_rounds_then_ask_the_open_question(new_path):
     sid = chat()
     collecting(new_path, sid)
     state, prompt_text = new_path(sid, "version 17", "details", [AIMessage(content="When did it start?")])
-    assert state["ticket_draft"].rounds == 1 and "Ask what else the support team needs" in prompt_text
+    assert state["ticket_draft"].rounds == 1 and "ask only whether there is anything else they'd like to add" in prompt_text
     state, prompt_text = new_path(sid, "yesterday", "details", [AIMessage(content="Anything else to add?")])
     assert state["ticket_draft"].rounds == 2 and state["phase"] == "collect"
     assert "Ask whether there is anything else they'd like to add about: Does it run on Linux?" in prompt_text
@@ -748,8 +750,10 @@ def test_yes_creates_the_ticket(new_path):
     assert (state["phase"], state["pending"]) == ("none", [])
     # The card keeps the customer's language; the ticket sent to the API is in English.
     assert (created["title"], created["title_customer"]) == ("App crash", "تعطل التطبيق")
-    sent = ticket_api.ticket_client().calls[-2][1]["Ticket"]
-    assert (sent["Title"], sent["Queue"]) == ("App crash", "Ole5 Technical")
+    assert (created["collected_customer"], created["unknown_customer"]) == ({"الشاشة": "الوارد"}, ["نسخة التطبيق"])
+    (_, create), (_, update) = ticket_api.ticket_client().calls[-2:]
+    assert (create["Ticket"]["Title"], create["Ticket"]["Queue"]) == ("App crash", "Ole5 Technical")
+    assert update["Article"]["Body"].startswith("Collected: screen: Inbox\n")
     assert f"The ticket {number} was created." in prompt_text and "This needs the support team" not in prompt_text
 
 
@@ -857,7 +861,7 @@ def test_the_task_is_the_last_message_off_the_plain_chat_turn(new_path):
         (("We need to migrate our data", "ticket", [AIMessage(content="After this one.")]), {}, "The customer raised a new issue: We need to migrate our data."),
         (("thanks", "talk", [AIMessage(content="Sure. Still want it?")]), {}, "Answer the customer's message as usual. A ticket offer"),
         (("yes", "accept", [AIMessage(content="Which version?")]), {}, "The customer agreed to a ticket"),
-        (("version 17", "details", [AIMessage(content="Anything else?")]), {}, "Ask what else the support team needs"),
+        (("version 17", "details", [AIMessage(content="Anything else?")]), {}, "The customer added details about"),
         (("ok", "talk", [AIMessage(content="Anything else?")]), {},
          "Answer the customer's message as usual. Then continue the current ticket: ask what else the support team needs"),
         (("nothing else", "done", [AIMessage(content="Submit it?")]), {"groundings": [GOOD]}, "The ticket summary is ready"),

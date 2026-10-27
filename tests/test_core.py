@@ -107,12 +107,14 @@ def test_knowledge_document_is_served_rendered(tmp_path, monkeypatch):
     from ole5_chat.api import app
     from ole5_chat.config import get_settings
     (tmp_path / "kb" / "ole5").mkdir(parents=True)
-    (tmp_path / "kb" / "ole5" / "نظام OLE5 — قاعدة المعرفة.md").write_text("# عنوان\n\n- بند", encoding="utf-8")
+    (tmp_path / "kb" / "ole5" / "نظام OLE5 — قاعدة المعرفة.md").write_text(
+        "# عنوان\n\n_chunk_002_\n\n- بند\n\n_chunk_003_\n\nنص", encoding="utf-8")
     monkeypatch.setenv("KB_EXPORT_DIR", str(tmp_path / "kb"))
     get_settings.cache_clear()
     client = TestClient(app)
     page = client.get("/chat/kb/OLE5/نظام OLE5 — قاعدة المعرفة")
     assert page.status_code == 200 and "<h1>عنوان</h1>" in page.text and "<li>بند</li>" in page.text
+    assert page.text.count('<section class="chunk">') == 2 and "chunk_00" not in page.text
     assert client.get("/chat/kb/OLE5/missing").status_code == 404
     assert client.get("/chat/kb/OLE5/..%2F..%2Fetc").status_code == 404
     assert client.get("/chat/kb/OLE5").json() == ["نظام OLE5 — قاعدة المعرفة"]
