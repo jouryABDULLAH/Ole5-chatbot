@@ -18,7 +18,7 @@ from ole5_chat.agent import prompt
 from ole5_chat.agent.contracts import Reply
 from ole5_chat.agent.search import QUESTIONS
 from ole5_chat.agent.state import ChatState
-from ole5_chat.agent.validate import NAMES, SORRY, language_of, language_problem
+from ole5_chat.agent.validate import NAMES, SORRY, language_of, language_problem, script_problem
 from ole5_chat.knowledge.contracts import Retrieval
 
 log = logging.getLogger(__name__)
@@ -57,8 +57,9 @@ def _is_json(text: str) -> bool:
 
 
 def _problem(text: str, language: str) -> str | None:
-    """What is wrong with the reply's language, or None."""
-    return language_problem(text, language) or (
+    """What is wrong with the reply's language, or None. A voice turn checks the script instead of making a model call."""
+    found = script_problem(text, language) if llm.voice_active() else language_problem(text, language)
+    return found or (
         CHINESE.search(text) and f"The reply contains Chinese characters; rewrite it in {NAMES[language]}.") or None
 
 
@@ -169,7 +170,11 @@ def respond_agent(state: ChatState) -> dict:
     question = state.get("next") in QUESTIONS
     retrieval = Retrieval.from_json(state["last_retrieval"]) if state.get("last_retrieval") else None
     customer = next((m.text for m in reversed(state["messages"]) if m.type == "human"), "")
-    language = language_of(customer) or state["identity"].language
+    heard = state.get("heard_language")
+    if state.get("channel") == "voice" and heard in NAMES:
+        language = heard  # speech-to-text already knows; saves a model call per turn
+    else:
+        language = language_of(customer) or state["identity"].language
     convo = _convo(state, language, retrieval)
     corrections: list[str] = []
     sources, status = [], "answered"

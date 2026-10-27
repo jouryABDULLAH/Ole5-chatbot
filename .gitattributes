@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# The vendored speech detector files are kept byte for byte (their SHA-256 is checked).
+web/vendor/** -text

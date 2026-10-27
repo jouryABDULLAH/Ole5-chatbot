@@ -3,13 +3,14 @@
 import logging
 import threading
 import uuid
+from typing import Callable
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from openinference.instrumentation import using_session
 
-from ole5_chat import attachments
+from ole5_chat import attachments, llm
 from ole5_chat.agent.graph import build
 from ole5_chat.agent.contracts import PendingIssue, Reply
 from ole5_chat.agent.state import ChatState, TicketDraft, initial_state
@@ -66,7 +67,10 @@ def _lock(session_id: str) -> threading.Lock:
         return _locks.setdefault(session_id, threading.Lock())
 
 
-def send(session_id: str, text: str, attachment_ids: list[str] = ()) -> ChatState:
+def send(session_id: str, text: str, attachment_ids: list[str] = (), *, channel: str = "chat",
+         heard_language: str | None = None, on_event: Callable[[dict], None] | None = None) -> ChatState:
+    """One customer message. channel "voice" marks a transcribed message (voice prompts, voice model limits); on_event,
+    if given, receives each node's name and the graph's progress events while the turn runs."""
     with _lock(session_id):
         state = get(session_id)
         names = [f["file_name"] for f in state["attachments"] if f["id"] in attachment_ids]
@@ -74,10 +78,28 @@ def send(session_id: str, text: str, attachment_ids: list[str] = ()) -> ChatStat
             raise AttachmentNotFound()
         if names:
             text = f"{text}\n{ATTACHED.format(', '.join(names))}".strip()
-        log.info("message  session=%s %r", session_id[:8], text)
-        with using_session(session_id):
-            # next cleared: after a turn that failed past the router, this message must not go straight to a handler.
-            return _graph.invoke({"messages": [HumanMessage(content=text)], "next": None}, _config(session_id))
+        log.info("message  session=%s channel=%s %r", session_id[:8], channel, text)
+        # next cleared: after a turn that failed past the router, this message must not go straight to a handler.
+        turn = {"messages": [HumanMessage(content=text)], "next": None, "channel": channel,
+                "heard_language": heard_language, "confirmed": False, "reconfirmed": False}
+        with using_session(session_id), llm.voice_turn(channel == "voice"):
+            return _run(session_id, turn, on_event)
+
+
+def _run(session_id: str, turn: dict, on_event: Callable[[dict], None] | None) -> ChatState:
+    if on_event is None:
+        return _graph.invoke(turn, _config(session_id))
+    for mode, data in _graph.stream(turn, _config(session_id), stream_mode=["updates", "custom"]):
+        try:
+            if mode == "updates":
+                for node in data or {}:
+                    on_event({"type": "node", "node": node})
+            else:
+                on_event(data)
+        except Exception:
+            # A failing listener must not abort the turn halfway through the graph.
+            log.exception("session  event listener failed")
+    return get(session_id)
 
 
 def attach(session_id: str, file_name: str, data: bytes) -> dict:
@@ -99,7 +121,25 @@ def detach(session_id: str, att_id: str) -> bool:
     return True
 
 
-def submit(session_id: str) -> ChatState:
-    with _lock(session_id), using_session(session_id):
+def submit(session_id: str, *, channel: str = "chat", said: str | None = None, heard_language: str | None = None,
+           on_event: Callable[[dict], None] | None = None) -> ChatState:
+    """The Submit button, or on voice a second acknowledgement right after "just to confirm" (D15): said is then the
+    customer's words, added to the history in the same turn."""
+    with _lock(session_id), using_session(session_id), llm.voice_turn(channel == "voice"):
         check(get(session_id))
-        return _graph.invoke({"next": "yes"}, _config(session_id))
+        turn = {"next": "yes", "channel": channel, "heard_language": heard_language, "confirmed": True,
+                "reconfirmed": False}
+        if said:
+            log.info("message  session=%s channel=%s submit %r", session_id[:8], channel, said)
+            turn["messages"] = [HumanMessage(content=said)]
+        return _run(session_id, turn, on_event)
+
+
+def note(session_id: str, said: str, answer: str) -> ChatState:
+    """A voice exchange the voice shell answered itself (the "just to confirm" line), added to the history so the
+    transcript and the model both see it."""
+    with _lock(session_id):
+        get(session_id)
+        _graph.update_state(_config(session_id), {"messages": [HumanMessage(content=said), AIMessage(content=answer)]},
+                            as_node="validate")
+        return get(session_id)

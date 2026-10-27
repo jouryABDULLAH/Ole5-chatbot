@@ -43,6 +43,33 @@ def language_problem(text: str, language: str) -> str | None:
             f"Write the same reply in {NAMES[language]}.")
 
 
+ARABIC_LETTER = re.compile(r"[ء-ي]")
+LATIN_LETTER = re.compile(r"[A-Za-z]")
+
+
+def script_language(text: str) -> str | None:
+    """"ar" or "en" from the letters a text is written in, or None when it has too few letters to tell."""
+    arabic, latin = len(ARABIC_LETTER.findall(text)), len(LATIN_LETTER.findall(text))
+    if arabic + latin < 4:
+        return None
+    return "ar" if arabic >= latin else "en"
+
+
+def script_problem(text: str, language: str) -> str | None:
+    """Like language_problem, without a model call: the reply's letters must be mostly in the customer's script. Names
+    in the other script (an English screen name in an Arabic reply, an Arabic one in an English reply) are allowed."""
+    arabic, latin = len(ARABIC_LETTER.findall(text)), len(LATIN_LETTER.findall(text))
+    total = arabic + latin
+    if total < 4:
+        return None
+    other = latin if language == "ar" else arabic
+    if other / total <= 0.6:
+        return None
+    found = "en" if language == "ar" else "ar"
+    return (f"The reply is in {NAMES[found]}. The customer wrote in {NAMES[language]}. "
+            f"Write the same reply in {NAMES[language]}.")
+
+
 def match(options: list[str], value: str | None) -> str | None:
     if not value or not value.strip():
         return None

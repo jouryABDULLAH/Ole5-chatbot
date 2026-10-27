@@ -1,0 +1,1 @@
+"""The voice channel: a shell around the same Ole5 graph. Speech in (Groq Whisper), the graph unchanged with a voice flag, speech out (Groq Orpheus). The plan and its decisions are in VOICE_PLAN.md and VOICE_LOG.md."""

@@ -5,7 +5,7 @@ from functools import lru_cache
 from ole5_chat import products, values
 from ole5_chat.agent.contracts import OPTIONS, Classification, route_schema
 from ole5_chat.agent.state import ChatState
-from ole5_chat.agent.tasks import RESPOND_TASK
+from ole5_chat.agent.tasks import RESPOND_TASK, VOICE_CLOSE
 from ole5_chat.agent.validate import NAMES, Language
 from ole5_chat.config import ROOT, get_settings
 from ole5_chat.llm import schema_text
@@ -113,10 +113,13 @@ def router(state: ChatState) -> str:
     phase = state["phase"]
     pending = state.get("pending") or []
     last = next((m.text for m in reversed(state["messages"]) if m.type == "ai"), "none")
-    return _fill("router", product_name=config.name, phase_description=PHASES[phase],
+    text = _fill("router", product_name=config.name, phase_description=PHASES[phase],
                  issue=pending[0].text if pending else "none", last_assistant=last,
                  options="\n\n".join(_option(config, phase, o) for o in OPTIONS[phase]),
                  schema=schema_text(route_schema(phase)))
+    if spoken(state):
+        text = text.replace("Reply with JSON only", f"{VOICE_ROUTER}\n\nReply with JSON only", 1)
+    return text
 
 
 def language() -> str:
@@ -134,10 +137,52 @@ def _persona(config: products.ProductConfig, language: str) -> str:
     return "\n".join(lines)
 
 
+# The voice channel (VOICE_PLAN.md section 6). A voice turn keeps every rule above about what a reply says; these change
+# how it is said. The voice wording of the ticket steps is in tasks.py.
+
+VOICE_STYLE = """## This reply is spoken
+
+The customer is talking to you by voice: your reply is read aloud by a speech engine and also shown on screen.
+- Keep exactly the content the rules above put in the reply: the same steps, conditions and causes from DIRECT
+  passages, nothing added and nothing dropped. Only the form changes.
+- Short spoken sentences, in the order the passages give. Don't add ordering words such as "first" or "then"
+  (أولاً، ثم) that the passages don't use, and don't turn different ways of doing something into steps.
+- One step per line is fine, since a line break becomes a pause; no bullet or number markers.
+- Write screen and menu names exactly as the passages do, arrows included: the speech engine reads an arrow as "then".
+  No brackets or slashes outside names.
+- At most two short questions, and a question goes last.
+- Don't name the documents or sources; they are shown on screen."""
+
+VOICE_ROUTER = ("The customer is speaking: their messages are speech-to-text transcripts and may have misheard or "
+                "missing words. Judge what they meant. While the summary is shown, yes needs a clear yes or an "
+                "instruction to send it (نعم، ايه، ايوه، اكيد، موافق، أرسلها، افتحها، yes, sure, submit, send, go "
+                "ahead, confirm); an acknowledgement without one (\"تمام كذا\", \"اوكي زين\", \"ok, sounds good\") is "
+                "talk, not yes and not question.")
+
+
+def voice(state: ChatState) -> bool:
+    return state.get("channel") == "voice"
+
+
+def spoken(state: ChatState) -> bool:
+    """A voice turn the customer spoke (a typed message in voice mode has no heard language)."""
+    return voice(state) and state.get("heard_language") is not None
+
+
+def voice_language(state: ChatState) -> str:
+    """The language the reply will be in: what speech-to-text heard; for a typed message the letters it was typed in
+    (as respond_agent will judge it); else the last reply's, else the customer's."""
+    from ole5_chat.agent.validate import script_language
+    typed = next((m.text for m in reversed(state["messages"]) if m.type == "human"), "") if state["messages"] else ""
+    found = state.get("heard_language") or script_language(typed) or state.get("language") or state["identity"].language
+    return found if found in VOICE_CLOSE else "en"
+
+
 def respond(state: ChatState, language: str) -> str:
     config = products.load(state["identity"].product)
-    return _fill("respond", persona=_persona(config, language), language=NAMES[language],
+    text = _fill("respond", persona=_persona(config, language), language=NAMES[language],
                  task=state.get("task") or RESPOND_TASK, note=state.get("note") or "")
+    return f"{text.rstrip()}\n\n{VOICE_STYLE}\n" if voice(state) else text
 
 
 def search(state: ChatState) -> str:

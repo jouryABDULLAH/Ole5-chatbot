@@ -206,3 +206,9 @@ def my_tickets(session_id: str) -> list[TicketView]:
     except sessions.SessionNotFound as exc:
         raise HTTPException(status_code=404, detail="Session not found") from exc
     return [TicketView(**t) for t in ticket_status.my_tickets(email, ticket_api.ticket_client())]
+
+
+# The voice channel's routes, registered here so they come before main.py mounts web/ at "/".
+from ole5_chat.voice.api import router as voice_router  # noqa: E402
+
+app.include_router(voice_router)

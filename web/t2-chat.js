@@ -1,5 +1,6 @@
-/* <t2-chat api="https://chat-service">: the support chat widget. Plain JavaScript in one file, no build step. It knows only the chat service's HTTP API; the api attribute defaults to the page's own origin. When a cited source is clicked it fires a cancelable t2-document event {product, title} so the host page can show the document in place. */
+/* <t2-chat api="https://chat-service">: the support chat widget. Plain JavaScript in one file, no build step. It knows only the chat service's HTTP API; the api attribute defaults to the page's own origin. When a cited source is clicked it fires a cancelable t2-document event {product, title} so the host page can show the document in place. The microphone button loads voice.js from the same folder as this file and talks over the session's voice WebSocket instead. */
 (() => {
+  const HERE = document.currentScript ? new URL(".", document.currentScript.src).href : "";
   const TEXT = {
     en: {
       open: "Chat", close: "Close chat", title: "Support",
@@ -16,6 +17,13 @@
       attach: "Attach a file", remove: "Remove", uploading: "Uploading",
       tooBig: "The file is too large.", badType: "This file type cannot be attached.",
       tooMany: "No more files can be attached to this ticket.",
+      voiceOn: "Talk to the assistant", voiceOff: "Turn the microphone off", stop: "Stop",
+      mute: "Mute", unmute: "Unmute", muteKey: "Mute or unmute the microphone (M)",
+      stages: { starting: "Starting the microphone", listening: "Listening", hearing: "Hearing you",
+                thinking: "Thinking", searching: "Checking the knowledge base", speaking: "Speaking",
+                muted: "Microphone muted" },
+      you: "You", micBlocked: "The microphone is blocked. Allow it in the browser to talk.",
+      voiceFailed: "Voice could not start. You can keep typing.", voiceLost: "The voice connection was lost.",
     },
     ar: {
       open: "محادثة", close: "إغلاق المحادثة", title: "الدعم",
@@ -32,6 +40,13 @@
       attach: "إرفاق ملف", remove: "إزالة", uploading: "جارٍ الرفع",
       tooBig: "حجم الملف كبير جداً.", badType: "لا يمكن إرفاق هذا النوع من الملفات.",
       tooMany: "لا يمكن إرفاق ملفات أخرى بهذه التذكرة.",
+      voiceOn: "تحدث مع المساعد", voiceOff: "إيقاف الميكروفون", stop: "إيقاف",
+      mute: "كتم", unmute: "إلغاء الكتم", muteKey: "كتم الميكروفون أو إلغاء كتمه (M)",
+      stages: { starting: "جارٍ تشغيل الميكروفون", listening: "أستمع إليك", hearing: "أسمعك",
+                thinking: "أفكر في ردي", searching: "أبحث في قاعدة المعرفة", speaking: "أتحدث",
+                muted: "الميكروفون مكتوم" },
+      you: "أنت", micBlocked: "الميكروفون محظور. اسمح به في المتصفح لتتحدث.",
+      voiceFailed: "تعذّر تشغيل الصوت. يمكنك متابعة الكتابة.", voiceLost: "انقطع الاتصال الصوتي.",
     },
   };
   const KEY = "t2-chat-session";
@@ -117,7 +132,27 @@
     .chip button:hover:not(:disabled) { background:var(--soft); color:var(--ink); }
     .restart { align-self:center; border:0; background:none; color:var(--accent); font-size:14px; cursor:pointer;
                text-decoration:underline; text-underline-offset:3px; }
-    @media (prefers-reduced-motion: reduce) { .panel { animation:none; } .dots i { animation:none; opacity:.6; } }
+    .mic { width:42px; height:42px; display:grid; place-items:center; border:1px solid var(--line); border-radius:12px;
+           background:#fff; color:var(--muted); cursor:pointer; flex:none; }
+    .mic:hover:not(:disabled) { color:var(--ink); background:var(--soft); }
+    .mic.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+    .mic:disabled { opacity:.45; cursor:default; }
+    .voicebar { display:flex; align-items:center; gap:10px; min-height:44px; padding:8px 12px 8px 16px;
+                border-top:1px solid var(--line); background:var(--soft); font-size:14px; }
+    .voicebar + .files, .voicebar + .compose { border-top:0; }
+    .voicebar .pulse { width:10px; height:10px; border-radius:50%; background:var(--muted); flex:none; }
+    .voicebar .pulse.listening, .voicebar .pulse.hearing { background:var(--accent); }
+    .voicebar .pulse.hearing, .voicebar .pulse.speaking { animation:pulse 1s infinite; }
+    .voicebar .pulse.speaking { background:var(--accent-dark); }
+    .voicebar .pulse.thinking, .voicebar .pulse.searching { animation:pulse 1.6s infinite; }
+    .voicebar .words { flex:1; min-width:0; display:flex; flex-direction:column; line-height:1.35; }
+    .voicebar .stage { font-weight:500; }
+    .voicebar .caption { color:var(--muted); font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .voicebar .stopbtn { padding:6px 12px; border:1px solid var(--accent); border-radius:999px; background:#fff;
+                         color:var(--accent); font-size:13px; font-weight:500; cursor:pointer; flex:none; }
+    .voicebar .stopbtn:hover { background:var(--accent); color:#fff; }
+    @media (prefers-reduced-motion: reduce) { .panel { animation:none; } .dots i { animation:none; opacity:.6; }
+                                              .voicebar .pulse { animation:none !important; } }
     /* On a phone the panel is a bottom sheet, so the top of the page (a document, say) stays readable above it. */
     @media (max-width: 480px) { .panel { inset:auto 0 0 0; width:100%; height:60vh; height:60dvh;
                                          border-radius:16px 16px 0 0; border-bottom:0; }
@@ -129,6 +164,7 @@
   const ICON_SEND = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>';
 
   const ICON_CLIP = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.5l-7.8 7.8a5 5 0 01-7.1-7.1l8.5-8.5a3.3 3.3 0 014.7 4.7l-8.5 8.5a1.7 1.7 0 01-2.4-2.4L15 6.9"/></svg>';
+  const ICON_MIC = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0013 0M12 17.5V21"/></svg>';
   const ICON_X = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
   const ACCEPT = ".png,.jpg,.jpeg,.pdf,.docx,.xlsx,.txt,.log";
   const MAX_MB = 10;
@@ -160,6 +196,16 @@
     return data;
   }
 
+  const loaded = {};
+  function loadScript(src) {
+    loaded[src] ||= new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = src; s.onload = resolve; s.onerror = () => { delete loaded[src]; reject(new Error(src)); };
+      document.head.append(s);
+    });
+    return loaded[src];
+  }
+
   async function upload(base, path, file) {
     const form = new FormData();
     form.append("file", file);
@@ -179,6 +225,10 @@
       this.busy = false;
       this.error = "";
       this.pending = [];
+      this.voice = null;          // the VoiceLink while the microphone is on
+      this.voiceAllowed = false;  // the service has voice on and the browser has a microphone API
+      this.voiceStage = "starting";
+      this.caption = "";
     }
 
     get api() { return (this.getAttribute("api") || "").replace(/\/$/, ""); }
@@ -191,6 +241,27 @@
         try { this.view = await call(this.api, "GET", `/chat/sessions/${saved}`); } catch { store.set(null); }
       }
       this.render();
+      this.checkVoice();
+      // M mutes and unmutes the microphone while voice is on, unless the customer is typing. By key position, so it
+      // works with an Arabic keyboard too.
+      document.addEventListener("keydown", (e) => {
+        if (!this.voice || e.code !== "KeyM" || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+        const target = e.composedPath()[0];
+        if (target && (target.tagName === "TEXTAREA" || target.tagName === "INPUT" || target.isContentEditable)) return;
+        e.preventDefault();
+        this.toggleMute();
+      });
+    }
+
+    toggleMute() {
+      if (!this.voice) return;
+      this.voice.setMuted(!this.voice.muted).then(() => this.updateVoiceBar());
+    }
+
+    async checkVoice() {
+      if (!navigator.mediaDevices || !window.WebSocket || !window.AudioContext) return;
+      try { this.voiceAllowed = !!(await call(this.api, "GET", "/chat/voice/config")).enabled; } catch { return; }
+      if (this.voiceAllowed) this.render();
     }
 
     static get observedAttributes() { return ["lang"]; }
@@ -216,7 +287,7 @@
       const head = el("div", { class: "head" },
         el("strong", {}, this.view ? this.view.product_name : this.t.title),
         el("button", { class: "icon", type: "button", "aria-label": this.t.close, html: ICON_CLOSE,
-                       onclick: () => { this.open = false; this.render(); } }));
+                       onclick: () => { this.stopVoice(); this.open = false; this.render(); } }));
       return el("section", { class: "panel", role: "dialog", "aria-label": this.t.title },
                 head, ...(this.view ? this.chat() : [this.signin()]));
     }
@@ -264,15 +335,89 @@
                                    onchange: () => { if (picker.files[0]) this.stage(picker.files[0]); } });
       const clip = el("button", { class: "clip", type: "button", "aria-label": this.t.attach, title: this.t.attach,
                                   html: ICON_CLIP, disabled: this.busy, onclick: () => picker.click() });
+      const mic = this.voiceAllowed ? el("button", { class: this.voice ? "mic on" : "mic", type: "button",
+        "aria-label": this.voice ? this.t.voiceOff : this.t.voiceOn, title: this.voice ? this.t.voiceOff : this.t.voiceOn,
+        "aria-pressed": this.voice ? "true" : "false", html: ICON_MIC, onclick: () => this.toggleVoice() }) : null;
       const form = el("form", { class: "compose", onsubmit: (e) => { e.preventDefault(); this.send(box.value); } },
-                      picker, clip, box, sendBtn);
+                      picker, clip, mic, box, sendBtn);
       const files = this.pending.length ? el("div", { class: "files" },
         ...this.pending.map((f, i) => el("span", { class: "chip", dir: "auto" }, el("span", { title: f.name }, f.name),
           el("button", { type: "button", "aria-label": `${this.t.remove} ${f.name}`, html: ICON_X,
                          disabled: this.busy, onclick: () => { this.pending.splice(i, 1); this.render(); } }))))
         : null;
       queueMicrotask(() => { log.scrollTop = log.scrollHeight; });
-      return [log, files, form];
+      return [log, this.voice ? this.voiceBar() : null, files, form];
+    }
+
+    voiceBar() {
+      const bar = el("div", { class: "voicebar", role: "status" });
+      this.fillVoiceBar(bar);
+      return bar;
+    }
+
+    fillVoiceBar(bar) {
+      const stage = this.voiceStage;
+      bar.replaceChildren(...[el("span", { class: `pulse ${stage}`, "aria-hidden": "true" }),
+        el("span", { class: "words" }, el("span", { class: "stage" }, this.t.stages[stage] || ""),
+           this.caption ? el("span", { class: "caption", dir: "auto", title: this.caption }, this.caption) : null),
+        stage === "speaking" ? el("button", { class: "stopbtn", type: "button", onclick: () => this.voice && this.voice.interrupt() },
+                                  this.t.stop) : null,
+        this.voice ? el("button", { class: "stopbtn", type: "button", title: this.t.muteKey,
+                                    "aria-pressed": this.voice.muted ? "true" : "false", onclick: () => this.toggleMute() },
+                        this.voice.muted ? this.t.unmute : this.t.mute) : null].filter(Boolean));  // a null child prints "null"
+    }
+
+    /** Only the voice bar changes: a full render would rebuild the panel on every status. */
+    updateVoiceBar() {
+      const bar = this.root.querySelector(".voicebar");
+      if (bar) this.fillVoiceBar(bar);
+    }
+
+    toggleVoice() { if (this.voice) { this.stopVoice(); this.render(); } else this.startVoice(); }
+
+    async startVoice() {
+      if (!this.view || this.voice) return;
+      this.error = ""; this.voiceStage = "starting"; this.caption = "";
+      let link;
+      try {
+        await loadScript(HERE + "voice.js");
+        link = this.voice = new window.T2Voice.VoiceLink({
+          api: this.api, sessionId: this.view.session_id, halfDuplex: new URLSearchParams(location.search).has("halfduplex"),
+          on: { event: (m) => this.voiceEvent(m), stage: (s) => { this.voiceStage = s; this.updateVoiceBar(); },
+                speech: (on) => { if (this.voiceStage !== "speaking" && (on || this.voiceStage === "hearing")) { this.voiceStage = on ? "hearing" : "listening"; this.updateVoiceBar(); } },
+                closed: () => { this.voice = null; this.busy = false; this.error = this.t.voiceLost; this.render(); } } });
+        this.render();
+        await link.start();
+      } catch (err) {
+        if (link) link.stop();
+        if (link && this.voice !== link) return;
+        this.voice = null;
+        this.error = err && err.name === "NotAllowedError" ? this.t.micBlocked : this.t.voiceFailed;
+        this.render();
+      }
+    }
+
+    stopVoice() {
+      if (!this.voice) return;
+      const link = this.voice;
+      this.voice = null;
+      link.stop();
+      this.busy = false;
+    }
+
+    voiceEvent(m) {
+      if (m.type === "view") {
+        this.view = m.session; this.busy = false; this.render();
+      } else if (m.type === "turn") {
+        if (m.text) this.view = { ...this.view, messages: [...this.view.messages, { author: "customer", text: m.text, sources: [] }] };
+        this.busy = true; this.render();
+      } else if (m.type === "heard") {
+        this.caption = `${this.t.you}: ${m.text}`; this.updateVoiceBar();
+      } else if (m.type === "tts_start" && m.kind !== "reply") {
+        this.caption = m.text; this.updateVoiceBar();
+      } else if (m.type === "error") {
+        this.error = m.text; this.render();
+      }
     }
 
     /* A link to a cited knowledge base document. The host page may listen for the t2-document event and show the
@@ -346,6 +491,12 @@
     async send(text) {
       text = text.trim();
       if ((!text && !this.pending.length) || this.busy) return;
+      if (this.voice && !this.pending.length) {   // in voice mode a typed message is answered aloud too
+        this.root.querySelector("textarea").value = ""; this.draft = "";
+        this.caption = `${this.t.you}: ${text}`; this.updateVoiceBar();
+        this.voice.text(text);
+        return;
+      }
       const before = this.view;
       const shown = this.pending.length ? `${text}\n[attached: ${this.pending.map((f) => f.name).join(", ")}]` : text;
       this.view = { ...before, messages: [...before.messages, { author: "customer", text: shown, sources: [] }] };
@@ -372,6 +523,7 @@
 
     async submitTicket() {
       if (this.busy) return;
+      if (this.voice) { this.voice.submit(); return; }   // the confirmation is spoken; the turn event marks it busy
       this.busy = true; this.error = ""; this.render();
       try {
         this.view = await call(this.api, "POST", `/chat/sessions/${this.view.session_id}/submit`);
@@ -383,6 +535,7 @@
     }
 
     restart() {
+      this.stopVoice();
       store.set(null);
       this.view = null; this.busy = false; this.error = ""; this.draft = "";
       this.render(); this.focusInput();

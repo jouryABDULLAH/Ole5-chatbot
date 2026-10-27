@@ -1,6 +1,7 @@
-"""The process to run: the chat API, plus the web/ folder served as static files for local testing. The page only talks to the API over HTTP. Logs go to the terminal through rich; traces go to Phoenix when TRACING is on; RAGent2 loads its models in the background when KB_BACKEND is ragent2."""
+"""The process to run: the chat API, plus the web/ folder served as static files for local testing. The page only talks to the API over HTTP. Logs go to the terminal through rich; traces go to Phoenix when TRACING is on; RAGent2 loads its models in the background when KB_BACKEND is ragent2, and the voice channel's fixed lines are synthesized in the background."""
 
 import logging
+import mimetypes
 import os
 import threading
 
@@ -76,9 +77,24 @@ def warm_knowledge() -> None:
     threading.Thread(target=load, daemon=True).start()
 
 
+def warm_voice() -> None:
+    """The fixed voice lines synthesized and saved to disk in the background, so the first ones play at once."""
+    s = get_settings()
+    if s.voice_enabled and s.groq_api_key:
+        from ole5_chat.voice import fillers
+        fillers.warm_in_background()
+
+
 start_tracing()
 warm_knowledge()
+warm_voice()
 
 from ole5_chat.api import app
 
+# The speech detector in web/vendor: the browser refuses a module or worklet script not served as JavaScript, and
+# Windows can map .mjs to text/plain.
+mimetypes.add_type("text/javascript", ".js")
+mimetypes.add_type("text/javascript", ".mjs")
+mimetypes.add_type("application/wasm", ".wasm")
+mimetypes.add_type("application/octet-stream", ".onnx")
 app.mount("/", StaticFiles(directory=ROOT / "web", html=True), name="web")

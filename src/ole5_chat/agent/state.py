@@ -29,6 +29,7 @@ class TicketDraft(BaseModel):
     rounds: int = 0
     confidence: Literal["high", "medium", "low"] | None = None
     queue_reason: str | None = None
+    submit_failures: int = 0  # voice: how many times submitting this ticket failed
 
 
 class ChatState(MessagesState):
@@ -47,10 +48,14 @@ class ChatState(MessagesState):
     task: str | None
     language: str | None  # The customer's language, set by respond_agent; the router's try-again reply uses it.
     offered: bool  # Set by respond_agent on a question turn it had no full answer for; read by post_check.
+    channel: str  # "chat" or "voice": how this turn's message arrived. Passed on every turn; LangGraph keeps the last value.
+    heard_language: str | None  # On a voice turn, the language speech-to-text heard ("ar" or "en").
+    confirmed: bool  # This turn submits on the customer's word: the Submit button, or D15's second acknowledgement.
+    reconfirmed: bool  # Set by the voice yes guard when it asked "just to confirm" again (D15 counts it).
 
 
 def initial_state(identity: Identity) -> ChatState:
     return ChatState(messages=[], identity=identity, sources=[],
                      last_retrieval=None, reply=None, note=None, ticket_draft=None, corrections=[], created_tickets=[],
                      attachments=[], phase="none", pending=[], next=None, task=None, language=None,
-                     offered=False)
+                     offered=False, channel="chat", heard_language=None, confirmed=False, reconfirmed=False)
