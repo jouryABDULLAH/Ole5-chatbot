@@ -1,5 +1,5 @@
-"""The speech detector's files in web/vendor (D48): byte for byte the ones jsdelivr serves, and the same versions and
-file names that web/voice.js loads, the local copy first and the CDN after it."""
+"""The speech detector's files in web/vendor (D48): byte for byte the ones jsdelivr serves, with their license notices,
+and the same versions and file names that web/voice.js loads, the local copy first and the CDN after it."""
 
 import base64
 import hashlib
@@ -19,20 +19,32 @@ FILES = {
     f"{ORT}/ort-wasm-simd-threaded.mjs": (20856, "MN2FHZwAYilAUA9x3dL/iCDFy2UnCBYIAXW5WHBThag="),
     f"{ORT}/ort-wasm-simd-threaded.wasm": (11210254, "ca7wSVnFwbbeRhtlOOIFjjBmEANKharSdC0Mf9RTP+Q="),
 }
+# The license notices as downloaded on 2026-10-27; where each is from is in web/vendor/README.md.
+NOTICES = {
+    f"{VAD}/LICENSE": (1896, "I568pCB4A9NQcSRRfA3WMkwNXPc+HEhq3ha6wXiPSnk="),
+    f"{VAD}/bundle.min.js.LICENSE.txt": (132, "hdgprc3uD+ClyqlcI4+eTUl1jysiKUQXH10uj5JuAbQ="),
+    f"{VAD}/silero-vad.LICENSE": (1075, "LmPpo4tuj8DHvDfOF0ysoYYocIVsba9Wl8+3heklUgs="),
+    f"{ORT}/LICENSE": (1073, "LwfHJ1Gu2ZeQuKSGnPIxHfhahgsi3tBfoigDWHpIkiw="),
+}
 CDN = {VAD: "@ricky0123/vad-web@0.0.31/dist/", ORT: "onnxruntime-web@1.22.0/dist/"}
 JS = (ROOT / "web" / "voice.js").read_text(encoding="utf-8")
 
 
-@pytest.mark.parametrize("path", sorted(FILES))
-def test_a_vendored_file_is_byte_for_byte_the_one_jsdelivr_serves(path):
+@pytest.mark.parametrize("path", sorted(FILES | NOTICES))
+def test_a_vendored_file_or_notice_is_byte_for_byte_the_one_downloaded(path):
     data = (VENDOR / path).read_bytes()
-    assert (len(data), base64.b64encode(hashlib.sha256(data).digest()).decode()) == FILES[path]
+    assert (len(data), base64.b64encode(hashlib.sha256(data).digest()).decode()) == (FILES | NOTICES)[path]
 
 
-def test_nothing_else_is_vendored_but_the_readme_and_license_notices():
+def test_nothing_else_is_vendored_but_the_readme():
     found = {p.relative_to(VENDOR).as_posix() for p in VENDOR.rglob("*") if p.is_file()}
-    assert set(FILES) <= found
-    assert all(p == "README.md" or "LICENSE" in p.upper() for p in found - set(FILES))
+    assert found == set(FILES) | set(NOTICES) | {"README.md"}
+
+
+def test_the_bundle_points_to_its_notice_next_to_it():
+    first = (VENDOR / VAD / "bundle.min.js").read_text(encoding="utf-8").split("\n", 1)[0]
+    assert first == "/*! For license information please see bundle.min.js.LICENSE.txt */"
+    assert f"{VAD}/bundle.min.js.LICENSE.txt" in NOTICES
 
 
 def test_voice_js_tries_the_vendored_folders_first_then_the_same_versions_on_the_cdn():
