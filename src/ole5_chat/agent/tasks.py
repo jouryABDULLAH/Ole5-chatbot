@@ -27,24 +27,23 @@ TASKS = {
     "queued": "The customer raised a new issue: {new}. It will be handled after the current ticket ({issue}). Say so in "
               "one line. Don't answer the new issue and don't offer a ticket for it now. Then continue the current "
               "ticket: {current}",
-    "accept": "The customer agreed to a ticket for: {issue}. Ask what the support team will need to act on it: work "
-              "out the likely cause and ask what would confirm or rule it out, a few things at a time, skipping what "
-              "the customer already said. Ask about what the customer sees and did. Don't name a screen, template, "
-              "setting or option unless a passage names it. Nothing has been created yet; "
-              "the ticket is created only when they submit the summary. Don't say a ticket is opened, created or "
-              "being opened.",
+    "accept": "The customer agreed to a ticket for: {issue}. Acknowledge in one line. Then, in one sentence, ask "
+              "whether they would like to add anything that would help the support team, and name inside that "
+              "sentence at most two things that would help with this particular problem, skipping anything they "
+              "already said. They are named as what would help, not asked as questions. No list, no numbering, no "
+              "second question. Don't name a screen, template, setting or option unless a passage names it. Nothing "
+              "has been created yet; the ticket is created only when they submit the summary. Don't say a ticket is "
+              "opened, created or being opened.",
     "declined": "The customer said no to opening a ticket; none was opened. Acknowledge it in one line without saying "
                 "a ticket was cancelled or closed, and say they can contact support at any time.",
     "urgent_ready": "This is urgent, so the ticket was prepared right away without the usual questions: {issue}. The "
                     "summary is shown with a Submit button. Nothing has been created yet. Say in one line that because "
                     "it is urgent the summary is ready now, and ask whether to submit the ticket for: {issue}. Don't "
                     "repeat the summary.",
-    "details": "Ask what else the support team needs to act on: {issue}. A few things at a time, skipping what the "
-               "customer already said. If the team has enough, ask instead whether there is anything else they'd like "
-               "to add. Ask about what the customer sees and did. Don't name a screen, template, setting or option "
-               "unless a passage names it. Nothing has been created yet; the ticket is "
-               "created only when they submit the summary. Don't say a ticket is opened, created or being opened. "
-               "Don't ask again a question you already asked; if the customer didn't answer it, they don't know.",
+    "details": "The customer added details about: {issue}. Acknowledge what they gave in a few words, then ask only "
+               "whether there is anything else they'd like to add. One sentence, one question. Don't ask for anything "
+               "specific. Nothing has been created yet; the ticket is created only when they submit the summary. "
+               "Don't say a ticket is opened, created or being opened.",
     "open_question": "Ask whether there is anything else they'd like to add about: {issue}. Nothing else.",
     "confirm": "The ticket summary is ready and shown with a Submit button. Nothing has been created yet; the ticket is "
                "created only when they submit. Say the summary is ready in one line and ask whether to submit the "
