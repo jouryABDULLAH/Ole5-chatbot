@@ -39,15 +39,31 @@ def tool_client(temperature: float) -> ChatGroq:
     return ChatGroq(model=s.groq_model, api_key=s.groq_api_key.get_secret_value(), temperature=temperature)
 
 
+# Groq's codes for a generation it rejected: the model's own output is in failed_generation and it can correct itself.
+GENERATION_REJECTED = ("tool_use_failed", "output_parse_failed", "json_validate_failed")
+
+
+def _correction(exc: BadRequestError) -> list[BaseMessage]:
+    """What to send back when Groq rejected the generation: the model's output and the reason, so it corrects itself.
+    Empty for a rejection the model can't act on (a bad request, an unknown model, too long a context)."""
+    body = exc.body.get("error") if isinstance(exc.body, dict) else None
+    if not isinstance(body, dict) or body.get("code") not in GENERATION_REJECTED:
+        return []
+    return [AIMessage(content=body.get("failed_generation") or ""),
+            HumanMessage(content=f"That was not valid: {body.get('message')}. Return only what the schema or the tool "
+                                 "call requires.")]
+
+
 def invoke(convo: list[BaseMessage], tool=None, tool_choice: str | None = None) -> AIMessage:
-    """One plain model call, retried warmer if Groq rejects it. Only the search node binds a tool."""
-    error = "no attempt made"
+    """One plain model call. If Groq rejects the generation, it is retried warmer with the rejection sent back to the
+    model. Only the search node binds a tool."""
+    error, correction = "no attempt made", []
     for temperature in (0, 0.3):
         try:
             client = tool_client(temperature)
-            return (client.bind_tools([tool], tool_choice=tool_choice) if tool else client).invoke(convo)
+            return (client.bind_tools([tool], tool_choice=tool_choice) if tool else client).invoke([*convo, *correction])
         except BadRequestError as exc:
-            error = str(exc)[:400]
+            error, correction = str(exc)[:400], _correction(exc)
             log.warning("llm  rejected by Groq at temperature %s: %s", temperature, error)
     raise ModelFailed(error)
 
@@ -86,6 +102,7 @@ def structured(system: str, messages: list[BaseMessage], schema: type[T], node: 
                 except BadRequestError as exc:
                     error = str(exc)[:400]
                     log.warning("%s  llm schema=%s attempt=%d rejected by Groq: %s", node, schema.__name__, attempt, error)
+                    convo += _correction(exc)
                     continue
                 if reasoning := reply.additional_kwargs.get("reasoning_content"):
                     span.set_attribute("output.value", reasoning)

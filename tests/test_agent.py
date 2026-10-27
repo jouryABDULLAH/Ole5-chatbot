@@ -3,12 +3,14 @@
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
-from ole5_chat import sessions
+from ole5_chat import llm, sessions
 from ole5_chat.agent.contracts import Classification
 from ole5_chat.agent.validate import check_ticket
 from ole5_chat.knowledge.contracts import Evidence, Retrieval, Verdict
 from ole5_chat.values import catalog
 
+# The real llm.structured, taken before the autouse model fixture replaces it with the scripted one.
+REAL_STRUCTURED = llm.structured
 GOOD = Classification(queue="Ole5 Technical", type="Mobile App Issue", subtype="Application crash",
                       reason="Issue - app crashes on Inbox", priority="Medium", title="App crash",
                       summary="The app crashes on the Inbox screen.", confidence="high", queue_reason="tech")
@@ -158,11 +160,13 @@ def sent(fake, n=-1):
     return fake.calls[n][1]
 
 
-def rejected():
+def rejected(code=None, generation=""):
+    """Groq's 400. With a code it is a rejected generation, the model's output in failed_generation."""
     from groq import BadRequestError
     import httpx
+    body = {"error": {"code": code, "message": f"Groq rejected: {code}", "failed_generation": generation}} if code else None
     return BadRequestError("bad tool call", response=httpx.Response(400, request=httpx.Request("POST", "https://x")),
-                           body=None)
+                           body=body)
 
 
 def test_a_question_forces_the_search_and_respond_has_no_tool(model, respond_node):
@@ -378,6 +382,38 @@ def test_the_search_call_is_retried_warmer(model, respond_node):
     out, fake = respond_node("How do I save a draft?", [rejected(), searching("How to save a draft?"), DONE], [hit("Guide")])
     assert [t for t, _ in fake.calls] == [0, 0.3, 0]
     assert out["reply"].say == "Press Save as draft." and out["corrections"] == []
+    assert len(sent(fake, 1)) == len(sent(fake, 0))  # a 400 without a generation: nothing to send back
+
+
+def test_a_rejected_generation_is_sent_back_to_the_model(model, respond_node):
+    model.add(*answer("answered", "Press Save as draft.", ["Guide"]))
+    refusal = rejected("tool_use_failed", "I can't share that.")
+    out, fake = respond_node("How do I save a draft?", [refusal, searching("How to save a draft?"), DONE], [hit("Guide")])
+    retry = sent(fake, 1)
+    assert retry[-2].type == "ai" and retry[-2].content == "I can't share that."
+    assert retry[-1].type == "human" and "Groq rejected: tool_use_failed" in retry[-1].content
+    assert out["reply"].say == "Press Save as draft." and out["corrections"] == []
+
+
+def test_structured_sends_a_rejected_generation_back_to_the_model(monkeypatch):
+    from ole5_chat.agent.contracts import Reply
+
+    class Client:
+        calls = []
+
+        def __init__(self, raises):
+            self.raises = raises
+
+        def invoke(self, convo, config=None):
+            Client.calls.append(list(convo))
+            if self.raises:
+                raise rejected("output_parse_failed", "{say: broken")
+            return AIMessage(content='{"say": "ok", "sources": []}')
+
+    monkeypatch.setattr(llm, "_client", lambda temperature: Client(raises=temperature == 0))
+    result = REAL_STRUCTURED("system", [HumanMessage(content="hi")], Reply)
+    assert result.say == "ok" and len(Client.calls) == 2
+    assert Client.calls[1][-2].content == "{say: broken" and "output_parse_failed" in Client.calls[1][-1].content
 
 
 def test_the_search_node_runs_at_most_the_cap(respond_node, monkeypatch):
