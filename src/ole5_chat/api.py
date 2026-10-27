@@ -1,8 +1,6 @@
 """HTTP API of the chat service: start a session with an email, send messages, attach files, read the conversation back, submit the ticket, serve the attached files and the knowledge base documents a source names, list the customer's tickets."""
 
-from html import escape
 from typing import Literal
-from urllib.parse import quote
 
 from fastapi import FastAPI, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
@@ -181,14 +179,13 @@ def _documents(product: str) -> list:
     return sorted(folder.glob("*.md")) if folder and folder.is_dir() else []
 
 
-@app.get("/chat/kb/{product}", response_class=HTMLResponse)
-def list_documents(product: str) -> HTMLResponse:
-    """The documents the answers come from, each a link to its rendered page, so a reader can check an answer."""
+@app.get("/chat/kb/{product}")
+def list_documents(product: str) -> list[str]:
+    """The titles of the documents the answers come from; each is a page under this path."""
     files = _documents(product)
     if not files:
         raise HTTPException(status_code=404, detail="No documents")
-    items = "".join(f'<li><a href="/chat/kb/{quote(product)}/{quote(f.stem)}">{escape(f.stem)}</a></li>' for f in files)
-    return HTMLResponse(KB_PAGE.format(title=escape(product), body=f"<h1>{escape(product)}</h1><ul>{items}</ul>"))
+    return [f.stem for f in files]
 
 
 @app.get("/chat/kb/{product}/{title}", response_class=HTMLResponse)

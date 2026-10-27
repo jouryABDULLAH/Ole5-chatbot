@@ -1,4 +1,4 @@
-/* <t2-chat api="https://chat-service">: the support chat widget. Plain JavaScript in one file, no build step. It knows only the chat service's HTTP API; the api attribute defaults to the page's own origin. */
+/* <t2-chat api="https://chat-service">: the support chat widget. Plain JavaScript in one file, no build step. It knows only the chat service's HTTP API; the api attribute defaults to the page's own origin. When a cited source is clicked it fires a cancelable t2-document event {product, title} so the host page can show the document in place. */
 (() => {
   const TEXT = {
     en: {
@@ -6,7 +6,7 @@
       signinTitle: "Chat with support", signinBody: "Enter the email you use for support.",
       email: "Email", cont: "Continue", checking: "Checking",
       placeholder: "Write a message", send: "Send", writing: "Writing a reply",
-      source: "Source", sources: "Sources", documents: "Documents",
+      source: "Source", sources: "Sources",
       summary: "Ticket summary", submit: "Submit ticket", submitting: "Submitting",
       fields: { queue: "Queue", type: "Type", subtype: "Subtype", priority: "Priority", title: "Title", summary: "Summary",
                 attachments: "Attachments" },
@@ -22,7 +22,7 @@
       signinTitle: "تحدث مع الدعم", signinBody: "أدخل البريد الإلكتروني الذي تستخدمه للدعم.",
       email: "البريد الإلكتروني", cont: "متابعة", checking: "جارٍ التحقق",
       placeholder: "اكتب رسالتك", send: "إرسال", writing: "جارٍ كتابة الرد",
-      source: "المصدر", sources: "المصادر", documents: "المستندات",
+      source: "المصدر", sources: "المصادر",
       summary: "ملخص التذكرة", submit: "إرسال التذكرة", submitting: "جارٍ الإرسال",
       fields: { queue: "القائمة", type: "النوع", subtype: "النوع الفرعي", priority: "الأولوية", title: "العنوان", summary: "الملخص",
                 attachments: "المرفقات" },
@@ -43,23 +43,20 @@
     * { box-sizing:border-box; }
     button, input, textarea { font:inherit; color:inherit; }
     :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-    .launcher { position:fixed; inset-block-end:24px; inset-inline-end:24px; display:flex; align-items:center; gap:10px;
+    /* The launcher and the panel sit at the bottom right in both languages, so a host page can keep that side clear. */
+    .launcher { position:fixed; bottom:24px; right:24px; display:flex; align-items:center; gap:10px;
                 padding:12px 20px 12px 16px; border:0; border-radius:999px; background:var(--accent); color:#fff;
                 font-size:15px; font-weight:500; cursor:pointer; box-shadow:0 6px 20px rgba(14,90,76,.28); }
     .launcher:hover { background:var(--accent-dark); }
     .launcher svg { width:20px; height:20px; }
-    .panel { position:fixed; inset-block-end:24px; inset-inline-end:24px; width:min(392px, calc(100vw - 32px));
+    .panel { position:fixed; bottom:24px; right:24px; width:min(392px, calc(100vw - 32px));
              height:min(620px, calc(100vh - 48px)); display:flex; flex-direction:column; background:var(--paper);
              border:1px solid var(--line); border-radius:16px; overflow:hidden;
              box-shadow:0 18px 48px rgba(30,42,44,.16); transform-origin:bottom right; animation:open .16s ease-out; }
-    :host([dir=rtl]) .panel { transform-origin:bottom left; }
     @keyframes open { from { opacity:0; transform:translateY(8px) scale(.98); } }
     .head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px 14px 20px;
             border-bottom:1px solid var(--line); }
-    .head strong { font-weight:600; font-size:15px; }
-    .head .docs { margin-inline-start:auto; color:var(--accent); font-size:13px; text-decoration:underline;
-                  text-underline-offset:3px; }
-    .icon { display:grid; place-items:center; width:32px; height:32px; border:0; border-radius:8px; background:none;
+    .head strong { font-weight:600; font-size:15px; }    .icon { display:grid; place-items:center; width:32px; height:32px; border:0; border-radius:8px; background:none;
             color:var(--muted); cursor:pointer; }
     .icon:hover { background:var(--soft); color:var(--ink); }
     .signin { flex:1; display:flex; flex-direction:column; justify-content:center; gap:16px; padding:32px 28px; }
@@ -121,8 +118,10 @@
     .restart { align-self:center; border:0; background:none; color:var(--accent); font-size:14px; cursor:pointer;
                text-decoration:underline; text-underline-offset:3px; }
     @media (prefers-reduced-motion: reduce) { .panel { animation:none; } .dots i { animation:none; opacity:.6; } }
-    @media (max-width: 480px) { .panel { inset:0; width:100%; height:100%; border-radius:0; border:0; }
-                                .launcher { inset-block-end:16px; inset-inline-end:16px; } }
+    /* On a phone the panel is a bottom sheet, so the top of the page (a document, say) stays readable above it. */
+    @media (max-width: 480px) { .panel { inset:auto 0 0 0; width:100%; height:60vh; height:60dvh;
+                                         border-radius:16px 16px 0 0; border-bottom:0; }
+                                .launcher { bottom:16px; right:16px; } }
   `;
 
   const ICON_CHAT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>';
@@ -198,8 +197,9 @@
     attributeChangedCallback() { if (this.isConnected) this.render(); }
 
     render() {
+      /* Keep what was typed across a re-render, but not from the email field into the message box or back. */
       const typed = this.root.querySelector("textarea, input:not([type=file])");
-      if (typed) this.draft = typed.value;
+      if (typed && typed.tagName === (this.view ? "TEXTAREA" : "INPUT")) this.draft = typed.value;
       this.setAttribute("dir", this.lang === "ar" ? "rtl" : "ltr");
       this.root.replaceChildren(el("style", {}, CSS), this.open ? this.panel() : this.launcher());
       const field = this.root.querySelector("textarea, input:not([type=file])");
@@ -215,8 +215,6 @@
     panel() {
       const head = el("div", { class: "head" },
         el("strong", {}, this.view ? this.view.product_name : this.t.title),
-        this.view ? el("a", { class: "docs", href: `${this.api}/chat/kb/${encodeURIComponent(this.view.product)}`,
-                              target: "_blank", rel: "noopener" }, this.t.documents) : null,
         el("button", { class: "icon", type: "button", "aria-label": this.t.close, html: ICON_CLOSE,
                        onclick: () => { this.open = false; this.render(); } }));
       return el("section", { class: "panel", role: "dialog", "aria-label": this.t.title },
@@ -244,9 +242,7 @@
         const bubble = el("div", { class: "bot", dir: "auto" }, m.text);
         if (m.sources.length) {
           const label = m.sources.length > 1 ? this.t.sources : this.t.source;
-          const links = m.sources.flatMap((s, j) => [j ? ", " : null,
-            el("a", { href: `${this.api}/chat/kb/${encodeURIComponent(this.view.product)}/${encodeURIComponent(s)}`,
-                      target: "_blank", rel: "noopener" }, s)]);
+          const links = m.sources.flatMap((s, j) => [j ? ", " : null, this.documentLink(s)]);
           bubble.append(el("div", { class: "src" }, `${label}: `, ...links));
         }
         log.append(bubble);
@@ -277,6 +273,18 @@
         : null;
       queueMicrotask(() => { log.scrollTop = log.scrollHeight; });
       return [log, files, form];
+    }
+
+    /* A link to a cited knowledge base document. The host page may listen for the t2-document event and show the
+       document itself; if it doesn't, or the click has a modifier key, the link opens the API's page in a new tab. */
+    documentLink(title) {
+      const href = `${this.api}/chat/kb/${encodeURIComponent(this.view.product)}/${encodeURIComponent(title)}`;
+      return el("a", { href, target: "_blank", rel: "noopener", onclick: (e) => {
+        if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+        const event = new CustomEvent("t2-document", { bubbles: true, composed: true, cancelable: true,
+                                                        detail: { product: this.view.product, title } });
+        if (!this.dispatchEvent(event)) e.preventDefault();
+      } }, title);
     }
 
     card(draft) {

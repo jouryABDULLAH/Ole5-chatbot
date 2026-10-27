@@ -115,6 +115,5 @@ def test_knowledge_document_is_served_rendered(tmp_path, monkeypatch):
     assert page.status_code == 200 and "<h1>عنوان</h1>" in page.text and "<li>بند</li>" in page.text
     assert client.get("/chat/kb/OLE5/missing").status_code == 404
     assert client.get("/chat/kb/OLE5/..%2F..%2Fetc").status_code == 404
-    index = client.get("/chat/kb/OLE5")
-    assert index.status_code == 200 and "نظام OLE5 — قاعدة المعرفة</a>" in index.text
+    assert client.get("/chat/kb/OLE5").json() == ["نظام OLE5 — قاعدة المعرفة"]
     assert client.get("/chat/kb/RICH").status_code == 404

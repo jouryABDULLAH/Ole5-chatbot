@@ -8,18 +8,33 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    :root { --paper: #FBFCFB; --ink: #1E2A2C; --muted: #5F6D6B; --line: #DCE3E0; --accent: #0E5A4C; }
+    :root { --paper: #FBFCFB; --ink: #1E2A2C; --muted: #5F6D6B; --line: #DCE3E0; --soft: #EAF1EE; --accent: #0E5A4C; }
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; background: var(--paper); color: var(--ink);
            font: 16px/1.6 "IBM Plex Sans Arabic", system-ui, sans-serif; }
     header { display: flex; align-items: center; gap: 12px; padding: 18px 32px; border-bottom: 1px solid var(--line); }
     .mark { width: 12px; height: 12px; border-radius: 3px; background: var(--accent); }
     header strong { font-weight: 600; font-size: 15px; }
-    main { max-width: 640px; padding: 72px 32px; }
+    /* The chat panel docks at the bottom right, 392px wide; the page keeps that side clear so it never covers a document. */
+    main { padding: 40px 32px; }
+    @media (min-width: 1000px) { main { padding-right: 448px; } }
     h1 { margin: 0 0 12px; font-size: 28px; line-height: 1.25; font-weight: 600; }
+    h2 { margin: 0; font-size: 15px; font-weight: 600; }
     p { margin: 0; color: var(--muted); max-width: 56ch; }
     a { color: var(--accent); }
-    @media (max-width: 600px) { header, main { padding-inline: 16px; } main { padding-block: 40px; } }
+    .docs { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 24px; margin-top: 32px; }
+    nav ul { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+    nav button { width: 100%; padding: 10px 14px; border: 1px solid transparent; border-radius: 10px; background: none;
+                 color: var(--ink); font: inherit; font-size: 15px; line-height: 1.5; text-align: start; cursor: pointer; }
+    nav button:hover { background: var(--soft); }
+    nav button[aria-current] { background: var(--soft); border-color: var(--line); font-weight: 500; }
+    nav button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    iframe { width: 100%; height: calc(100vh - 120px); min-height: 480px; border: 1px solid var(--line);
+             border-radius: 12px; background: #fff; }
+    .empty { color: var(--muted); padding: 24px; }
+    .open { display: block; margin-bottom: 8px; font-size: 14px; text-align: right; }
+    @media (max-width: 800px) { .docs { grid-template-columns: 1fr; } }
+    @media (max-width: 600px) { header, main { padding-inline: 16px; } main { padding-block: 24px; } }
   </style>
 </head>
 <body>
@@ -27,11 +42,47 @@
   <main>
     <h1>Support</h1>
     <p>This page stands in for the ticket system. Open the chat to ask a question or report a problem. To see the sign-in step in Arabic, add <a href="?lang=ar">?lang=ar</a> to the address.</p>
+    <section class="docs" aria-labelledby="docs-title">
+      <nav><h2 id="docs-title">Knowledge base</h2><ul id="doc-list"></ul></nav>
+      <div id="doc-view"><p class="empty">Pick a document to read it here. A source cited in the chat opens here too.</p></div>
+    </section>
   </main>
   <t2-chat></t2-chat>
   <script>
+    const PRODUCT = "OLE5";
     const lang = new URLSearchParams(location.search).get("lang");
-    if (lang) document.querySelector("t2-chat").setAttribute("lang", lang);
+    const chat = document.querySelector("t2-chat");
+    if (lang) chat.setAttribute("lang", lang);
+    if (lang === "ar") document.getElementById("docs-title").textContent = "قاعدة المعرفة";
+
+    const list = document.getElementById("doc-list"), view = document.getElementById("doc-view");
+    function show(title) {
+      for (const b of list.querySelectorAll("button")) b.toggleAttribute("aria-current", b.textContent === title);
+      const url = `/chat/kb/${encodeURIComponent(PRODUCT)}/${encodeURIComponent(title)}`;
+      const open = document.createElement("a");
+      open.href = url; open.target = "_blank"; open.rel = "noopener"; open.className = "open";
+      open.textContent = lang === "ar" ? "فتح في صفحة جديدة" : "Open in a new tab";
+      const frame = document.createElement("iframe");
+      frame.src = url;
+      frame.title = title;
+      view.replaceChildren(open, frame);
+      view.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    fetch(`/chat/kb/${encodeURIComponent(PRODUCT)}`).then((r) => r.ok ? r.json() : []).then((titles) => {
+      for (const title of titles) {
+        const button = document.createElement("button");
+        button.type = "button"; button.textContent = title; button.dir = "auto";
+        button.addEventListener("click", () => show(title));
+        const item = document.createElement("li");
+        item.append(button);
+        list.append(item);
+      }
+      chat.addEventListener("t2-document", (e) => {
+        if (!titles.length) return;
+        e.preventDefault();
+        show(titles.includes(e.detail.title) ? e.detail.title : titles[0]);
+      });
+    });
   </script>
   <script src="t2-chat.js"></script>
 </body>
