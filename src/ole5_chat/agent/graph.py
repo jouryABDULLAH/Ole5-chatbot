@@ -39,7 +39,8 @@ def greet(state: ChatState) -> dict:
 def validate(state: ChatState) -> dict:
     reply = state["reply"]
     log.info("validate  phase=%s pending=%d sources=%s", state["phase"], len(state["pending"]), reply.sources)
-    return {"messages": [AIMessage(content=reply.say)], "sources": reply.sources, "last_retrieval": None,
+    return {"messages": [AIMessage(content=reply.say, additional_kwargs={"sources": reply.sources})],
+            "sources": reply.sources, "last_retrieval": None,
             "note": None, "task": None, "next": None, "offered": False}
 
 

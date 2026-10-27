@@ -80,7 +80,7 @@ def test_session_api_flow(monkeypatch):
 
     start = client.post("/chat/sessions", json={"email": "ole5@example.com"}).json()
     assert start["phase"] == "none"
-    assert start["messages"] == [{"author": "bot", "text": products.load("OLE5").greet("ar")}]
+    assert start["messages"] == [{"author": "bot", "text": products.load("OLE5").greet("ar"), "sources": []}]
 
     sid = start["session_id"]
     reply = client.post(f"/chat/sessions/{sid}/messages", json={"text": "hi"}).json()
@@ -115,3 +115,6 @@ def test_knowledge_document_is_served_rendered(tmp_path, monkeypatch):
     assert page.status_code == 200 and "<h1>عنوان</h1>" in page.text and "<li>بند</li>" in page.text
     assert client.get("/chat/kb/OLE5/missing").status_code == 404
     assert client.get("/chat/kb/OLE5/..%2F..%2Fetc").status_code == 404
+    index = client.get("/chat/kb/OLE5")
+    assert index.status_code == 200 and "نظام OLE5 — قاعدة المعرفة</a>" in index.text
+    assert client.get("/chat/kb/RICH").status_code == 404

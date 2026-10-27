@@ -1,6 +1,8 @@
 """HTTP API of the chat service: start a session with an email, send messages, attach files, read the conversation back, submit the ticket, serve the attached files and the knowledge base documents a source names, list the customer's tickets."""
 
+from html import escape
 from typing import Literal
+from urllib.parse import quote
 
 from fastapi import FastAPI, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
@@ -38,6 +40,7 @@ class Line(BaseModel):
 
     author: Literal["customer", "bot"]
     text: str
+    sources: list[str] = []
 
 
 class AttachmentView(BaseModel):
@@ -57,7 +60,6 @@ class SessionView(BaseModel):
     language: str
     phase: Phase
     messages: list[Line]
-    sources: list[str]
     ticket_draft: TicketDraft | None = None
     draft_ready: bool = False
     ticket_number: str | None = None
@@ -76,7 +78,8 @@ class TicketView(BaseModel):
 
 
 def _line(message: BaseMessage) -> Line:
-    return Line(author="customer" if message.type == "human" else "bot", text=message.text)
+    return Line(author="customer" if message.type == "human" else "bot", text=message.text,
+                sources=message.additional_kwargs.get("sources", []))
 
 
 def _attachment(f: dict) -> AttachmentView:
@@ -89,7 +92,7 @@ def _view(session_id: str, state: ChatState) -> SessionView:
     return SessionView(session_id=session_id, product=who.product, product_name=products.load(who.product).name,
                        language=who.language,
                        phase=state["phase"], messages=[_line(m) for m in state["messages"]],
-                       sources=state["sources"], ticket_draft=draft, draft_ready=state["phase"] == "confirm",
+                       ticket_draft=draft, draft_ready=state["phase"] == "confirm",
                        ticket_number=numbers[-1] if numbers else None, ticket_numbers=numbers,
                        attachments=[_attachment(f) for f in state.get("attachments") or []])
 
@@ -171,14 +174,28 @@ line-height:1.8;color:#1E2A2C}}h1,h2,h3{{line-height:1.4}}code{{background:#EAF1
 table{{border-collapse:collapse}}td,th{{border:1px solid #DCE3E0;padding:6px 10px}}</style></head><body>{body}</body></html>"""
 
 
+def _documents(product: str) -> list:
+    """The knowledge base documents of a product, as files; empty when the product has no export."""
+    tenant = get_settings().kb_tenants.get(product.upper())
+    folder = get_settings().kb_export_dir / tenant if tenant else None
+    return sorted(folder.glob("*.md")) if folder and folder.is_dir() else []
+
+
+@app.get("/chat/kb/{product}", response_class=HTMLResponse)
+def list_documents(product: str) -> HTMLResponse:
+    """The documents the answers come from, each a link to its rendered page, so a reader can check an answer."""
+    files = _documents(product)
+    if not files:
+        raise HTTPException(status_code=404, detail="No documents")
+    items = "".join(f'<li><a href="/chat/kb/{quote(product)}/{quote(f.stem)}">{escape(f.stem)}</a></li>' for f in files)
+    return HTMLResponse(KB_PAGE.format(title=escape(product), body=f"<h1>{escape(product)}</h1><ul>{items}</ul>"))
+
+
 @app.get("/chat/kb/{product}/{title}", response_class=HTMLResponse)
 def read_document(product: str, title: str) -> HTMLResponse:
     from markdown_it import MarkdownIt
 
-    tenant = get_settings().kb_tenants.get(product.upper())
-    folder = get_settings().kb_export_dir / tenant if tenant else None
-    wanted = f"{title}.md"
-    path = next((f for f in folder.iterdir() if f.name == wanted), None) if folder and folder.is_dir() else None
+    path = next((f for f in _documents(product) if f.stem == title), None)
     if path is None:
         raise HTTPException(status_code=404, detail="Document not found")
     body = MarkdownIt().render(path.read_text(encoding="utf-8"))

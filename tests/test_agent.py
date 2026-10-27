@@ -594,6 +594,7 @@ def test_new_path_answered_question_stays_in_none(new_path):
     state, _ = new_path(sid, "How do I save a draft?", "question", [searching("How to save a draft?"), DONE],
                         [hit("Guide")], answer("answered", "Press Save as draft.", ["Guide"]))
     assert (state["phase"], state["pending"], state["sources"]) == ("none", [], ["Guide"])
+    assert state["messages"][-1].additional_kwargs["sources"] == ["Guide"]
 
 
 def test_new_path_unanswered_question_is_queued_and_offered(new_path):

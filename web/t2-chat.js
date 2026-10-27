@@ -6,7 +6,7 @@
       signinTitle: "Chat with support", signinBody: "Enter the email you use for support.",
       email: "Email", cont: "Continue", checking: "Checking",
       placeholder: "Write a message", send: "Send", writing: "Writing a reply",
-      source: "Source", sources: "Sources",
+      source: "Source", sources: "Sources", documents: "Documents",
       summary: "Ticket summary", submit: "Submit ticket", submitting: "Submitting",
       fields: { queue: "Queue", type: "Type", subtype: "Subtype", priority: "Priority", title: "Title", summary: "Summary",
                 attachments: "Attachments" },
@@ -22,7 +22,7 @@
       signinTitle: "تحدث مع الدعم", signinBody: "أدخل البريد الإلكتروني الذي تستخدمه للدعم.",
       email: "البريد الإلكتروني", cont: "متابعة", checking: "جارٍ التحقق",
       placeholder: "اكتب رسالتك", send: "إرسال", writing: "جارٍ كتابة الرد",
-      source: "المصدر", sources: "المصادر",
+      source: "المصدر", sources: "المصادر", documents: "المستندات",
       summary: "ملخص التذكرة", submit: "إرسال التذكرة", submitting: "جارٍ الإرسال",
       fields: { queue: "القائمة", type: "النوع", subtype: "النوع الفرعي", priority: "الأولوية", title: "العنوان", summary: "الملخص",
                 attachments: "المرفقات" },
@@ -57,6 +57,8 @@
     .head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px 14px 20px;
             border-bottom:1px solid var(--line); }
     .head strong { font-weight:600; font-size:15px; }
+    .head .docs { margin-inline-start:auto; color:var(--accent); font-size:13px; text-decoration:underline;
+                  text-underline-offset:3px; }
     .icon { display:grid; place-items:center; width:32px; height:32px; border:0; border-radius:8px; background:none;
             color:var(--muted); cursor:pointer; }
     .icon:hover { background:var(--soft); color:var(--ink); }
@@ -213,6 +215,8 @@
     panel() {
       const head = el("div", { class: "head" },
         el("strong", {}, this.view ? this.view.product_name : this.t.title),
+        this.view ? el("a", { class: "docs", href: `${this.api}/chat/kb/${encodeURIComponent(this.view.product)}`,
+                              target: "_blank", rel: "noopener" }, this.t.documents) : null,
         el("button", { class: "icon", type: "button", "aria-label": this.t.close, html: ICON_CLOSE,
                        onclick: () => { this.open = false; this.render(); } }));
       return el("section", { class: "panel", role: "dialog", "aria-label": this.t.title },
@@ -235,13 +239,12 @@
     chat() {
       const log = el("div", { class: "log", "aria-live": "polite" });
       const lines = this.view.messages;
-      lines.forEach((m, i) => {
+      lines.forEach((m) => {
         if (m.author === "customer") { log.append(this.customerBubble(m.text)); return; }
         const bubble = el("div", { class: "bot", dir: "auto" }, m.text);
-        const last = i === lines.length - 1;
-        if (last && this.view.sources.length) {
-          const label = this.view.sources.length > 1 ? this.t.sources : this.t.source;
-          const links = this.view.sources.flatMap((s, j) => [j ? ", " : null,
+        if (m.sources.length) {
+          const label = m.sources.length > 1 ? this.t.sources : this.t.source;
+          const links = m.sources.flatMap((s, j) => [j ? ", " : null,
             el("a", { href: `${this.api}/chat/kb/${encodeURIComponent(this.view.product)}/${encodeURIComponent(s)}`,
                       target: "_blank", rel: "noopener" }, s)]);
           bubble.append(el("div", { class: "src" }, `${label}: `, ...links));
@@ -337,7 +340,7 @@
       if ((!text && !this.pending.length) || this.busy) return;
       const before = this.view;
       const shown = this.pending.length ? `${text}\n[attached: ${this.pending.map((f) => f.name).join(", ")}]` : text;
-      this.view = { ...before, messages: [...before.messages, { author: "customer", text: shown }], sources: [] };
+      this.view = { ...before, messages: [...before.messages, { author: "customer", text: shown, sources: [] }] };
       this.root.querySelector("textarea").value = "";
       this.busy = true; this.error = ""; this.render();
       try {
