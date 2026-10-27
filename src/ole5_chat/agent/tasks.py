@@ -5,9 +5,10 @@ RESPOND_TASK = ("Answer the customer from the passages. If no passage answers th
                 "this and ask whether they would like a ticket opened.")
 TALK_TASK = ("This message needs no search. Reply to what the customer actually said, in one or two short lines. A "
              "greeting gets the persona's greeting and thanks gets its thanks line; anything else gets a plain reply to "
-             "it, never a greeting or thanks line. If the customer says they have a problem but not what it is, ask what "
-             "it is in one short open question, with no acknowledgement before it: \"يسعدني مساعدتك، ما المشكلة التي "
-             "تواجهها؟\" If they say there is no problem or nothing to add, don't ask again: say you're here if they need "
+             "it, never a greeting or thanks line. If the customer says they have a problem, or asks for a ticket, but "
+             "not what it is about, ask what it is in one short open question, with no acknowledgement before it: "
+             "\"يسعدني مساعدتك، ما المشكلة التي تواجهها؟\" or \"يسعدني مساعدتك، ما الموضوع الذي تريد فتح التذكرة "
+             "بشأنه؟\" If they say there is no problem or nothing to add, don't ask again: say you're here if they need "
              "anything. Don't state a product fact that isn't already in this chat, and don't offer a ticket.")
 
 
