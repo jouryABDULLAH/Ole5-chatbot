@@ -76,7 +76,7 @@ Then open http://localhost:8000. The page stands in for the ticket system: the k
 Notes:
 
 - With `KB_BACKEND=ragent2` the first start loads the retrieval models in the background and logs `kb  ready` when searches can run.
-- Attachments are stored in `uploads/`. Mock tickets are written to `sheets/tickets.xlsx`.
+- Attachments are stored in `uploads/`. Every ticket created, mock or real, is recorded in `sheets/tickets.xlsx`; the mock keeps the ticket itself in memory.
 
 ## Tracing with Phoenix (optional)
 
