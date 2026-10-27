@@ -8,7 +8,7 @@
       email: "Email", cont: "Continue", checking: "Checking",
       placeholder: "Write a message", send: "Send", writing: "Writing a reply",
       source: "Source", sources: "Sources",
-      summary: "Ticket summary", submit: "Submit ticket", submitting: "Submitting",
+      summary: "Ticket summary", submit: "Submit ticket", submitting: "Submitting", submitted: "Ticket {number} submitted",
       fields: { queue: "Queue", type: "Type", subtype: "Subtype", priority: "Priority", title: "Title", summary: "Summary",
                 attachments: "Attachments" },
       notSet: "Not set", failed: "The message was not sent. Try again.",
@@ -31,7 +31,7 @@
       email: "البريد الإلكتروني", cont: "متابعة", checking: "جارٍ التحقق",
       placeholder: "اكتب رسالتك", send: "إرسال", writing: "جارٍ كتابة الرد",
       source: "المصدر", sources: "المصادر",
-      summary: "ملخص التذكرة", submit: "إرسال التذكرة", submitting: "جارٍ الإرسال",
+      summary: "ملخص التذكرة", submit: "إرسال التذكرة", submitting: "جارٍ الإرسال", submitted: "تم إرسال التذكرة {number}",
       fields: { queue: "القائمة", type: "النوع", subtype: "النوع الفرعي", priority: "الأولوية", title: "العنوان", summary: "الملخص",
                 attachments: "المرفقات" },
       notSet: "غير محدد", failed: "لم تُرسل الرسالة. حاول مرة أخرى.",
@@ -100,6 +100,9 @@
     @keyframes pulse { 0%,80%,100% { opacity:.25; } 40% { opacity:1; } }
     .card { border:1px solid var(--line); border-radius:12px; background:#fff; overflow:hidden; }
     .card h3 { margin:0; padding:12px 16px; font-size:14px; font-weight:600; border-bottom:1px solid var(--line); }
+    .card.done { background:var(--paper); color:var(--muted); }
+    .card.done h3 { display:flex; align-items:center; gap:8px; color:var(--accent); }
+    .card.done h3 svg { width:16px; height:16px; flex:none; }
     .card dl { margin:0; padding:6px 16px; display:grid; grid-template-columns:auto 1fr; gap:6px 16px; font-size:14px; }
     .card dt { color:var(--muted); }
     .card dd { margin:0; line-height:1.5; white-space:pre-line; overflow-wrap:anywhere; }
@@ -165,7 +168,8 @@
 
   const ICON_CLIP = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.5l-7.8 7.8a5 5 0 01-7.1-7.1l8.5-8.5a3.3 3.3 0 014.7 4.7l-8.5 8.5a1.7 1.7 0 01-2.4-2.4L15 6.9"/></svg>';
   const ICON_MIC = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0013 0M12 17.5V21"/></svg>';
-  const ICON_X = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>';
+  const ICON_X ='<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
   const ACCEPT = ".png,.jpg,.jpeg,.pdf,.docx,.xlsx,.txt,.log";
   const MAX_MB = 10;
 
@@ -308,7 +312,8 @@
     chat() {
       const log = el("div", { class: "log", "aria-live": "polite" });
       const lines = this.view.messages;
-      lines.forEach((m) => {
+      lines.forEach((m, i) => {
+        for (const t of this.view.created_tickets) if (t.message_index === i) log.append(this.card(t, t.attachments, t));
         if (m.author === "customer") { log.append(this.customerBubble(m.text)); return; }
         const bubble = el("div", { class: "bot", dir: "auto" }, m.text);
         if (m.sources.length) {
@@ -318,7 +323,9 @@
         }
         log.append(bubble);
       });
-      if (this.view.draft_ready && this.view.ticket_draft) log.append(this.card(this.view.ticket_draft));
+      if (this.view.draft_ready && this.view.ticket_draft) {
+        log.append(this.card(this.view.ticket_draft, (this.view.attachments || []).map((f) => f.file_name)));
+      }
       if (this.busy) log.append(el("div", { class: "writing" }, el("span", { class: "dots", "aria-hidden": "true" },
                                     el("i"), el("i"), el("i")), this.t.writing));
       if (this.error) log.append(el("p", { class: "error", role: "alert" }, this.error));
@@ -432,16 +439,21 @@
       } }, title);
     }
 
-    card(draft) {
+    /* The ticket card: the draft with its Submit button, or, once submitted, the same fields greyed under the ticket
+       number, kept in the chat where the summary was. */
+    card(fields, files, submitted = null) {
       const rows = el("dl");
       for (const key of ["title", "summary", "queue", "type", "subtype", "priority"]) {
-        const value = draft[key];
+        const value = fields[key];
         rows.append(el("dt", {}, this.t.fields[key]),
                     el("dd", { class: value ? null : "missing", dir: "auto" }, value || this.t.notSet));
       }
-      const files = this.view.attachments || [];
-      if (files.length) rows.append(el("dt", {}, this.t.fields.attachments),
-                                    el("dd", { dir: "auto" }, files.map((f) => f.file_name).join("\n")));
+      if (files.length) rows.append(el("dt", {}, this.t.fields.attachments), el("dd", { dir: "auto" }, files.join("\n")));
+      if (submitted) {
+        return el("div", { class: "card done" },
+                  el("h3", {}, el("span", { html: ICON_CHECK }), this.t.submitted.replace("{number}", submitted.ticket_number)),
+                  rows);
+      }
       return el("div", { class: "card" }, el("h3", {}, this.t.summary), rows,
         el("div", { class: "actions" },
            el("button", { class: "primary", type: "button", disabled: this.busy, onclick: () => this.submitTicket() },

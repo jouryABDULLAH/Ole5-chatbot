@@ -244,6 +244,12 @@ def submit(state: ChatState) -> dict:
                                         issue)}
         return {"note": NOT_CREATED, "task": TASKS["confirm"].format(issue=state["pending"][0].text),
                 "corrections": corrections}
+    # The card the customer submitted stays in the chat: its fields, the files, and the index of the reply that
+    # announces the ticket (validate appends it right after this turn), so the widget can show it above that reply.
+    draft = state["ticket_draft"]
+    ticket = {**ticket, "title": draft.title, "summary": draft.summary, "queue": draft.queue, "type": draft.type,
+              "subtype": draft.subtype, "priority": draft.priority,
+              "attachments": [f["file_name"] for f in state["attachments"]], "message_index": len(state["messages"])}
     done_state = {**state, "ticket_draft": None, "corrections": state["corrections"] + corrections}
     update, fragment = next_issue(done_state, state["pending"][1:])
     if prompt.voice(state):

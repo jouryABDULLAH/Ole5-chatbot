@@ -49,6 +49,21 @@ class AttachmentView(BaseModel):
     size: int
 
 
+class CreatedTicket(BaseModel):
+    """A ticket submitted in this session, as the card showed it; message_index is the reply that announced it."""
+    model_config = ConfigDict(extra="forbid")
+
+    ticket_number: str
+    title: str | None = None
+    summary: str | None = None
+    queue: str | None = None
+    type: str | None = None
+    subtype: str | None = None
+    priority: str | None = None
+    attachments: list[str] = []
+    message_index: int
+
+
 class SessionView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -62,6 +77,7 @@ class SessionView(BaseModel):
     draft_ready: bool = False
     ticket_number: str | None = None
     ticket_numbers: list[str] = []
+    created_tickets: list[CreatedTicket] = []
     attachments: list[AttachmentView] = []
 
 
@@ -86,12 +102,13 @@ def _attachment(f: dict) -> AttachmentView:
 
 def _view(session_id: str, state: ChatState) -> SessionView:
     who, draft = state["identity"], state.get("ticket_draft")
-    numbers = [t["ticket_number"] for t in state["created_tickets"]]
+    created = [CreatedTicket(**{k: v for k, v in t.items() if k != "ticket_id"}) for t in state["created_tickets"]]
+    numbers = [t.ticket_number for t in created]
     return SessionView(session_id=session_id, product=who.product, product_name=products.load(who.product).name,
                        language=who.language,
                        phase=state["phase"], messages=[_line(m) for m in state["messages"]],
                        ticket_draft=draft, draft_ready=state["phase"] == "confirm",
-                       ticket_number=numbers[-1] if numbers else None, ticket_numbers=numbers,
+                       ticket_number=numbers[-1] if numbers else None, ticket_numbers=numbers, created_tickets=created,
                        attachments=[_attachment(f) for f in state.get("attachments") or []])
 
 

@@ -78,6 +78,9 @@ def test_submit_creates_the_ticket_as_the_spec_shows(api, writer):
         "Collected: screen: Inbox", "Missing: nothing", "Customer does not know: nothing", "Confidence: high",
         "Why this queue: An app defect", "Urgent: no"]
     assert view["ticket_draft"] is None and not view["draft_ready"] and view["ticket_numbers"] == [number]
+    card = view["created_tickets"][-1]
+    assert (card["ticket_number"], card["title"], card["priority"]) == (number, DRAFT["title"], DRAFT["priority"])
+    assert card["message_index"] == len(view["messages"]) - 1
 
     row = sheets.tickets()[-1]
     assert (row["ticket_number"], row["customer_email"], row["product"]) == (number, "ole5@example.com", "OLE5")

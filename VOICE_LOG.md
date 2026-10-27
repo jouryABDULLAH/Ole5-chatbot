@@ -327,3 +327,10 @@ before D48 (`voice-cp3`, `voice-cp2`) always load it from the CDN.
   (the built-in browser, a recording as the microphone): a file attached and sent with a message (the D49 fix); the
   speech detector from `/vendor` only; a spoken Arabic question heard, searched and answered with its source under
   the reply; the source opened Joori's documents view beside the chat with voice still on; no page or server error.
+- 2026-10-27 15:25 — **Joori's two new commits merged, then `main` pushed.** Before the push, GitHub's `main` had
+  moved to 9907dac ("Submitted ticket card stays in the chat", "Router: a ticket request with no topic is talk").
+  Merged into `main` with a second merge commit; two overlaps: `handlers.submit` keeps the voice failure branch and
+  takes Joori's card fields on the created ticket (the session view now carries them, voice included), and
+  `t2-chat.js` keeps the mic icon beside Joori's check icon. 482 tests pass; all seven live flows pass (tickets made
+  by voice in en_ticket and ar_urgent, no view error; first sound median 1.5 s). Pushed `main` to origin at the
+  user's request, without the voice tags; `voice-v2` moved to the same commit.
