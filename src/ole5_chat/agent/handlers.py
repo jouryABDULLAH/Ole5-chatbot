@@ -273,6 +273,8 @@ def status(state: ChatState) -> dict:
                       for t in recent)
     today = datetime.now(timezone.utc).date().isoformat()
     task = TASKS["status"].format(tickets=lines, today=today) if found else TASKS["status_none"]
+    if found and prompt.voice(state):
+        task += tasks.VOICE_STATUS + (tasks.VOICE_STATUS_ARABIC if prompt.voice_language(state) == "ar" else "")
     log.info("handlers  status tickets=%d phase=%s", len(found), phase)
     return {"task": _then(task, back)}
 

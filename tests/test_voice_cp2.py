@@ -216,6 +216,16 @@ def test_on_voice_a_status_question_in_confirm_goes_back_on_the_closing_words(gr
                         **spoken())
     assert "- T-1, Archive button, 2026-10-01, open" in task and state["phase"] == "confirm"
     assert task.endswith(f'"{tasks.VOICE_CLOSE["en"]}"')
+    assert task.index(tasks.VOICE_STATUS) < task.index("Then continue") and tasks.VOICE_STATUS_ARABIC not in task
+
+
+def test_a_status_question_by_voice_in_arabic_describes_the_titles_in_arabic(graph, monkeypatch):
+    sid = chat()
+    sheet_tickets(monkeypatch, [ticket_row(sessions.get(sid)["identity"].email)], {"7": "open"})
+    _, task = graph(sid, "وش صار على تذكرتي؟", "status", [AIMessage(content="تذكرتك مفتوحة.")], **spoken("ar"))
+    assert task.endswith(tasks.VOICE_STATUS + tasks.VOICE_STATUS_ARABIC)
+    _, typed = graph(sid, "وش صار على تذكرتي؟", "status", [AIMessage(content="تذكرتك مفتوحة.")])
+    assert tasks.VOICE_STATUS not in typed and tasks.VOICE_STATUS_ARABIC not in typed  # text chat as before
 
 
 def test_a_typed_message_in_voice_mode_gets_tasks_in_its_own_language(graph):

@@ -12,6 +12,11 @@ ON_SCREEN = {
     "ar": "رقم التذكرة ظاهر على شاشتك، وينتهي بـ {digits}.",
     "en": "Your ticket number is on your screen, ending in {digits}.",
 }
+# An earlier ticket's number (a status reply lists the customer's tickets) is said in place as how it ends, with the
+# words that only introduce it: "Ticket number {N}, Archive button" → "Ticket ending in zero zero one two, Archive button".
+ENDING_IN = {"ar": "رقمها ينتهي بـ {digits}", "en": "ending in {digits}"}
+ENDING_IN_FIRST = {"ar": "التذكرة التي ينتهي رقمها بـ {digits}", "en": "Ticket ending in {digits}"}  # starting a sentence
+EARLIER_LEAD = {"ar": r"(?:و?ب?رقم(?:ها)?\s*[:：]?\s*)?", "en": r"(?:(?:number|no\.?)\s*[:：]?\s*|#\s*)?"}
 THEN = {"ar": "، ثم ", "en": ", then "}
 # How names are said, where the voice gets them wrong: the Saudi voice read "Ole5" as "ولا خمسة". The spellings below
 # are the user's picks from samples of each voice (D37, 2026-10-26); the diacritics make abdullah say "oo-lee".
@@ -53,6 +58,16 @@ def _digits(number: str, language: str) -> str:
     return " ".join(DIGITS[language][int(c)] for c in last)
 
 
+def _earlier_numbers(text: str, numbers: list[str], language: str) -> str:
+    """Each earlier ticket's number in the reply, said in place as its last four digits (D12)."""
+    for number in (n for n in numbers if n and n in text):
+        lead = re.compile(EARLIER_LEAD[language] + QUOTED.format(re.escape(number)), re.IGNORECASE)
+        digits = _digits(number, language)
+        text = lead.sub(lambda m: (ENDING_IN_FIRST if re.search(r"(?:^|[.!?؟]\s*)$", m.string[:m.start()])
+                                   else ENDING_IN)[language].format(digits=digits), text)
+    return text
+
+
 def _ticket_numbers(text: str, numbers: list[str], language: str) -> str:
     """The ticket number leaves the reply: in English "ticket {N}" becomes "the ticket"; elsewhere the number goes with
     the words that introduce it, and a clause left with nothing else ("Your ticket number is {N}.") is dropped. A
@@ -91,8 +106,9 @@ def _ticket_numbers(text: str, numbers: list[str], language: str) -> str:
     return text
 
 
-def speakable(text: str, language: str, ticket_numbers: list[str] = ()) -> str:
-    """The reply as plain spoken sentences."""
+def speakable(text: str, language: str, ticket_numbers: list[str] = (), earlier: list[str] = ()) -> str:
+    """The reply as plain spoken sentences. ticket_numbers: the tickets created in this session; earlier: the
+    customer's other tickets, which a status reply names."""
     language = language if language in DIGITS else "en"
     text = LINK.sub(r"\1", text)
     text = URL.sub("", text)
@@ -106,6 +122,7 @@ def speakable(text: str, language: str, ticket_numbers: list[str] = ()) -> str:
     text = " ".join(line if ENDS_SENTENCE.search(line) else f"{line}." for line in lines)
     text = re.sub(r"([،,])\s*([.!?؟])", r"\2", text)
     text = re.sub(r"\s{2,}", " ", text).strip()
+    text = _earlier_numbers(text, [n for n in earlier if n not in ticket_numbers], language)
     text = _ticket_numbers(text, list(ticket_numbers), language)
     for pattern, said in PRONOUNCE[language]:
         text = pattern.sub(said, text)

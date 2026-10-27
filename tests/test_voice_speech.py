@@ -242,6 +242,26 @@ def test_a_reply_without_the_number_is_unchanged():
     assert speakable.speakable("Press Save.", "en", [NUMBER]) == "Press Save."
 
 
+EARLIER = "2026102010000012"
+
+
+@pytest.mark.parametrize("language, text, spoken", [
+    ("en", f"You have two tickets. Ticket number {EARLIER}, Archive button, from 20 October, is open.\n"
+           f"Ticket {NUMBER}, Inbox crash, from today, is new.",
+     "You have two tickets. Ticket ending in zero zero one two, Archive button, from 20 October, is open. Inbox "
+     "crash, from today, is new. Your ticket number is on your screen, ending in zero zero zero one."),
+    ("ar", f"تذكرتك رقم {EARLIER} عن زر الأرشفة، من ٢٠ أكتوبر، وحالتها مفتوحة.",
+     "تذكرتك رقمها ينتهي بـ صفر صفر واحد اثنان عن زر الأرشفة، من ٢٠ أكتوبر، وحالتها مفتوحة."),
+    ("en", f"{EARLIER}, Archive button, 20 October, open.", "Ticket ending in zero zero one two, Archive button, 20 "
+                                                            "October, open."),
+    ("ar", f"{EARLIER}، زر الأرشفة، ٢٠ أكتوبر، مفتوحة.", "التذكرة التي ينتهي رقمها بـ صفر صفر واحد اثنان، زر الأرشفة، "
+                                                         "٢٠ أكتوبر، مفتوحة."),
+])
+def test_an_earlier_tickets_number_is_said_in_place_as_how_it_ends(language, text, spoken):
+    # A status reply (D12): earlier tickets keep their place in the list; this session's ticket still points to the screen.
+    assert speakable.speakable(text, language, [NUMBER], [EARLIER, NUMBER]) == spoken
+
+
 def test_segments_start_with_one_sentence_then_group_up_to_the_limit():
     long = "This sentence is long enough to stand on its own as a segment. "
     parts = speakable.segments("Hello. " + long * 8)

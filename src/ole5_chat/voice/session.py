@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from ole5_chat import sessions
 from ole5_chat.agent.validate import script_language
 from ole5_chat.config import get_settings
+from ole5_chat.tickets import status as ticket_status
 from ole5_chat.tickets.submit import SubmitRefused
 from ole5_chat.voice import fillers, rules, speakable, stt, tts
 
@@ -57,6 +58,16 @@ def _view(session_id: str, state: dict) -> dict:
     return view(session_id, state).model_dump(mode="json")
 
 
+def _customer_tickets(state: dict) -> list[str]:
+    """Every ticket number on the customer's account, from any session: a status reply names them (D12 says them as
+    how they end). Empty when the sheet cannot be read: the reply is still spoken."""
+    try:
+        return ticket_status.numbers(state["identity"].email)
+    except Exception as exc:  # a missing, locked or corrupt sheet, as in the status handler
+        log.warning("voice  ticket numbers not read: %s", exc)
+        return []
+
+
 @dataclass
 class Backend:
     """What a voice session calls. Tests replace each part with a fake."""
@@ -69,6 +80,7 @@ class Backend:
     note: Callable[[str, str, str], dict] = sessions.note
     get: Callable[[str], dict] = sessions.get
     view: Callable[[str, dict], dict] = _view
+    tickets: Callable[[dict], list[str]] = _customer_tickets
     warm: Callable[[], Awaitable[None]] | None = None
     touch: Callable[[], Awaitable[None]] | None = None  # the customer started talking: reopen idle connections
 
@@ -811,7 +823,8 @@ class VoiceSession:
                 before = max((i + 1 for i, m in enumerate(messages) if m.type == "human"), default=before)
             reply = "\n".join(m.text for m in messages[before:] if m.type == "ai").strip()
             numbers = [t["ticket_number"] for t in state.get("created_tickets") or []]
-            self._speak_reply(reply, script_language(reply) or language or self.language, numbers, turn=no)
+            self._speak_reply(reply, script_language(reply) or language or self.language, numbers, turn=no,
+                              earlier=self.backend.tickets(state))
             spoke = bool(reply)
             asked = rules.normalize(rules.line("just_confirm", script_language(reply) or self.language))
             if state.get("reconfirmed") and state.get("phase") == "confirm" and self.last_reply and \
@@ -872,14 +885,15 @@ class VoiceSession:
         self.speaker.drop_waiting({"reply"}, turn=item.turn)
         self._spawn(self._say_line("speech_failed"))
 
-    def _speak_reply(self, reply: str, language: str, numbers: list[str], turn: int | None) -> None:
+    def _speak_reply(self, reply: str, language: str, numbers: list[str], turn: int | None,
+                     earlier: list[str] = ()) -> None:
         if not reply:
             return
         # D17: a reply that ends on a question may get "I'm here…" if it goes unanswered; never once a ticket exists.
         self.idle_armed = reply.rstrip().endswith(QUESTION_END) and not numbers and \
             not self.backend.get(self.id).get("created_tickets")
         self.speaker.drop_waiting({"filler"})
-        spoken = speakable.speakable(reply, language, numbers)
+        spoken = speakable.speakable(reply, language, numbers, earlier)
         self.last_reply = [self.speaker.say("reply", text, language, turn=turn, part=i)
                            for i, text in enumerate(speakable.segments(spoken))]
 

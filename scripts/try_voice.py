@@ -157,6 +157,8 @@ FLOWS = {
     # Scenario 5: the knowledge base down: the apology, and the conversation goes on once it is back.
     "failure": [("kb", "down", None), ("rec", "s1_kb_archive", None), ("kb", "up", None),
                 ("rec", "s1_kb_password", None)],
+    # Joori's status handler on voice: the tickets the flows above made are earlier tickets here (D12, D50).
+    "status": [("typed", "What's the status of my tickets?", "none"), ("typed", "وش صار على تذكرتي؟", "none")],
 }
 REDEMPTION_S = 0.85  # the browser sends an utterance this long after the customer stops (web/voice.js, D30)
 LEAD_S = 0.12  # a silent player starts this long after its first frame arrives (web/voice.js)

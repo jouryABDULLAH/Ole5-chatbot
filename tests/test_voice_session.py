@@ -32,10 +32,12 @@ class FakeOle5:
         self.after: dict = {}  # state fields the next turn sets (e.g. reconfirmed by the graph's guard)
         self.refuse_submit = False
         self.speech_fails: set[str] = set()  # texts whose speech request fails
+        self.earlier: list[str] = []  # the customer's ticket numbers in the sheet
 
     def backend(self) -> Backend:
         return Backend(transcribe=self.transcribe, speech=self.speech, cached=self.cached, send=self.send,
-                       submit=self.submit, note=self.note, get=lambda sid: self.state, view=self.view)
+                       submit=self.submit, note=self.note, get=lambda sid: self.state, view=self.view,
+                       tickets=lambda state: self.earlier)
 
     async def transcribe(self, wav, language):
         text = self.heard.pop(0)
@@ -167,6 +169,19 @@ def test_a_question_is_heard_answered_and_spoken_in_order():
     assert page.events("turn")[0]["text"] == "كيف أستعيد كلمة المرور؟"
     assert page.events("status")[-1]["stage"] == "listening"
     assert kinds.count("audio") == 1 + 2 and page.events("tts_end")[-1]["cancelled"] is False  # cached: one piece
+
+
+def test_a_status_reply_says_an_earlier_tickets_number_as_how_it_ends():
+    fake = FakeOle5(heard=["وش صار على تذكرتي؟"], replies=["تذكرتك رقم 2026102010000012 عن زر الأرشفة، وحالتها مفتوحة."])
+    fake.earlier = ["2026102010000012"]
+
+    async def scenario(voice, page):
+        voice.utterance({"over_bot": False}, WAV)
+        await until(lambda: page.said("reply"))
+        await idle(voice, page)
+
+    page = run(fake, scenario)
+    assert page.said("reply") == ["تذكرتك رقمها ينتهي بـ صفر صفر واحد اثنان عن زر الأرشفة، وحالتها مفتوحة."]
 
 
 def test_a_search_says_let_me_check_before_the_reply():

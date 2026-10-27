@@ -129,4 +129,9 @@ VOICE_TASKS = {
 }
 VOICE_CREATED_ALONE = " Nothing more."
 VOICE_CREATED_THEN = " Nothing more about this ticket. Then, separately:"
+VOICE_STATUS = " The reply is spoken: say each date in words (27 October), never as digits."
+# Titles are English (classify writes them so); an Arabic reply quoting them can turn mostly Latin and get the English
+# voice (D35), so here they are said in Arabic, as the read-back does (VOICE_ARABIC).
+VOICE_STATUS_ARABIC = (" This reply is spoken in formal Arabic, so here the titles do not stay as written: say what each "
+                       "ticket is about in a few Arabic words of your own, and quote no English title.")
 VOICE_FEW_QUESTIONS = " Ask about one or two things only, each as its own short question; keep the rest for your next reply."
