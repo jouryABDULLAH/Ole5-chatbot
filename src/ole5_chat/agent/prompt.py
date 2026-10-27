@@ -40,8 +40,10 @@ MEANINGS = {
     "talk": "nothing to look up: a greeting, thanks, a question about the assistant itself (who it is, what it can do), "
             "an acknowledgement with nothing open to agree to, a side remark, a request to repeat what the assistant "
             "just said, a question about why the assistant said or did something (\"why?\", \"what do you mean?\"), a "
-            "request to open a ticket, or a report of a problem, that doesn't say what it is about (\"افتح لي تذكرة\", "
-            "\"عندي مشكلة\", \"I need help\").",
+            "request to open a ticket, or a report of a problem, that names no symptom and no feature, so there is "
+            "nothing to search for yet (\"عندي مشكلة\", \"افتح لي تذكرة\", \"I need help\"). Once a message names "
+            "anything, a screen, an error, something that doesn't work, it is a question, however short.",
+        
     "ticket": "the message reports a topic from this list: {always_ticket}.",
     "urgent": "the message describes a situation from this list: {urgent_when}. Judge it from the impact described, "
               "not the tone.",
