@@ -34,14 +34,14 @@ PHASES = {
 }
 
 MEANINGS = {
-    "question": "asks about the product or reports a problem with it, including a follow-up to an earlier answer, but "
-                "not a report that an answer didn't help. A "
+    "question": "asks about the product or reports a problem with it, including a follow-up to an earlier answer about "
+                "the product, but not a follow-up about their ticket, and not a report that an answer didn't help. A "
                 "request to open a ticket that names a topic is a question too: the assistant searches first and "
                 "offers a ticket only when it has no answer.",
     "talk": "nothing to look up: a greeting, thanks, a question about the assistant itself (who it is, what it can do), "
             "an acknowledgement with nothing open to agree to, a side remark, a request to repeat what the assistant "
-            "just said, a question about why the assistant said or did something (\"why?\", \"what do you mean?\"), a "
-            "request to open a ticket, or a report of a problem, that names no symptom and no feature, so there is "
+            "just said, a question about why the assistant said or did something (\"why?\", \"what do you mean?\" "
+            "about the assistant's own words, not about a ticket's status), a request to open a ticket, or a report of a problem, that names no symptom and no feature, so there is "
             "nothing to search for yet (\"عندي مشكلة\", \"افتح لي تذكرة\", \"I need help\"). Once a message names "
             "anything, a screen, an error, something that doesn't work, it is a question, however short.",
         
@@ -49,7 +49,10 @@ MEANINGS = {
               "steps the assistant gave didn't help (\"لا زال لا يعمل\", \"العطل مستمر\").",
     "urgent": "the message describes a situation from this list: {urgent_when}. Judge it from the impact described, "
               "not the tone.",
-    "status": "the customer asks about their own tickets: status, whether one was received, its number.",
+    "status": "the customer asks about their own tickets: status, whether one was received, its number; and, after a "
+              "status answer, anything about that ticket or about what the answer said: whether it's resolved, when the "
+              "team replies, what a state or a word in the answer means (\"يعني ما انحلت؟\", \"ما معنى غير متوفرة؟\"). "
+              "Nothing here is in the knowledge base.",
     "accept": "agrees to the ticket the assistant just offered.",
     "decline": "turns the offer down.",
     "details": "answers the assistant's questions about the problem, including \"I don't know\" about something the "

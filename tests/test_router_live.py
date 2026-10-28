@@ -26,6 +26,9 @@ ARCHIVE = "The archive button does nothing"
 DENIED = "Access denied when opening a correspondence"
 ANSWER = "To add a watermark, open the document settings and choose Watermark."
 CREATED = "تم إنشاء التذكرة، وسيرد فريق الدعم عبر البريد الإلكتروني."
+STATUS = "تذكرتك T-MOCK-0001 بعنوان تعطل التطبيق، بتاريخ 2026-10-27، حالتها جديدة: وصلت ولم يستلمها الفريق بعد."
+STATUS_UNKNOWN = "آخر تذكرة رفعتها هي T-MOCK-0001 بعنوان تعطل التطبيق بتاريخ 2026-10-27، وحالة التذكرة غير متوفرة حالاً."
+PERMISSION = "لإضافة علامة مائية، افتح إعدادات المستند واختر علامة مائية. تحتاج صلاحية تعديل المستند."
 
 # phase, the issue being handled, the assistant's last message, the customer's message, the expected next.
 CASES = [
@@ -114,6 +117,15 @@ HELD_OUT = [
     ("offer_ticket", ARCHIVE, OFFER, "انت روبوت؟", "talk"),
     ("collect", DENIED, ERROR, "وين ألقى رقم الخطأ؟", "question"),
     ("confirm", DENIED, SUMMARY, "how do I attach a file to a ticket?", "question"),
+    ("none", None, STATUS, "يعني ما انحلت للآن؟", "status"),
+    ("none", None, STATUS, "ومتى بيردون؟", "status"),
+    # Follow-ups to a status answer stay status; follow-ups to a product answer and to the intro keep their routes.
+    ("none", None, STATUS_UNKNOWN, "ما معنى غير متوفرة؟", "status"),
+    ("none", None, STATUS, "شو يعني حالتها جديدة؟", "status"),
+    ("none", None, STATUS, "طيب وبعدين وش يصير؟", "status"),
+    ("none", None, PERMISSION, "ما معنى الصلاحية؟", "question"),
+    ("none", None, PERMISSION, "لا زال لا يعمل", "ticket"),
+    ("none", None, GREETING, "what do you mean?", "talk"),
 ]
 
 
