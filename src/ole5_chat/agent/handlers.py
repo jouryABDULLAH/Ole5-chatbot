@@ -2,11 +2,12 @@
 
 import logging
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
-from ole5_chat import values
+from ole5_chat import products, values
 from ole5_chat.agent import classify as classifier
 from ole5_chat.agent.contracts import PendingIssue, Phase
-from ole5_chat.agent.tasks import CURRENT, QUEUED_URGENT, TASKS, URGENT
+from ole5_chat.agent.tasks import CHANNEL, CURRENT, HOURS, QUEUED_URGENT, STATE_MEANINGS, TASKS, URGENT
 from ole5_chat.agent.state import ChatState, TicketDraft
 from ole5_chat.config import get_settings
 from ole5_chat.tickets import client as ticket_api
@@ -52,6 +53,13 @@ def next_issue(state: ChatState, pending: list[PendingIssue]) -> tuple[dict, str
 
 def _then(task: str, fragment: str) -> str:
     return f"{task} {fragment}" if fragment else task
+
+
+def _support(state: ChatState, field: str, sentence: str) -> str:
+    """The product's support hours or channel in the customer's language, set in sentence; empty when it has none."""
+    texts = getattr(products.load(state["identity"].product), field)
+    text = texts.get(state.get("language") or state["identity"].language) or texts.get("en")
+    return sentence.format(text) if text else ""
 
 
 def handler(state: ChatState) -> str:
@@ -111,7 +119,8 @@ def accept(state: ChatState) -> dict:
 
 def decline(state: ChatState) -> dict:
     update, fragment = next_issue(state, state["pending"][1:])
-    return {**update, "task": _then(TASKS["declined"], fragment)}
+    declined = TASKS["declined"].format(channel=_support(state, "support_channel", CHANNEL))
+    return {**update, "task": _then(declined, fragment)}
 
 
 def details(state: ChatState) -> dict:
@@ -153,7 +162,8 @@ def change(state: ChatState) -> dict:
 
 def cancel(state: ChatState) -> dict:
     update, fragment = next_issue({**state, "ticket_draft": None}, state["pending"][1:])
-    return {"ticket_draft": None, **update, "task": _then(TASKS["cancelled"], fragment)}
+    cancelled = TASKS["cancelled"].format(channel=_support(state, "support_channel", CHANNEL))
+    return {"ticket_draft": None, **update, "task": _then(cancelled, fragment)}
 
 
 def submit(state: ChatState) -> dict:
@@ -164,6 +174,12 @@ def submit(state: ChatState) -> dict:
         log.warning("handlers  ticket not created: %s", exc)
         return {"note": NOT_CREATED, "task": TASKS["confirm"].format(issue=state["pending"][0].text),
                 "corrections": state["corrections"] + [f"submit failed: {exc}"]}
+    # The creation time in the product's timezone; tickets.xlsx keeps it in UTC.
+    zone = products.load(state["identity"].product).timezone
+    created_at = datetime.fromisoformat(ticket.pop("created_at")).astimezone(ZoneInfo(zone))
+    created = TASKS["created"].format(number=ticket["ticket_number"],
+                                      created_at=f"{created_at:%d/%m/%Y %H:%M} ({zone})",
+                                      hours=_support(state, "support_hours", HOURS["created"]))
     # The card the customer submitted stays in the chat: its fields, the files, and the index of the reply that
     # announces the ticket (validate appends it right after this turn), so the widget can show it above that reply.
     draft = state["ticket_draft"]
@@ -178,7 +194,7 @@ def submit(state: ChatState) -> dict:
     update, fragment = next_issue(done_state, state["pending"][1:])
     return {"created_tickets": [*state["created_tickets"], ticket], "ticket_draft": None, "attachments": [],
             "corrections": done_state["corrections"], **update,
-            "task": _then(TASKS["created"].format(number=ticket["ticket_number"]), fragment)}
+            "task": _then(created, fragment)}
 
 
 def status(state: ChatState) -> dict:
@@ -196,7 +212,17 @@ def status(state: ChatState) -> dict:
     lines = "\n".join(f"- {t['ticket_number']}, {t['title']}, {t['created_at'][:10]}, {t['state'] or 'unknown'}"
                       for t in recent)
     today = datetime.now(timezone.utc).date().isoformat()
-    task = TASKS["status"].format(tickets=lines, today=today) if found else TASKS["status_none"]
+    if found:
+        # Each state with what values.xlsx says (open or closed) and what it means for the customer.
+        states = "\n".join(
+            f"- {o.value}: {o.description or ''}"
+            + (f", {STATE_MEANINGS[o.value.casefold()]}" if o.value.casefold() in STATE_MEANINGS
+               and (o.description or "").casefold() in ("open", "closed") else "")
+            for o in values.catalog(state["identity"].product).statuses)
+        task = TASKS["status"].format(tickets=lines, today=today, states=states,
+                                      hours=_support(state, "support_hours", HOURS["status"]))
+    else:
+        task = TASKS["status_none"].format(channel=_support(state, "support_channel", CHANNEL))
     log.info("handlers  status tickets=%d phase=%s", len(found), phase)
     return {"task": _then(task, back)}
 

@@ -63,7 +63,7 @@ def test_submit_creates_the_ticket_as_the_spec_shows(api, writer):
     number = view["ticket_number"]
     assert number.startswith("T-MOCK-")
     assert view["messages"][-1] == {"author": "bot", "text": "تم.", "sources": []}
-    assert f"The ticket {number} was created." in writer.prompts[-1]
+    assert f"The ticket {number} was created on " in writer.prompts[-1]
 
     (op1, create), (op2, update) = api.calls
     assert (op1, op2) == ("TicketCreate", "TicketUpdate")

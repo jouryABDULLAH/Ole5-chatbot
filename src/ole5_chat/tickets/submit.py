@@ -74,12 +74,13 @@ def submit(state: ChatState, api: TicketApi) -> tuple[dict, list[str]]:
         log.exception("tickets  TicketUpdate failed for %s", created["TicketNumber"])
         corrections.append(f"TicketUpdate failed, the ticket is not classified: {exc}")
 
+    created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     sheets.add_ticket({"ticket_id": created["TicketID"], "ticket_number": created["TicketNumber"],
                        "customer_email": who.email, "product": who.product, "title": draft.title,
-                       "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds")})
+                       "created_at": created_at})
     for f in state["attachments"]:
         sheets.add_attachment({"ticket_number": created["TicketNumber"], "file_name": f["file_name"],
                                "link": attachments.link(f["id"]), "uploaded_at": f["uploaded_at"]})
     log.info("tickets  created number=%s product=%s queue=%s", created["TicketNumber"], who.product, draft.queue)
-    ticket = {"ticket_id": created["TicketID"], "ticket_number": created["TicketNumber"]}
+    ticket = {"ticket_id": created["TicketID"], "ticket_number": created["TicketNumber"], "created_at": created_at}
     return ticket, corrections

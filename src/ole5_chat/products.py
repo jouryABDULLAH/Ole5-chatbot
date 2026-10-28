@@ -29,6 +29,10 @@ class ProductConfig(BaseModel):
     urgent_when: list[str] = []
     # Per kind of problem, the information only the customer can give and the team cannot act without.
     required: dict[str, list[str]] = {}
+    # When and how support works, by language like the introduction; stated from here, never by the model.
+    support_hours: dict[str, str] = {}
+    support_channel: dict[str, str] = {}
+    timezone: str = "UTC"
     team_scopes: str | None = None
 
     def greet(self, language: str) -> str:

@@ -1,5 +1,7 @@
 """The agent with scripted models and searches: the greeting, classify and its value checks, respond_agent's gates, the router's options and prompt, the search node, and the graph's handlers, post_check and pending issues."""
 
+import re
+
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
@@ -274,6 +276,7 @@ def test_status_with_no_tickets_says_so_without_a_search_or_an_offer(new_path, m
     state, prompt_text = new_path(sid, "what's the status of my tickets?", "status",
                                   [AIMessage(content="There are no tickets on your account from this chat.")])
     assert "There are no tickets on their account" in prompt_text and llm.tool_client.bound == [None]
+    assert "Say how support works: " in prompt_text
     assert state["phase"] == "none" and state["pending"] == [] and state["sources"] == []
 
 
@@ -298,7 +301,11 @@ def test_status_gives_every_ticket_newest_first_with_dates_only(new_path, monkey
     _, prompt_text = new_path(sid, "what's the status of my tickets?", "status", [AIMessage(content="Your tickets.")])
     listed = [line.split(",")[0][2:] for line in prompt_text.splitlines() if line.startswith("- T-")]
     assert listed == ["T-6", "T-5", "T-4", "T-3", "T-2", "T-1"] and "- T-6, Archive button, 2026-10-06, open" in prompt_text
-    assert "Today: " in prompt_text and "give the 5 most recent and say how many more there are" in prompt_text
+    assert "Today: " in prompt_text and "give the 5 most recent, one line each, and say how many more" in prompt_text
+    # What each state means comes from the code, and the hours from chat.yaml, never from the model.
+    assert "- New: open, received, not yet picked up by the team" in prompt_text
+    assert "- closed successful: closed, resolved and closed" in prompt_text
+    assert "give the support hours: من الأحد إلى الخميس" in prompt_text  # in the customer's language
 
 
 def test_a_ticket_whose_state_cannot_be_read_shows_unknown(new_path, monkeypatch):
@@ -677,6 +684,7 @@ def test_new_path_decline_with_one_issue_empties_pending(new_path):
     state, prompt_text = new_path(sid, "لا شكراً", "decline", [AIMessage(content="تمام، تقدر تتواصل معنا في أي وقت.")])
     assert (state["phase"], state["pending"]) == ("none", [])
     assert "none was opened. Acknowledge it in one line without saying a ticket was cancelled" in prompt_text
+    assert "Say how support works: " in prompt_text and "at any time" not in prompt_text
 
 
 def test_new_path_decline_with_two_issues_offers_the_next(new_path):
@@ -861,7 +869,10 @@ def test_yes_creates_the_ticket(new_path):
     assert (create["Ticket"]["Title"], create["Ticket"]["Queue"]) == ("App crash", "Ole5 Technical")
     assert update["Article"]["Body"].startswith(
         "Required: page: Inbox; error text or screenshot: unknown\nCollected: screen: Inbox\n")
-    assert f"The ticket {number} was created." in prompt_text and "This needs the support team" not in prompt_text
+    # The creation time in Riyadh time as DD/MM/YYYY HH:MM, and the support hours from chat.yaml.
+    assert re.search(rf"The ticket {number} was created on \d\d/\d\d/\d{{4}} \d\d:\d\d \(Asia/Riyadh\)\.", prompt_text)
+    assert "reply by email during the support hours: Sunday to Thursday, 09:00 to 18:00 Riyadh time." in prompt_text
+    assert "This needs the support team" not in prompt_text
 
 
 def test_yes_with_a_second_issue_offers_it(new_path):
@@ -900,6 +911,7 @@ def test_cancel_drops_the_draft_and_the_issue(new_path, where):
     state, prompt_text = new_path(sid, "cancel it", "cancel", [AIMessage(content="Cancelled.")])
     assert (state["ticket_draft"], state["pending"], state["phase"]) == (None, [], "none")
     assert "The customer cancelled the ticket." in prompt_text
+    assert "Say how support works: Technical support is through the ticket system only" in prompt_text
 
 
 def test_submit_button_skips_the_router(new_path, model):
@@ -1053,7 +1065,7 @@ def test_submit_starts_the_urgent_issue_waiting(new_path):
     state, prompt_text = new_path(sid, "submit it", "yes", [AIMessage(content="Created. The urgent one is ready.")],
                                   groundings=[GOOD])
     assert len(state["created_tickets"]) == 1 and state["phase"] == "confirm" and state["ticket_draft"].urgent
-    assert "was created." in prompt_text and "This is urgent" in prompt_text
+    assert "was created on " in prompt_text and "This is urgent" in prompt_text
 
 
 def test_decline_starts_the_urgent_issue_waiting(new_path):

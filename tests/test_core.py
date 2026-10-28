@@ -60,6 +60,26 @@ def test_products_differ_only_by_chat_yaml():
     assert ole5.greet("fr") == ole5.persona.introduction["en"]
 
 
+def test_support_hours_and_channel_load_for_both_products_and_default_to_empty():
+    for code in ("OLE5", "rich"):
+        config = products.load(code)
+        assert set(config.support_hours) == set(config.support_channel) == {"ar", "en"}
+        assert config.timezone == "Asia/Riyadh"
+    bare = products.ProductConfig(code="X", name="X", persona={"identity": "x", "introduction": {"en": "Hi"}})
+    assert (bare.support_hours, bare.support_channel, bare.timezone) == ({}, {}, "UTC")
+
+
+def test_tasks_render_without_the_support_sentences_when_a_product_has_none(monkeypatch):
+    from types import SimpleNamespace
+    from ole5_chat.agent import handlers
+    bare = products.load("OLE5").model_copy(update={"support_hours": {}, "support_channel": {}})
+    monkeypatch.setattr(products, "load", lambda code: bare)
+    state = {"identity": SimpleNamespace(product="OLE5", language="en"), "language": "en"}
+    channel = handlers._support(state, "support_channel", handlers.CHANNEL)
+    declined = handlers.TASKS["declined"].format(channel=channel)
+    assert channel == "" and declined.endswith("cancelled or closed.")
+
+
 def test_ticket_row_is_appended():
     sheets.add_ticket({"ticket_id": "g1", "ticket_number": "T-1", "customer_email": "ole5@example.com",
                        "product": "OLE5", "title": "t", "created_at": "2026-10-19"})

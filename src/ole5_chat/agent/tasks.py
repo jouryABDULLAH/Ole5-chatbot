@@ -35,7 +35,7 @@ TASKS = {
               "has been created yet; the ticket is created only when they submit the summary. Don't say a ticket is "
               "opened, created or being opened.",
     "declined": "The customer said no to opening a ticket; none was opened. Acknowledge it in one line without saying "
-                "a ticket was cancelled or closed, and say they can contact support at any time.",
+                "a ticket was cancelled or closed.{channel}",
     "urgent_ready": "This is urgent, so the ticket was prepared right away without the usual questions: {issue}. The "
                     "summary is shown with a Submit button. Nothing has been created yet. Say in one line that because "
                     "it is urgent the summary is ready now, and ask whether to submit the ticket for: {issue}. Don't "
@@ -62,22 +62,42 @@ TASKS = {
                "Don't say the ticket is created, opened or being opened. Don't repeat the summary.",
     "changed": "The ticket summary was updated as the customer asked and is shown again. Say what changed in one line "
                "and ask whether to submit the ticket for: {issue}.",
-    "created": "The ticket {number} was created. Tell the customer its number and that the support team will reply by "
-               "email. Nothing more about this ticket.",
-    "cancelled": "The customer cancelled the ticket. Acknowledge it in one line and say they can contact support at any "
-                 "time.",
+    "created": "The ticket {number} was created on {created_at}. Tell the customer its number and the date and time it "
+               "was created, and that the support team will reply by email{hours}. Nothing more about this ticket.",
+    "cancelled": "The customer cancelled the ticket. Acknowledge it in one line.{channel}",
     "status": "The customer asked about their tickets. Today: {today}. These are the tickets on their account, newest "
-              "first, from the ticket system, one per line as number, title, date, state:\n{tickets}\nAnswer in "
-              "sentences, not as a list copied from above: one ticket is one sentence; several are one line each. "
-              "Give the number, title, date and state. Titles stay as written; your own words follow the customer's "
-              "language. A state of unknown means the system didn't return one: say the state isn't available right "
-              "now, never the word unknown. If the customer asked about one ticket (the latest, a number, a title, a "
-              "date), give that one only. If they didn't say which, give the 5 most recent and say how many more there "
-              "are. If they ask about a ticket not in the list, say you have no record of it here. State nothing that "
-              "isn't in the list: no timeframes, no promises, nothing about what the team is doing.",
+              "first, from the ticket system, one per line as number, title, date, state:\n{tickets}\nAnswer what "
+              "they asked first, in one line, in sentences, not as a list copied from above. Give the number, title "
+              "and date only when the customer hasn't seen them in this chat already, or asked for them. If you "
+              "already gave this ticket's details in this chat, don't repeat them. States and what they mean for the "
+              "customer:\n{states}\nSay the meaning, and the state's name once if it helps.{hours} Titles stay as "
+              "written; your own words follow the customer's language. A state of unknown means the system didn't "
+              "return one: say the state isn't available right now, never the word unknown. If the customer asked "
+              "about one ticket (the latest, a number, a title, a date), give that one only. If they didn't say which, "
+              "give the 5 most recent, one line each, and say how many more there are. If they ask about a ticket not "
+              "in the list, say you have no record of it here. State nothing that isn't in the list or the hours: no "
+              "estimates, nothing about what the team is doing.",
     "status_none": "The customer asked about their tickets. There are no tickets on their account from this chat. Say "
-                   "so in one line, and that they can describe a problem here to get help or open one. Don't ask "
-                   "whether to open a ticket.",
+                   "so in one line, and that they can describe a problem here to get help or open one.{channel} Don't "
+                   "ask whether to open a ticket.",
+}
+
+# The product's support hours and channel (chat.yaml), filled into the tasks above; left out when a product has none.
+HOURS = {"created": " during the support hours: {}",
+         "status": " When they ask when the team will reply, give the support hours: {}."}
+CHANNEL = " Say how support works: {}."
+
+# What each ticket state means for the customer: values.xlsx says only open or closed, so the gloss is written here.
+STATE_MEANINGS = {
+    "new": "received, not yet picked up by the team",
+    "open": "picked up by the team",
+    "waiting for customer response": "the team is waiting for a reply from the customer",
+    "waiting for concerned department": "waiting for another department",
+    "waiting for service provider": "waiting for the service provider",
+    "pending reminder": "on hold until a set date",
+    "pending auto close+": "will close on its own soon unless the customer replies",
+    "closed successful": "resolved and closed",
+    "merged": "joined with another ticket and closed there",
 }
 URGENT = "This sounds urgent. "
 # Appended to queued when the new issue is urgent.
