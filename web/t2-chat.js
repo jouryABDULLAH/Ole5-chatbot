@@ -1,4 +1,4 @@
-/* <t2-chat api="https://chat-service">: the support chat widget. Plain JavaScript in one file, no build step. It knows only the chat service's HTTP API; the api attribute defaults to the page's own origin. When a cited source is clicked it fires a cancelable t2-document event {product, title} so the host page can show the document in place. */
+/* <t2-chat api="https://chat-service">: the support chat widget. Plain JavaScript in one file, no build step. It knows only the chat service's HTTP API; the api attribute defaults to the page's own origin. When a cited source is clicked it fires a cancelable t2-document event {product, title} so the host page can show the document in place, and it fires t2-tickets {session_id} when the session starts and on each new ticket. */
 (() => {
   const TEXT = {
     en: {
@@ -212,6 +212,13 @@
       this.root.replaceChildren(el("style", {}, CSS), this.open ? this.panel() : this.launcher());
       const field = this.root.querySelector("textarea, input:not([type=file])");
       if (field && this.draft) field.value = this.draft;
+      /* t2-tickets {session_id}: once the session is known and again on each new ticket, so the host page can list them. */
+      const count = this.view ? this.view.ticket_numbers.length : null;
+      if (count !== null && count !== this.ticketCount) {
+        this.dispatchEvent(new CustomEvent("t2-tickets", { bubbles: true, composed: true,
+                                                           detail: { session_id: this.view.session_id } }));
+      }
+      this.ticketCount = count;
     }
 
     launcher() {

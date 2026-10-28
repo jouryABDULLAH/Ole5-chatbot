@@ -33,6 +33,20 @@
              border-radius: 12px; background: #fff; }
     .empty { color: var(--muted); padding: 24px; }
     .open { display: block; margin-bottom: 8px; font-size: 14px; text-align: right; }
+    /* My tickets: under the document list, collapsible, and scrolling inside itself past three or four tickets. */
+    .tickets { margin-top: 24px; }
+    .tickets summary { font-size: 15px; font-weight: 600; cursor: pointer; }
+    .tickets summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .tickets ul { list-style: none; margin: 12px 0 0; padding: 0; max-height: 320px; overflow-y: auto;
+                  border: 1px solid var(--line); border-radius: 10px; }
+    .tickets li { padding: 10px 14px; font-size: 14px; line-height: 1.5; }
+    .tickets li + li { border-top: 1px solid var(--line); }
+    .tickets li > span { display: block; }
+    .tickets .top { display: flex; justify-content: space-between; gap: 8px; }
+    .tickets .num { font-weight: 600; direction: ltr; }
+    .tickets .state { padding: 0 8px; border-radius: 999px; background: var(--soft); color: var(--accent); font-size: 13px; }
+    .tickets .date { color: var(--muted); font-size: 13px; }
+    .tickets .empty { padding: 10px 14px; }
     @media (max-width: 800px) { .docs { grid-template-columns: 1fr; } }
     @media (max-width: 600px) { header, main { padding-inline: 16px; } main { padding-block: 24px; } }
   </style>
@@ -43,7 +57,12 @@
     <h1>Support</h1>
     <p>This page stands in for the ticket system. Open the chat to ask a question or report a problem. To see the sign-in step in Arabic, add <a href="?lang=ar">?lang=ar</a> to the address.</p>
     <section class="docs" aria-labelledby="docs-title">
-      <nav><h2 id="docs-title">Knowledge base</h2><ul id="doc-list"></ul></nav>
+      <nav><h2 id="docs-title">Knowledge base</h2><ul id="doc-list"></ul>
+        <details class="tickets" open>
+          <summary id="tickets-title">My tickets</summary>
+          <ul id="ticket-list"><li class="empty">Open the chat to see your tickets.</li></ul>
+        </details>
+      </nav>
       <div id="doc-view"><p class="empty">Pick a document to read it here. A source cited in the chat opens here too.</p></div>
     </section>
   </main>
@@ -54,6 +73,40 @@
     const chat = document.querySelector("t2-chat");
     if (lang) chat.setAttribute("lang", lang);
     if (lang === "ar") document.getElementById("docs-title").textContent = "قاعدة المعرفة";
+    const ticketsTitle = lang === "ar" ? "تذاكري" : "My tickets";
+    if (lang === "ar") {
+      document.getElementById("tickets-title").textContent = ticketsTitle;
+      document.querySelector("#ticket-list .empty").textContent = "افتح المحادثة لعرض تذاكرك.";
+    }
+
+    // The customer's tickets, newest first, fetched again each time the chat says a session started or a ticket was created.
+    const tickets = document.getElementById("ticket-list");
+    function span(cls, text) {
+      const s = document.createElement("span");
+      s.className = cls; s.textContent = text; s.dir = "auto";
+      return s;
+    }
+    chat.addEventListener("t2-tickets", (e) => {
+      fetch(`/chat/tickets?session_id=${encodeURIComponent(e.detail.session_id)}`).then((r) => r.ok ? r.json() : [])
+        .then((rows) => {
+          document.getElementById("tickets-title").textContent = `${ticketsTitle} (${rows.length})`;
+          if (!rows.length) {
+            const none = span("", lang === "ar" ? "لا توجد تذاكر بعد." : "No tickets yet.");
+            const item = document.createElement("li");
+            item.className = "empty"; item.append(none);
+            tickets.replaceChildren(item);
+            return;
+          }
+          tickets.replaceChildren(...rows.reverse().map((t) => {
+            const top = document.createElement("div");
+            top.className = "top";
+            top.append(span("num", t.ticket_number), t.state ? span("state", t.state) : "");
+            const item = document.createElement("li");
+            item.append(top, span("", t.title), span("date", t.created_at.slice(0, 10)));
+            return item;
+          }));
+        });
+    });
 
     const list = document.getElementById("doc-list"), view = document.getElementById("doc-view");
     function show(title) {
