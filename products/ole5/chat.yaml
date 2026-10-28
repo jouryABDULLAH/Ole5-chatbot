@@ -26,4 +26,4 @@ urgent_when:
 required:
   bug: [page, error text or screenshot]
   password: [username, whether the reset message arrived]
-  integration: [external system name, what should be exchanged]
+  integration: [external system name, what should be exchanged between the systems]
