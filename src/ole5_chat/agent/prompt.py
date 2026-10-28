@@ -34,7 +34,8 @@ PHASES = {
 }
 
 MEANINGS = {
-    "question": "asks about the product or reports a problem with it, including a follow-up to an earlier answer. A "
+    "question": "asks about the product or reports a problem with it, including a follow-up to an earlier answer, but "
+                "not a report that an answer didn't help. A "
                 "request to open a ticket that names a topic is a question too: the assistant searches first and "
                 "offers a ticket only when it has no answer.",
     "talk": "nothing to look up: a greeting, thanks, a question about the assistant itself (who it is, what it can do), "
@@ -44,7 +45,8 @@ MEANINGS = {
             "nothing to search for yet (\"عندي مشكلة\", \"افتح لي تذكرة\", \"I need help\"). Once a message names "
             "anything, a screen, an error, something that doesn't work, it is a question, however short.",
         
-    "ticket": "the message reports a topic from this list: {always_ticket}.",
+    "ticket": "the message reports a topic from this list: {always_ticket}. Or, after the assistant answered, it says the "
+              "steps the assistant gave didn't help (\"لا زال لا يعمل\", \"العطل مستمر\").",
     "urgent": "the message describes a situation from this list: {urgent_when}. Judge it from the impact described, "
               "not the tone.",
     "status": "the customer asks about their own tickets: status, whether one was received, its number.",
