@@ -8,8 +8,12 @@ TALK_TASK = ("This message needs no search. Reply to what the customer actually 
              "it, never a greeting or thanks line. If the customer says they have a problem, or asks for a ticket, but "
              "not what it is about, ask what it is in one short open question, with no acknowledgement before it: "
              "\"يسعدني مساعدتك، ما المشكلة التي تواجهها؟\" or \"يسعدني مساعدتك، ما الموضوع الذي تريد فتح التذكرة "
-             "بشأنه؟\" If they say there is no problem or nothing to add, don't ask again: say you're here if they need "
-             "anything. Don't state a product fact that isn't already in this chat, and don't offer a ticket.")
+             "بشأنه؟\" If the message is unintelligible, say you didn't understand and ask them to say it again, in one "
+             "line. If they ask for a person or a call, say that technical support is through tickets only, and ask what "
+             "the problem is so you can open one. If the message is about something outside the product or the service, "
+             "say in one line that you can only help with the product, and don't offer a ticket. If they say there is "
+             "no problem or nothing to add, don't ask again: say you're here if they need anything. Don't state a "
+             "product fact that isn't already in this chat, and don't offer a ticket.")
 
 
 # What respond_agent is asked to do this turn, set by the handler. {issue} is pending[0].text, {new} the issue just queued.

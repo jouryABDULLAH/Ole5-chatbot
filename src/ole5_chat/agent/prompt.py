@@ -34,16 +34,21 @@ PHASES = {
 }
 
 MEANINGS = {
-    "question": "asks about the product or reports a problem with it, including a follow-up to an earlier answer about "
-                "the product, but not a follow-up about their ticket, and not a report that an answer didn't help. A "
+    "question": "names something in the product and asks or reports something about it: how, why, whether it's "
+                "possible, that it doesn't work; including a follow-up to an earlier answer about the product, but not a "
+                "follow-up about their ticket, and not a report that an answer didn't help. A "
                 "request to open a ticket that names a topic is a question too: the assistant searches first and "
                 "offers a ticket only when it has no answer.",
     "talk": "nothing to look up: a greeting, thanks, a question about the assistant itself (who it is, what it can do), "
             "an acknowledgement with nothing open to agree to, a side remark, a request to repeat what the assistant "
             "just said, a question about why the assistant said or did something (\"why?\", \"what do you mean?\" "
-            "about the assistant's own words, not about a ticket's status), a request to open a ticket, or a report of a problem, that names no symptom and no feature, so there is "
-            "nothing to search for yet (\"عندي مشكلة\", \"افتح لي تذكرة\", \"I need help\"). Once a message names "
-            "anything, a screen, an error, something that doesn't work, it is a question, however short.",
+            "about the assistant's own words, not about a ticket's status), a request to open a ticket, or a report of "
+            "a problem, that names no symptom and no feature, so there is nothing to search for yet (\"عندي مشكلة\", "
+            "\"افتح لي تذكرة\", \"I need help\"), text that makes no sense as a message (garbled, fragments, a stray "
+            "word), a request for a person, an employee, or to be called, without saying what the problem is, a feature "
+            "or a screen named with no question or symptom about it (\"الأرشفة\", \"كلمة المرور\"), or a message about "
+            "something outside the product or the service. Once a message asks or reports something about what it "
+            "names in the product, it is a question, however short.",
         
     "ticket": "the message reports a topic from this list: {always_ticket}. Or, after the assistant answered, it says the "
               "steps the assistant gave didn't help (\"لا زال لا يعمل\", \"العطل مستمر\").",

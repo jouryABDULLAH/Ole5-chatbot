@@ -132,6 +132,14 @@ HELD_OUT = [
     ("none", None, PERMISSION, "ما معنى الصلاحية؟", "question"),
     ("none", None, PERMISSION, "لا زال لا يعمل", "ticket"),
     ("none", None, GREETING, "what do you mean?", "talk"),
+    # Garbled text, a request for a person, a bare feature name and an off-topic message are talk; a question or a
+    # symptom about a feature is a question.
+    ("none", None, GREETING, "أبغى موظف", "talk"),
+    ("none", None, GREETING, "أبغى موظف، النظام ما يفتح", "question"),
+    ("none", None, GREETING, "الأرشفة", "talk"),
+    ("none", None, GREETING, "كيف الأرشفة؟", "question"),
+    ("none", None, GREETING, "الأرشفة ما تشتغل", "question"),
+    ("none", None, GREETING, "متى تمطر في اسبانيا", "talk"),
 ]
 
 
