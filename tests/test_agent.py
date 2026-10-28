@@ -79,6 +79,17 @@ def test_classify_refuses_required_keys_that_are_not_a_kind(model):
     assert draft.required == GOOD.required and len(model.calls) == 2
 
 
+def test_classify_with_no_kinds_drops_the_required_keys(model):
+    from unittest.mock import patch
+    from ole5_chat import products
+    from ole5_chat.agent.classify import classify
+    config = products.load("OLE5").model_copy(update={"required": {}})
+    model.add(GOOD)
+    with patch.object(products, "load", lambda code: config):
+        draft = classify(drafting())["ticket_draft"]
+    assert (draft.required, draft.missing) == ({}, []) and len(model.calls) == 1
+
+
 def test_classify_failure_keeps_the_draft_unclassified(model):
     from ole5_chat.agent.classify import classify
     out = classify(drafting())

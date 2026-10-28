@@ -32,6 +32,8 @@ def classify(state: ChatState) -> dict:
                             "customer gave, and ask them to send their last message again.",
                     "corrections": state["corrections"] + [f"classify failed: {exc}"]}
         fields, problems = check_ticket(result, catalog)
+        if not kinds:  # A product with no kinds asks nothing: keys the model made up are dropped, not refused.
+            result = result.model_copy(update={"required": {}})
         # required is one kind's list, every item as a key, or empty when no kind fits the problem (nothing to ask).
         if result.required and not any(set(result.required) == set(items) for items in kinds.values()):
             problems.append(f"required: keys {sorted(result.required)} are not one kind's full list")
