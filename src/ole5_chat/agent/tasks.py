@@ -44,7 +44,18 @@ TASKS = {
                "whether there is anything else they'd like to add. One sentence, one question. Don't ask for anything "
                "specific. Nothing has been created yet; the ticket is created only when they submit the summary. "
                "Don't say a ticket is opened, created or being opened.",
-    "open_question": "Ask whether there is anything else they'd like to add about: {issue}. Nothing else.",
+    "retry_summary": "The ticket summary could not be prepared this time. Say so in one line and ask them to send their "
+                     "last message again. Don't ask for any details. Nothing has been created yet.",
+    # Collect asks for the required items one at a time: {item} is the next one not given yet.
+    "ask_first": "The customer agreed to a ticket for: {issue}. Say in one line that you need some information from "
+                 "them to open the ticket, without saying how many items or listing them. Then on a new line ask for "
+                 "this one thing: {item}. One question. Don't explain why. Nothing has been created yet; don't say a "
+                 "ticket is opened, created or being opened.",
+    "ask_direct": "The customer agreed to a ticket for: {issue}. Say in one sentence that to open the ticket you need "
+                  "this one thing, and ask for it: {item}. Nothing else. Nothing has been created yet; don't say a "
+                  "ticket is opened.",
+    "ask_next": "Ask for this one thing: {item}. One short sentence, one question, no explanation, at most a few words "
+                "of acknowledgement first.",
     "confirm": "The ticket summary is ready and shown with a Submit button. Nothing has been created yet; the ticket is "
                "created only when they submit. Say the summary is ready in one line and ask whether to submit the "
                "ticket for: {issue}. "
@@ -73,7 +84,7 @@ URGENT = "This sounds urgent. "
 # How a reply goes back to the current ticket, by phase (the queued task, and chat in collect or confirm).
 CURRENT = {
     "offer_ticket": "ask whether they would like a ticket for: {issue}.",
-    "collect": "ask what else the support team needs for: {issue}.",
+    "collect": "ask again, in one sentence, for the one piece of information you last asked for about: {issue}.",
     "confirm": "the summary for {issue} is still shown; ask whether to submit it.",
 }
 QUEUED_URGENT = " Because the new issue is urgent, also say they can cancel the current one to start it now."

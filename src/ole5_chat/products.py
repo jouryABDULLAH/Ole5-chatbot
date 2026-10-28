@@ -27,7 +27,8 @@ class ProductConfig(BaseModel):
     persona: Persona
     always_ticket: list[str] = []
     urgent_when: list[str] = []
-    ask_before_ticket: dict[str, list[str]] = {}
+    # Per kind of problem, the information only the customer can give and the team cannot act without.
+    required: dict[str, list[str]] = {}
     team_scopes: str | None = None
 
     def greet(self, language: str) -> str:

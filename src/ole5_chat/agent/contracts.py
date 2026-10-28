@@ -53,8 +53,10 @@ class Classification(BaseModel):
     confidence: Literal["high", "medium", "low"] | None = None
     queue_reason: str | None = None
     collected: dict[str, str] = {}
-    missing: list[str] = []
     unknown: list[str] = []
+    # The product's required items for this kind of problem: the value given, "unknown", "declined", or None when
+    # not given yet. missing is not a model field: code derives it from the None entries.
+    required: dict[str, str | None] = {}
     # collected and unknown again in the customer's language, for the card.
     collected_customer: dict[str, str] = {}
     unknown_customer: list[str] = []

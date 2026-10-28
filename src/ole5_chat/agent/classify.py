@@ -4,7 +4,7 @@ import logging
 
 from langchain_core.messages import AIMessage, HumanMessage
 
-from ole5_chat import llm, values
+from ole5_chat import llm, products, values
 from ole5_chat.agent import prompt
 from ole5_chat.agent.contracts import Classification
 from ole5_chat.agent.state import ChatState
@@ -20,6 +20,7 @@ def _short(text: str, limit: int = 90) -> str:
 
 def classify(state: ChatState) -> dict:
     catalog = values.catalog(state["identity"].product)
+    kinds = products.load(state["identity"].product).required
     messages = list(state["messages"])
     fields, problems = {}, ["classification not run"]
     for attempt in (1, 2):
@@ -31,9 +32,12 @@ def classify(state: ChatState) -> dict:
                             "customer gave, and ask them to send their last message again.",
                     "corrections": state["corrections"] + [f"classify failed: {exc}"]}
         fields, problems = check_ticket(result, catalog)
-        log.info("classify  attempt=%d queue=%s type=%s subtype=%s priority=%s urgent=%s confidence=%s problems=%s",
-                 attempt, result.queue, result.type, result.subtype, result.priority, result.urgent,
-                 result.confidence, problems)
+        # required is one kind's list, every item as a key, or empty when no kind fits the problem (nothing to ask).
+        if result.required and not any(set(result.required) == set(items) for items in kinds.values()):
+            problems.append(f"required: keys {sorted(result.required)} are not one kind's full list")
+        log.info("classify  attempt=%d queue=%s type=%s subtype=%s priority=%s urgent=%s confidence=%s required=%s "
+                 "problems=%s", attempt, result.queue, result.type, result.subtype, result.priority, result.urgent,
+                 result.confidence, result.required, problems)
         if not problems:
             break
         messages = [*messages, AIMessage(content=result.model_dump_json()),
@@ -44,7 +48,9 @@ def classify(state: ChatState) -> dict:
         return {"note": "The ticket summary could not be built this time. Say so in one line, keep what the "
                         "customer gave, and ask them to send their last message again.",
                 "corrections": state["corrections"] + [f"classify refused: {'; '.join(problems)}"]}
-    draft = state["ticket_draft"].model_copy(update={**fields, "collected": result.collected, "missing": result.missing,
+    missing = [k for k, v in result.required.items() if v is None]
+    draft = state["ticket_draft"].model_copy(update={**fields, "collected": result.collected, "missing": missing,
+                                                     "required": result.required,
                                                      "unknown": result.unknown, "classified": True,
                                                      "collected_customer": result.collected_customer,
                                                      "unknown_customer": result.unknown_customer})

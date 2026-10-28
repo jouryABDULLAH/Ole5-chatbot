@@ -5,6 +5,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from ole5_chat import llm, sessions
 from ole5_chat.agent.contracts import Classification
+from ole5_chat.agent.tasks import TASKS
 from ole5_chat.agent.validate import check_ticket
 from ole5_chat.knowledge.contracts import Evidence, Retrieval, Verdict
 from ole5_chat.tickets import client as ticket_api
@@ -17,7 +18,11 @@ GOOD = Classification(queue="Ole5 Technical", type="Mobile App Issue", subtype="
                       summary="The app crashes on the Inbox screen.", title_customer="تعطل التطبيق",
                       summary_customer="يتعطل التطبيق عند فتح شاشة الوارد.", confidence="high", queue_reason="tech",
                       collected={"screen": "Inbox"}, unknown=["app version"],
-                      collected_customer={"الشاشة": "الوارد"}, unknown_customer=["نسخة التطبيق"])
+                      collected_customer={"الشاشة": "الوارد"}, unknown_customer=["نسخة التطبيق"],
+                      required={"page": "Inbox", "error text or screenshot": None})
+# The bug kind, every item given.
+COMPLETE = GOOD.model_copy(update={"required": {**GOOD.required, "error text or screenshot": "Error 500"},
+                                   "unknown": []})
 
 
 def chat(email="ole5@example.com"):
@@ -58,11 +63,20 @@ def drafting():
 
 def test_classify_retries_a_refused_value_then_classifies(model):
     from ole5_chat.agent.classify import classify
-    found = GOOD.model_copy(update={"collected": {"screen": "Inbox"}, "missing": ["app version"], "unknown": ["device"]})
+    found = GOOD.model_copy(update={"collected": {"screen": "Inbox"}, "unknown": ["device"]})
     model.add(GOOD.model_copy(update={"queue": "Ole5 Helpdesk"}), found)
     draft = classify(drafting())["ticket_draft"]
     assert draft.classified and draft.queue == "Ole5 Technical"
-    assert (draft.collected, draft.missing, draft.unknown) == ({"screen": "Inbox"}, ["app version"], ["device"])
+    # missing is derived from the required items not given yet, not written by the model.
+    assert (draft.collected, draft.missing, draft.unknown) == ({"screen": "Inbox"}, ["error text or screenshot"],
+                                                               ["device"])
+
+
+def test_classify_refuses_required_keys_that_are_not_a_kind(model):
+    from ole5_chat.agent.classify import classify
+    model.add(GOOD.model_copy(update={"required": {"colour": None}}), GOOD)
+    draft = classify(drafting())["ticket_draft"]
+    assert draft.required == GOOD.required and len(model.calls) == 2
 
 
 def test_classify_failure_keeps_the_draft_unclassified(model):
@@ -260,7 +274,7 @@ def test_status_in_collect_lists_the_tickets_and_goes_back_to_the_draft(new_path
     state, prompt_text = new_path(sid, "وش صار على تذكرتي؟", "status", [AIMessage(content="T-1 مفتوحة.")])
     assert "- T-1, Archive button, 2026-10-01, open" in prompt_text and "T-2" not in prompt_text
     assert "one per line as number, title, date, state" in prompt_text and "never the word unknown" in prompt_text
-    assert "Then continue the current ticket: ask what else the support team needs for" in prompt_text
+    assert "Then continue the current ticket: ask again, in one sentence, for the one piece of information" in prompt_text
     assert state["phase"] == "collect" and state["pending"] == before["pending"]
     assert state["ticket_draft"] == before["ticket_draft"]
 
@@ -637,10 +651,13 @@ def test_new_path_router_ticket_or_urgent_is_queued_and_offered(new_path, next_)
 def test_new_path_accept_creates_the_draft(new_path):
     sid = chat()
     unanswered(new_path, sid, "Does it run on Linux?")
-    state, prompt_text = new_path(sid, "ايه", "accept", [AIMessage(content="أي إصدار تستخدم؟")])
+    state, prompt_text = new_path(sid, "ايه", "accept", [AIMessage(content="أي إصدار تستخدم؟")], groundings=[GOOD])
     assert state["ticket_draft"] is not None and state["phase"] == "collect"
     assert [p.text for p in state["pending"]] == ["Does it run on Linux?"]
     assert "The customer agreed to a ticket for: Does it run on Linux?" in prompt_text
+    # Two required items, one not given yet: the first ask names it after the one-line lead.
+    assert "ask for this one thing: error text or screenshot." in prompt_text
+    assert state["ticket_draft"].missing == ["error text or screenshot"]
 
 
 def test_new_path_decline_with_one_issue_empties_pending(new_path):
@@ -687,10 +704,10 @@ def test_new_path_an_acknowledgement_is_never_queued(new_path):
     assert (state["phase"], state["pending"]) == ("none", [])
 
 
-def collecting(new_path, sid, question="Does it run on Linux?"):
-    """An unanswered question, then accept: a draft in collect."""
+def collecting(new_path, sid, question="Does it run on Linux?", found=GOOD):
+    """An unanswered question, then accept with classify scripted: a draft in collect, the error text still missing."""
     unanswered(new_path, sid, question)
-    return new_path(sid, "yes", "accept", [AIMessage(content="Which version do you use?")])
+    return new_path(sid, "yes", "accept", [AIMessage(content="Which version do you use?")], groundings=[found])
 
 
 def confirming(new_path, sid, **found):
@@ -700,33 +717,111 @@ def confirming(new_path, sid, **found):
                     groundings=[GOOD.model_copy(update=found)])
 
 
-def test_details_count_rounds_then_ask_the_open_question(new_path):
+def test_accept_with_everything_given_shows_the_summary_at_once(new_path):
+    sid = chat()
+    state, prompt_text = collecting(new_path, sid, found=COMPLETE)
+    assert state["phase"] == "confirm" and state["ticket_draft"].missing == []
+    assert "The ticket summary is ready" in prompt_text
+
+
+def test_accept_with_no_kind_fitting_shows_the_summary_at_once(new_path):
+    """A how-to or a request matches no kind: required is empty, nothing is asked."""
+    sid = chat()
+    state, prompt_text = collecting(new_path, sid, found=GOOD.model_copy(update={"required": {}}))
+    assert state["phase"] == "confirm" and state["ticket_draft"].classified
+    assert "The ticket summary is ready" in prompt_text
+
+
+def test_accept_with_a_one_item_kind_asks_directly(new_path):
+    sid = chat()
+    from unittest.mock import patch
+    from ole5_chat import products
+    one = GOOD.model_copy(update={"required": {"username": None}})
+    config = products.load("OLE5").model_copy(update={"required": {"password": ["username"]}})
+    with patch.object(products, "load", lambda code: config):
+        state, prompt_text = collecting(new_path, sid, found=one)
+    assert state["phase"] == "collect" and "you need this one thing, and ask for it: username." in prompt_text
+
+
+def test_details_ask_the_next_missing_item_and_settle_unknown_and_declined(new_path):
+    sid = chat()
+    two_missing = GOOD.model_copy(update={"required": {**GOOD.required, "page": None}})
+    collecting(new_path, sid, found=two_missing)
+    # "I don't know" settles the page; the next question is the error text.
+    state, prompt_text = new_path(sid, "ما أعرف", "details", [AIMessage(content="وش نص الخطأ؟")],
+                                  groundings=[GOOD.model_copy(update={"required": {**two_missing.required, "page": "unknown"}})])
+    assert state["ticket_draft"].rounds == 1 and state["phase"] == "collect"
+    assert prompt_text.count("Ask for this one thing: error text or screenshot.") == 1
+    assert "agreed to a ticket" not in prompt_text and state["ticket_draft"].required["page"] == "unknown"
+    # A refusal settles the error text; nothing is missing, so the summary is shown.
+    state, prompt_text = new_path(sid, "ما أبي أعطيك", "details", [AIMessage(content="الملخص جاهز.")],
+                                  groundings=[GOOD.model_copy(update={"required": {"page": "unknown", "error text or screenshot": "declined"}})])
+    assert state["phase"] == "confirm" and state["ticket_draft"].required["error text or screenshot"] == "declined"
+    assert state["ticket_draft"].missing == []
+
+
+def test_details_answering_every_item_at_once_shows_the_summary(new_path):
+    sid = chat()
+    none_given = GOOD.model_copy(update={"required": dict.fromkeys(GOOD.required)})
+    collecting(new_path, sid, found=none_given)
+    both = GOOD.model_copy(update={"required": {"page": "Inbox", "error text or screenshot": "Error 500"}})
+    state, prompt_text = new_path(sid, "Inbox, Error 500", "details", [AIMessage(content="Summary ready.")],
+                                  groundings=[both])
+    assert state["phase"] == "confirm" and "The ticket summary is ready" in prompt_text
+
+
+def test_three_rounds_with_items_missing_show_the_summary(new_path):
     sid = chat()
     collecting(new_path, sid)
-    state, prompt_text = new_path(sid, "version 17", "details", [AIMessage(content="When did it start?")])
-    assert state["ticket_draft"].rounds == 1 and "ask only whether there is anything else they'd like to add" in prompt_text
-    state, prompt_text = new_path(sid, "yesterday", "details", [AIMessage(content="Anything else to add?")])
-    assert state["ticket_draft"].rounds == 2 and state["phase"] == "collect"
-    assert "Ask whether there is anything else they'd like to add about: Does it run on Linux?" in prompt_text
+    for message in ("hmm", "not sure"):
+        state, _ = new_path(sid, message, "details", [AIMessage(content="Which version?")], groundings=[GOOD])
+        assert state["phase"] == "collect"
+    state, prompt_text = new_path(sid, "still no", "details", [AIMessage(content="Summary ready.")], groundings=[GOOD])
+    assert state["ticket_draft"].rounds == 3 and state["phase"] == "confirm"
+    assert state["ticket_draft"].missing == ["error text or screenshot"] and "The ticket summary is ready" in prompt_text
+
+
+def test_accept_with_classify_failing_asks_to_send_again(new_path):
+    sid = chat()
+    unanswered(new_path, sid, "Does it run on Linux?")
+    state, prompt_text = new_path(sid, "yes", "accept", [AIMessage(content="Please send that again.")])
+    assert state["phase"] == "collect" and state["ticket_draft"] is not None and not state["ticket_draft"].classified
+    assert TASKS["retry_summary"] in prompt_text
+    # The task says it; classify's note is not sent as well.
+    assert "could not be built" not in prompt_text and "anything else they'd like to add" not in prompt_text
+
+
+def test_done_with_classify_failing_on_a_draft_never_classified_asks_to_send_again(new_path):
+    sid = chat()
+    unanswered(new_path, sid, "Does it run on Linux?")
+    new_path(sid, "yes", "accept", [AIMessage(content="Please send that again.")])
+    state, prompt_text = new_path(sid, "nothing else", "done", [AIMessage(content="Please send that again.")])
+    assert state["phase"] == "collect" and not state["ticket_draft"].classified
+    assert TASKS["retry_summary"] in prompt_text and "anything else they'd like to add" not in prompt_text
 
 
 def test_done_classifies_once_and_shows_the_summary(new_path, model):
     sid = chat()
-    state, prompt_text = confirming(new_path, sid, collected={"version": "17"}, missing=["device"],
-                                    unknown=["since when"])
+    state, prompt_text = confirming(new_path, sid, collected={"version": "17"}, unknown=["since when"])
     draft = state["ticket_draft"]
     assert state["phase"] == "confirm" and draft.classified and draft.queue == "Ole5 Technical"
-    assert (draft.collected, draft.missing, draft.unknown) == ({"version": "17"}, [], ["since when", "device"])
+    # done: the required item still not given becomes unknown, in both lists.
+    assert (draft.collected, draft.missing, draft.unknown) == ({"version": "17"}, [],
+                                                               ["since when", "error text or screenshot"])
+    assert draft.required["error text or screenshot"] == "unknown"
     assert "The ticket summary is ready" in prompt_text
-    assert [c[0] for c in model.calls].count(Classification) == 1
+    # One classify at accept, one at done.
+    assert [c[0] for c in model.calls].count(Classification) == 2
 
 
-def test_done_with_classify_failing_stays_in_collect(new_path):
+def test_done_with_classify_failing_shows_the_earlier_draft(new_path):
     sid = chat()
     collecting(new_path, sid)
     state, prompt_text = new_path(sid, "nothing else", "done", [AIMessage(content="Please send that again.")])
-    assert state["phase"] == "collect" and not state["ticket_draft"].classified
-    assert "could not be built" in prompt_text and any("classify failed" in c for c in state["corrections"])
+    # The draft accept classified is shown; what is still missing becomes unknown.
+    draft = state["ticket_draft"]
+    assert state["phase"] == "confirm" and draft.missing == [] and "error text or screenshot" in draft.unknown
+    assert "The ticket summary is ready" in prompt_text and any("classify failed" in c for c in state["corrections"])
 
 
 def test_change_classifies_again(new_path, model):
@@ -737,7 +832,7 @@ def test_change_classifies_again(new_path, model):
                                   groundings=[GOOD.model_copy(update={"priority": "High"})])
     assert state["phase"] == "confirm" and state["ticket_draft"].priority == "High"
     assert "The ticket summary was updated" in prompt_text
-    assert [c[0] for c in model.calls].count(Classification) == 2
+    assert [c[0] for c in model.calls].count(Classification) == 3
 
 
 def test_yes_creates_the_ticket(new_path):
@@ -812,7 +907,7 @@ def test_a_stale_next_does_not_skip_the_router(new_path, model):
     sid = chat()
     collecting(new_path, sid)
     sessions._graph.update_state(sessions._config(sid), {"next": "yes"}, as_node="validate")
-    state, _ = new_path(sid, "version 17", "details", [AIMessage(content="Anything else?")])
+    state, _ = new_path(sid, "version 17", "details", [AIMessage(content="Anything else?")], groundings=[GOOD])
     assert state["created_tickets"] == [] and state["phase"] == "collect" and state["ticket_draft"].rounds == 1
 
 
@@ -820,8 +915,8 @@ def test_search_runs_only_on_question_and_respond_never_binds_a_tool(new_path):
     from ole5_chat import llm
     sid = chat()
     unanswered(new_path, sid, "Does it run on Linux?")
-    new_path(sid, "yes", "accept", [AIMessage(content="Which version do you use?")])
-    new_path(sid, "version 17", "details", [AIMessage(content="Anything else?")])
+    new_path(sid, "yes", "accept", [AIMessage(content="Which version do you use?")], groundings=[GOOD])
+    new_path(sid, "version 17", "details", [AIMessage(content="Anything else?")], groundings=[GOOD])
     new_path(sid, "nothing else", "done", [AIMessage(content="Submit it?")], groundings=[GOOD])
     fake = llm.tool_client
     assert fake.choices == ["required", "auto", None, None, None, None]
@@ -838,8 +933,8 @@ def test_a_json_reply_is_retried_as_a_chat_message(new_path):
 
 def test_done_moves_what_is_missing_to_unknown(new_path):
     sid = chat()
-    state, _ = confirming(new_path, sid, missing=["app version"])
-    assert state["ticket_draft"].missing == [] and "app version" in state["ticket_draft"].unknown
+    state, _ = confirming(new_path, sid)
+    assert state["ticket_draft"].missing == [] and "error text or screenshot" in state["ticket_draft"].unknown
 
 
 def task_sent(new_path, *args, **kwargs):
@@ -860,10 +955,11 @@ def test_the_task_is_the_last_message_off_the_plain_chat_turn(new_path):
     turns = [
         (("We need to migrate our data", "ticket", [AIMessage(content="After this one.")]), {}, "The customer raised a new issue: We need to migrate our data."),
         (("thanks", "talk", [AIMessage(content="Sure. Still want it?")]), {}, "Answer the customer's message as usual. A ticket offer"),
-        (("yes", "accept", [AIMessage(content="Which version?")]), {}, "The customer agreed to a ticket"),
-        (("version 17", "details", [AIMessage(content="Anything else?")]), {}, "The customer added details about"),
+        (("yes", "accept", [AIMessage(content="Which version?")]), {"groundings": [GOOD]}, "The customer agreed to a ticket"),
+        (("version 17", "details", [AIMessage(content="Anything else?")]), {"groundings": [GOOD]}, "Ask for this one thing"),
         (("ok", "talk", [AIMessage(content="Anything else?")]), {},
-         "Answer the customer's message as usual. Then continue the current ticket: ask what else the support team needs"),
+         "Answer the customer's message as usual. Then continue the current ticket: ask again, in one sentence, for "
+         "the one piece of information you last asked for"),
         (("nothing else", "done", [AIMessage(content="Submit it?")]), {"groundings": [GOOD]}, "The ticket summary is ready"),
         (("high priority", "change", [AIMessage(content="Changed. Submit?")]), {"groundings": [GOOD]}, "The ticket summary was updated"),
         (("submit", "yes", [AIMessage(content="Created.")]), {}, "The ticket T-MOCK-"),
@@ -897,7 +993,7 @@ def test_a_details_turn_without_a_question_does_not_search(new_path):
     sid = chat()
     collecting(new_path, sid)
     first = len(llm.tool_client.calls)
-    state, _ = new_path(sid, "version 17", "details", [AIMessage(content="When did it start?")])
+    state, _ = new_path(sid, "version 17", "details", [AIMessage(content="When did it start?")], groundings=[GOOD])
     assert len(llm.tool_client.calls) == first + 1 and state["sources"] == []
 
 
@@ -962,9 +1058,10 @@ def test_change_keeps_an_urgent_draft_urgent(new_path):
     sid = chat()
     new_path(sid, URGENT_ISSUE, "urgent", [AIMessage(content="Ready.")], groundings=[GOOD])
     state, _ = new_path(sid, "make the priority high", "change", [AIMessage(content="Changed.")],
-                        groundings=[GOOD.model_copy(update={"priority": "High", "urgent": False, "missing": ["device"]})])
+                        groundings=[GOOD.model_copy(update={"priority": "High", "urgent": False})])
     draft = state["ticket_draft"]
-    assert draft.urgent and draft.urgent_reason == URGENT_ISSUE and draft.missing == ["device"] and draft.priority == "High"
+    # An urgent ticket keeps what is missing: it skipped the questions.
+    assert draft.urgent and draft.urgent_reason == URGENT_ISSUE and draft.missing == ["error text or screenshot"] and draft.priority == "High"
 
 
 def test_post_check_never_classifies(model):
@@ -990,7 +1087,8 @@ def test_a_queued_issue_goes_back_to_the_current_ticket(new_path, phase):
         confirming(new_path, sid)
     task = task_sent(new_path, sid, "We need to migrate our data", "ticket", [AIMessage(content="After this one.")])
     ending = {"offer_ticket": "ask whether they would like a ticket for: Does it run on Linux?.",
-              "collect": "ask what else the support team needs for: Does it run on Linux?.",
+              "collect": "ask again, in one sentence, for the one piece of information you last asked for about: Does "
+                         "it run on Linux?.",
               "confirm": "the summary for Does it run on Linux? is still shown; ask whether to submit it."}[phase]
     assert task.startswith(NOTE + "The customer raised a new issue: We need to migrate our data.") and task.endswith(ending)
     assert "don't offer a ticket for it now" in task and "This needs the support team" not in task

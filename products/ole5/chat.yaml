@@ -23,9 +23,7 @@ always_ticket:
   - data migration requests
 urgent_when:
   - no user in the organization can sign in
-ask_before_ticket:
-  bug: [screen or page, steps to reproduce, screenshot, error text, when it started]
-  mobile_app: [device and OS version, app version, what happens, error text]
+required:
+  bug: [page, error text or screenshot]
   password: [username, whether the reset message arrived]
-  documents: [document or correspondence number, what is wrong with it]
   integration: [external system name, what should be exchanged]

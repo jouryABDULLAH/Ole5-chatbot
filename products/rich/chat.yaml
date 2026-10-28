@@ -25,7 +25,7 @@ always_ticket:
 urgent_when:
   - OTP or SMS not delivered for all users
   - the portal or the API is down
-ask_before_ticket:
+required:
   delivery: [sender name, two sample numbers, time window, message ID if any]
   sender_name: [sender name, registration or renewal, company registration number]
   integration: [API or SMPP, error text, server IP]

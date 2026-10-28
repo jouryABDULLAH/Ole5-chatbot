@@ -85,9 +85,28 @@ def queue(state: ChatState) -> dict:
     return {"pending": pending, "task": queued + (QUEUED_URGENT if state["next"] == "urgent" else "")}
 
 
+def _ask_or_confirm(state: ChatState, draft: TicketDraft, first: bool) -> dict:
+    """Collect asks for the required items one at a time, and stops when none is missing or the rounds are used up:
+    then the summary is shown, with what is still missing kept in the draft for the internal note."""
+    issue = state["pending"][0].text
+    missing = [k for k, v in draft.required.items() if v is None]
+    if not missing or draft.rounds >= get_settings().collect_rounds:
+        return {"ticket_draft": draft, "phase": "confirm", "task": TASKS["confirm"].format(issue=issue)}
+    key = "ask_direct" if first and len(draft.required) == 1 else "ask_first" if first else "ask_next"
+    return {"ticket_draft": draft, "phase": "collect", "task": TASKS[key].format(issue=issue, item=missing[0])}
+
+
+def _classified(state: ChatState, draft: TicketDraft, first: bool) -> dict:
+    """classify on the draft, then ask or confirm. When classify fails the draft stays as it is, collect goes on, and
+    the customer is asked to send their last message again (the task says it, so classify's note is dropped)."""
+    out = classifier.classify({**state, "ticket_draft": draft})
+    if "ticket_draft" not in out:
+        return {**out, "note": None, "ticket_draft": draft, "phase": "collect", "task": TASKS["retry_summary"]}
+    return _ask_or_confirm(state, out["ticket_draft"], first)
+
+
 def accept(state: ChatState) -> dict:
-    return {"ticket_draft": _new_draft(state), "phase": "collect",
-            "task": TASKS["accept"].format(issue=state["pending"][0].text)}
+    return _classified(state, _new_draft(state), first=True)
 
 
 def decline(state: ChatState) -> dict:
@@ -97,23 +116,27 @@ def decline(state: ChatState) -> dict:
 
 def details(state: ChatState) -> dict:
     draft = state["ticket_draft"]
-    rounds = draft.rounds + 1
-    key = "open_question" if rounds >= get_settings().collect_rounds else "details"
-    return {"ticket_draft": draft.model_copy(update={"rounds": rounds}),
-            "task": TASKS[key].format(issue=state["pending"][0].text)}
+    return _classified(state, draft.model_copy(update={"rounds": draft.rounds + 1}), first=False)
 
 
 def _nothing_missing(draft: TicketDraft) -> TicketDraft:
     """done means the customer has nothing more to give: what is still missing is what they don't know."""
-    return draft.model_copy(update={"unknown": list(dict.fromkeys([*draft.unknown, *draft.missing])), "missing": []})
+    required = {k: "unknown" if v is None else v for k, v in draft.required.items()}
+    return draft.model_copy(update={"unknown": list(dict.fromkeys([*draft.unknown, *draft.missing])), "missing": [],
+                                    "required": required})
 
 
 def done(state: ChatState) -> dict:
+    """When classify fails, a draft classified earlier is shown as it is; only a draft never classified asks again."""
     out = classifier.classify(state)
+    issue = state["pending"][0].text
     if "ticket_draft" in out:
         return {"ticket_draft": _nothing_missing(out["ticket_draft"]), "phase": "confirm",
-                "task": TASKS["confirm"].format(issue=state["pending"][0].text)}
-    return {**out, "task": TASKS["open_question"].format(issue=state["pending"][0].text)}
+                "task": TASKS["confirm"].format(issue=issue)}
+    if state["ticket_draft"].classified:
+        return {**out, "note": None, "ticket_draft": _nothing_missing(state["ticket_draft"]), "phase": "confirm",
+                "task": TASKS["confirm"].format(issue=issue)}
+    return {**out, "note": None, "task": TASKS["retry_summary"]}
 
 
 def change(state: ChatState) -> dict:
@@ -146,7 +169,8 @@ def submit(state: ChatState) -> dict:
     draft = state["ticket_draft"]
     ticket = {**ticket, "title": draft.title, "summary": draft.summary, "title_customer": draft.title_customer,
               "summary_customer": draft.summary_customer, "queue": draft.queue, "type": draft.type,
-              "subtype": draft.subtype, "priority": draft.priority, "collected": draft.collected,
+              "subtype": draft.subtype, "priority": draft.priority, "required": draft.required,
+              "collected": draft.collected,
               "unknown": draft.unknown, "collected_customer": draft.collected_customer,
               "unknown_customer": draft.unknown_customer,
               "attachments": [f["file_name"] for f in state["attachments"]], "message_index": len(state["messages"])}

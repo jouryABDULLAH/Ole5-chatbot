@@ -51,7 +51,8 @@ MEANINGS = {
     "accept": "agrees to the ticket the assistant just offered.",
     "decline": "turns the offer down.",
     "details": "answers the assistant's questions about the problem, including \"I don't know\" about something the "
-               "assistant asked, a file sent (a line \"[attached: name]\"), or more description.",
+               "assistant asked, a file sent (a line \"[attached: name]\"), or more description. A refusal to give "
+               "what was asked is an answer too (\"ما أبي أعطيك\", \"ما يهم\").",
     "done": "says there is nothing more to add, typically after the assistant asked whether there is anything else. "
             "A message that gives a last detail and says it is all they have is done. \"That's all I have\" and \"I "
             "don't know anything else\" are done.",
@@ -176,6 +177,8 @@ def classify(state: ChatState) -> str:
                    if catalog.has_reason_catalog else
                    "free text in English, up to 500 characters: a category, a dash, then a description.")
     scopes = f"## Team scopes\n\n{config.team_scopes}\n" if config.team_scopes else ""
+    kinds = "\n".join(f"  {kind}: {', '.join(items)}" for kind, items in config.required.items())
+    required = f"## Required for each kind of problem\n\n{kinds}\n" if kinds else ""
     return _fill("classify", product_name=config.name, reason_rule=reason_rule,
                  issue=pending[0].text if pending else "none", values=_values_block(catalog),
-                 team_scopes=scopes, schema=schema_text(Classification))
+                 required_kinds=required, team_scopes=scopes, schema=schema_text(Classification))

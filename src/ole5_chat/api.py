@@ -63,6 +63,7 @@ class CreatedTicket(BaseModel):
     type: str | None = None
     subtype: str | None = None
     priority: str | None = None
+    required: dict[str, str | None] = {}
     collected: dict[str, str] = {}
     unknown: list[str] = []
     collected_customer: dict[str, str] = {}
