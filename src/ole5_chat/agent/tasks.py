@@ -69,23 +69,25 @@ TASKS = {
               "first, from the ticket system, one per line as number, title, date, state:\n{tickets}\nAnswer what "
               "they asked first, in one line, in sentences, not as a list copied from above. Give the number, title "
               "and date only when the customer hasn't seen them in this chat already, or asked for them. If you "
-              "already gave this ticket's details in this chat, don't repeat them. States and what they mean for the "
-              "customer:\n{states}\nSay the meaning, and the state's name once if it helps.{hours} Titles stay as "
-              "written; your own words follow the customer's language. A state of unknown means the system didn't "
+              "already gave this ticket's details in this chat, don't repeat them. How tickets are handled, for "
+              "questions about the process:\n{process}\nAnswer process questions from this block only. Say a state's "
+              "meaning, and its name once if it helps. Titles stay as written; your own words follow the customer's language. A state of unknown means the system didn't "
               "return one: say the state isn't available right now, never the word unknown. If the customer asked "
               "about one ticket (the latest, a number, a title, a date), give that one only. If they didn't say which, "
               "give the 5 most recent, one line each, and say how many more there are. If they ask about a ticket not "
-              "in the list, say you have no record of it here. State nothing that isn't in the list or the hours: no "
-              "estimates, nothing about what the team is doing.",
+              "in the list, say you have no record of it here. State nothing that isn't in the list or the process "
+              "block: no estimates, nothing about what the team is doing.",
     "status_none": "The customer asked about their tickets. There are no tickets on their account from this chat. Say "
                    "so in one line, and that they can describe a problem here to get help or open one.{channel} Don't "
                    "ask whether to open a ticket.",
 }
 
-# The product's support hours and channel (chat.yaml), filled into the tasks above; left out when a product has none.
+# The product's support hours, channel and reply channel (chat.yaml), filled into the tasks above; left out when a
+# product has none.
 HOURS = {"created": " during the support hours: {}",
-         "status": " When they ask when the team will reply, give the support hours: {}."}
+         "status": "- Support hours, when the team replies: {}"}
 CHANNEL = " Say how support works: {}."
+REPLY_CHANNEL = "- Where the reply arrives: {}"
 
 # What each ticket state means for the customer: values.xlsx says only open or closed, so the gloss is written here.
 STATE_MEANINGS = {

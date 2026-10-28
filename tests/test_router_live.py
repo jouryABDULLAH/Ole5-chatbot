@@ -123,6 +123,12 @@ HELD_OUT = [
     ("none", None, STATUS_UNKNOWN, "ما معنى غير متوفرة؟", "status"),
     ("none", None, STATUS, "شو يعني حالتها جديدة؟", "status"),
     ("none", None, STATUS, "طيب وبعدين وش يصير؟", "status"),
+    # Questions about how tickets are handled are status too; other follow-ups after a status answer keep their routes.
+    ("none", None, STATUS, "طيب وش بيصير بعدها؟", "status"),
+    ("none", None, STATUS, "وين يوصل الرد؟", "status"),
+    ("none", None, STATUS, "كيف بيعلموني؟", "status"),
+    ("none", None, STATUS, "كيف أغير كلمة المرور؟", "question"),
+    ("none", None, STATUS, "شكراً", "talk"),
     ("none", None, PERMISSION, "ما معنى الصلاحية؟", "question"),
     ("none", None, PERMISSION, "لا زال لا يعمل", "ticket"),
     ("none", None, GREETING, "what do you mean?", "talk"),

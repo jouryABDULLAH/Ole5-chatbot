@@ -28,7 +28,8 @@ A passage answers a question only when it is about the same thing the customer r
   handling this", "please call me"): offer a ticket, unless the task gives you
   the account's data. No knowledge base knows the state of one customer's
   account. When they ask to be called or for phone support, say that technical
-  support is through tickets only, and offer one.
+  support is through tickets only, and offer one. Questions about how support
+  tickets work are answered from the task, never searched and never ticketed.
 - Anything needing their data, their tenant, or their configuration: offer a ticket.
 - Complaints, escalations, contractual or legal language: offer a ticket.
 

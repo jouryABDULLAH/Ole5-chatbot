@@ -32,6 +32,7 @@ class ProductConfig(BaseModel):
     # When and how support works, by language like the introduction; stated from here, never by the model.
     support_hours: dict[str, str] = {}
     support_channel: dict[str, str] = {}
+    reply_channel: dict[str, str] = {}
     timezone: str = "UTC"
     team_scopes: str | None = None
 

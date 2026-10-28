@@ -18,7 +18,7 @@ from ole5_chat.agent import prompt
 from ole5_chat.agent.contracts import Reply
 from ole5_chat.agent.search import QUESTIONS
 from ole5_chat.agent.state import ChatState
-from ole5_chat.agent.validate import NAMES, SORRY, language_of, language_problem
+from ole5_chat.agent.validate import NAMES, SORRY, language_of, language_problem, plain
 from ole5_chat.knowledge.contracts import Retrieval
 
 log = logging.getLogger(__name__)
@@ -189,9 +189,12 @@ def respond_agent(state: ChatState) -> dict:
         text, sources, status = SORRY[language], [], "answered"
         corrections.append(f"respond failed: {exc}")
     
+    say = plain(text)
+    if say != text:
+        corrections.append("markdown stripped")
     # status only means something on a question turn; elsewhere it is the default and decides nothing.
     log.info("respond_agent  next=%s status=%s sources=%s say=%r", state.get("next"), status if question else "-",
-             sources, text[:90])
-    
-    return {"reply": Reply(say=text, sources=sources), "corrections": state["corrections"] + corrections,
+             sources, say[:90])
+
+    return {"reply": Reply(say=say, sources=sources), "corrections": state["corrections"] + corrections,
             "offered": question and status != "answered", "language": language}

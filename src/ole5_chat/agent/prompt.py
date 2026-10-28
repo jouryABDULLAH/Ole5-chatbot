@@ -51,8 +51,10 @@ MEANINGS = {
               "not the tone.",
     "status": "the customer asks about their own tickets: status, whether one was received, its number; and, after a "
               "status answer, anything about that ticket or about what the answer said: whether it's resolved, when the "
-              "team replies, what a state or a word in the answer means (\"يعني ما انحلت؟\", \"ما معنى غير متوفرة؟\"). "
-              "Nothing here is in the knowledge base.",
+              "team replies, what a state or a word in the answer means (\"يعني ما انحلت؟\", \"ما معنى غير متوفرة؟\"), "
+              "or about how tickets are handled in general: what happens after a state, where and how the reply "
+              "arrives, how they'll be notified (\"وش بيصير بعدها؟\", \"وين يوصل الرد؟\"). Nothing here is in the "
+              "knowledge base.",
     "accept": "agrees to the ticket the assistant just offered.",
     "decline": "turns the offer down.",
     "details": "answers the assistant's questions about the problem, including \"I don't know\" about something the "

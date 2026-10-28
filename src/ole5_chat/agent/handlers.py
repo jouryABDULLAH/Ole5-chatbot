@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 from ole5_chat import products, values
 from ole5_chat.agent import classify as classifier
 from ole5_chat.agent.contracts import PendingIssue, Phase
-from ole5_chat.agent.tasks import CHANNEL, CURRENT, HOURS, QUEUED_URGENT, STATE_MEANINGS, TASKS, URGENT
+from ole5_chat.agent.tasks import CHANNEL, CURRENT, HOURS, QUEUED_URGENT, REPLY_CHANNEL, STATE_MEANINGS, TASKS, URGENT
 from ole5_chat.agent.state import ChatState, TicketDraft
 from ole5_chat.config import get_settings
 from ole5_chat.tickets import client as ticket_api
@@ -213,14 +213,17 @@ def status(state: ChatState) -> dict:
                       for t in recent)
     today = datetime.now(timezone.utc).date().isoformat()
     if found:
-        # Each state with what values.xlsx says (open or closed) and what it means for the customer.
-        states = "\n".join(
+        # How tickets are handled: the states in sheet order with what values.xlsx says (open or closed) and what each
+        # means for the customer, then where the reply arrives and the support hours from chat.yaml.
+        states = [
             f"- {o.value}: {o.description or ''}"
             + (f", {STATE_MEANINGS[o.value.casefold()]}" if o.value.casefold() in STATE_MEANINGS
                and (o.description or "").casefold() in ("open", "closed") else "")
-            for o in values.catalog(state["identity"].product).statuses)
-        task = TASKS["status"].format(tickets=lines, today=today, states=states,
-                                      hours=_support(state, "support_hours", HOURS["status"]))
+            for o in values.catalog(state["identity"].product).statuses]
+        process = "\n".join(line for line in ["The states, in the order a ticket moves through them:", *states,
+                                              _support(state, "reply_channel", REPLY_CHANNEL),
+                                              _support(state, "support_hours", HOURS["status"])] if line)
+        task = TASKS["status"].format(tickets=lines, today=today, process=process)
     else:
         task = TASKS["status_none"].format(channel=_support(state, "support_channel", CHANNEL))
     log.info("handlers  status tickets=%d phase=%s", len(found), phase)

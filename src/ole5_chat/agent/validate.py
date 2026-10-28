@@ -43,6 +43,12 @@ def language_problem(text: str, language: str) -> str | None:
             f"Write the same reply in {NAMES[language]}.")
 
 
+def plain(text: str) -> str:
+    """respond.md forbids markdown; the model still writes some. Bold, underline, backticks and leading # or - markers go."""
+    text = re.sub(r"\*\*|__|`", "", text)
+    return re.sub(r"(?m)^[ \t]*(#+|-)[ \t]+", "", text)
+
+
 def match(options: list[str], value: str | None) -> str | None:
     if not value or not value.strip():
         return None

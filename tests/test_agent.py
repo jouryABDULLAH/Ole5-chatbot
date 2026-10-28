@@ -302,10 +302,11 @@ def test_status_gives_every_ticket_newest_first_with_dates_only(new_path, monkey
     listed = [line.split(",")[0][2:] for line in prompt_text.splitlines() if line.startswith("- T-")]
     assert listed == ["T-6", "T-5", "T-4", "T-3", "T-2", "T-1"] and "- T-6, Archive button, 2026-10-06, open" in prompt_text
     assert "Today: " in prompt_text and "give the 5 most recent, one line each, and say how many more" in prompt_text
-    # What each state means comes from the code, and the hours from chat.yaml, never from the model.
-    assert "- New: open, received, not yet picked up by the team" in prompt_text
+    # How tickets are handled: the states in sheet order from the code, the reply channel and the hours from chat.yaml.
+    assert "The states, in the order a ticket moves through them:\n- New: open, received, not yet picked up by the team\n- Open: open, picked up by the team" in prompt_text
     assert "- closed successful: closed, resolved and closed" in prompt_text
-    assert "give the support hours: من الأحد إلى الخميس" in prompt_text  # in the customer's language
+    assert "- Where the reply arrives: يصل رد فريق الدعم إلى بريدك الإلكتروني المسجل" in prompt_text  # in the customer's language
+    assert "- Support hours, when the team replies: من الأحد إلى الخميس" in prompt_text
 
 
 def test_a_ticket_whose_state_cannot_be_read_shows_unknown(new_path, monkeypatch):
@@ -713,6 +714,20 @@ def test_new_path_same_unanswered_question_is_queued_once(new_path):
     unanswered(new_path, sid, "Does it run on Linux?")
     state, _ = unanswered(new_path, sid, "Does it run on Linux?")
     assert len(state["pending"]) == 1 and state["phase"] == "offer_ticket"
+
+
+def test_plain_strips_markdown_and_leaves_text_alone():
+    from ole5_chat.agent.validate import plain
+    assert plain("حالتها **جديدة** الآن.") == "حالتها جديدة الآن."
+    assert plain("# Steps\n- open `Settings`\n__done__") == "Steps\nopen Settings\ndone"
+    assert plain("1. Open Settings.\n2. Choose Watermark.") == "1. Open Settings.\n2. Choose Watermark."
+
+
+def test_a_reply_with_bold_is_stripped_and_logs_a_correction(new_path):
+    sid = chat()
+    state, _ = new_path(sid, "ايه", "talk", [AIMessage(content="حالتها **جديدة** الآن.")])
+    assert state["messages"][-1].text == "حالتها جديدة الآن."
+    assert "markdown stripped" in state["corrections"]
 
 
 def test_new_path_an_acknowledgement_is_never_queued(new_path):

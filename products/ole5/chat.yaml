@@ -29,6 +29,9 @@ support_hours:
 support_channel:
   ar: الدعم الفني عبر نظام التذاكر فقط، ولا يتوفر دعم هاتفي للاستفسارات التقنية
   en: Technical support is through the ticket system only; there is no phone support for technical questions
+reply_channel:
+  ar: يصل رد فريق الدعم إلى بريدك الإلكتروني المسجل
+  en: The support team's reply arrives at your registered email address
 timezone: Asia/Riyadh
 required:
   bug: [page, error text or screenshot]
