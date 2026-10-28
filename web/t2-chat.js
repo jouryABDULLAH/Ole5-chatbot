@@ -92,7 +92,7 @@
     .card.done h3 svg { width:16px; height:16px; flex:none; }
     .card h4 { margin:0; padding:10px 16px 0; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase;
                letter-spacing:.04em; }
-    .card dl { margin:0; padding:6px 16px; display:grid; grid-template-columns:auto 1fr; gap:6px 16px; font-size:14px; }
+    .card dl { margin:0; padding:6px 16px; display:grid; grid-template-columns:fit-content(50%) 1fr; gap:6px 16px; font-size:14px; }
     .card dt { color:var(--muted); }
     .card dd { margin:0; line-height:1.5; white-space:pre-line; overflow-wrap:anywhere; }
     .card dd.missing { color:var(--muted); font-style:italic; }
