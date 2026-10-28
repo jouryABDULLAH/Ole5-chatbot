@@ -14,6 +14,7 @@ DRAFT = dict(product="Ole5", queue="Ole5 Technical", type="Mobile App Issue", su
              reason="Issue - the app crashes on the Inbox screen", priority="Medium", title="App crashes on Inbox",
              summary="The mobile app crashes when the customer opens the Inbox screen.",
              collected={"screen": "Inbox"}, missing=[], classified=True, confidence="high",
+             required={"page": "Inbox", "error text or screenshot": "declined"},
              queue_reason="An app defect")
 
 
@@ -74,9 +75,10 @@ def test_submit_creates_the_ticket_as_the_spec_shows(api, writer):
     assert update["DynamicField"] == [{"Name": "SubType", "Value": "Application crash"},
                                       {"Name": "Conclusions", "Value": DRAFT["reason"]}]
     assert update["Article"]["IsVisibleForCustomer"] == 0
-    assert update["Article"]["Body"].splitlines()[:6] == [
-        "Collected: screen: Inbox", "Missing: nothing", "Customer does not know: nothing", "Confidence: high",
-        "Why this queue: An app defect", "Urgent: no"]
+    assert update["Article"]["Body"].splitlines()[:7] == [
+        "Required: page: Inbox; error text or screenshot: declined", "Collected: screen: Inbox",
+        "Missing: nothing", "Customer does not know: nothing", "Confidence: high", "Why this queue: An app defect",
+        "Urgent: no"]
     assert view["ticket_draft"] is None and not view["draft_ready"] and view["ticket_numbers"] == [number]
     card = view["created_tickets"][-1]
     assert (card["ticket_number"], card["title"], card["priority"]) == (number, DRAFT["title"], DRAFT["priority"])

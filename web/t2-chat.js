@@ -10,6 +10,7 @@
       summary: "Ticket summary", submit: "Submit ticket", submitting: "Submitting", submitted: "Ticket {number} submitted", submittedButton: "Submitted",
       fields: { queue: "Queue", type: "Type", subtype: "Subtype", priority: "Priority", title: "Title", summary: "Summary",
                 attachments: "Attachments", collected: "Collected", unknown: "Not given by the customer" },
+      ticketData: "Ticket data", requiredInfo: "Required information", notGiven: "Not given",
       notSet: "Not set", failed: "The message was not sent. Try again.",
       unreachable: "The chat service cannot be reached. Check that it is running, then try again.",
       restart: "Start a new chat",
@@ -26,6 +27,7 @@
       summary: "ملخص التذكرة", submit: "إرسال التذكرة", submitting: "جارٍ الإرسال", submitted: "تم إرسال التذكرة {number}", submittedButton: "تم الإرسال",
       fields: { queue: "القائمة", type: "النوع", subtype: "النوع الفرعي", priority: "الأولوية", title: "العنوان", summary: "الملخص",
                 attachments: "المرفقات", collected: "ما تم جمعه", unknown: "لم يحدده العميل" },
+      ticketData: "بيانات التذكرة", requiredInfo: "المعلومات المطلوبة", notGiven: "لم يُقدَّم",
       notSet: "غير محدد", failed: "لم تُرسل الرسالة. حاول مرة أخرى.",
       unreachable: "تعذّر الوصول إلى خدمة المحادثة. تأكد من تشغيلها ثم حاول مرة أخرى.",
       restart: "بدء محادثة جديدة",
@@ -88,6 +90,8 @@
     .card.done { background:var(--paper); color:var(--muted); }
     .card.done h3 { display:flex; align-items:center; gap:8px; color:var(--accent); }
     .card.done h3 svg { width:16px; height:16px; flex:none; }
+    .card h4 { margin:0; padding:10px 16px 0; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase;
+               letter-spacing:.04em; }
     .card dl { margin:0; padding:6px 16px; display:grid; grid-template-columns:auto 1fr; gap:6px 16px; font-size:14px; }
     .card dt { color:var(--muted); }
     .card dd { margin:0; line-height:1.5; white-space:pre-line; overflow-wrap:anywhere; }
@@ -305,6 +309,14 @@
                     el("dd", { class: value ? null : "missing", dir: "auto" }, value || this.t.notSet));
       }
       if (files.length) rows.append(el("dt", {}, this.t.fields.attachments), el("dd", { dir: "auto" }, files.join("\n")));
+      // The information the ticket needs from the customer, one row per item: the value, or "not given" when it is
+      // null, unknown or declined.
+      const required = el("dl");
+      for (const [item, value] of Object.entries(fields.required || {})) {
+        const given = value && value !== "unknown" && value !== "declined";
+        required.append(el("dt", { dir: "auto" }, item),
+                        el("dd", { class: given ? null : "missing", dir: "auto" }, given ? value : this.t.notGiven));
+      }
       // What the customer gave for the ticket, one line each, and what they said they don't have. (missing is empty
       // on the card: when the customer is done, what was still missing becomes unknown.)
       const items = Object.entries(Object.keys(fields.collected_customer || {}).length ? fields.collected_customer
@@ -314,14 +326,16 @@
       const unknown = (fields.unknown_customer || []).length ? fields.unknown_customer : (fields.unknown || []);
       if (unknown.length) rows.append(el("dt", {}, this.t.fields.unknown),
                                       el("dd", { class: "missing", dir: "auto" }, unknown.join("\n")));
+      const sections = [el("h4", {}, this.t.ticketData), rows];
+      if (required.childElementCount) sections.push(el("h4", {}, this.t.requiredInfo), required);
       if (submitted) {
         return el("div", { class: "card done" },
                   el("h3", {}, el("span", { html: ICON_CHECK }), this.t.submitted.replace("{number}", submitted.ticket_number)),
-                  rows,
+                  ...sections,
                   el("div", { class: "actions" },
                      el("button", { class: "primary", type: "button", disabled: true }, this.t.submittedButton)));
       }
-      return el("div", { class: "card" }, el("h3", {}, this.t.summary), rows,
+      return el("div", { class: "card" }, el("h3", {}, this.t.summary), ...sections,
         el("div", { class: "actions" },
            el("button", { class: "primary", type: "button", disabled: this.busy, onclick: () => this.submitTicket() },
               this.busy ? this.t.submitting : this.t.submit)));

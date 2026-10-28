@@ -848,7 +848,8 @@ def test_yes_creates_the_ticket(new_path):
     assert (created["collected_customer"], created["unknown_customer"]) == ({"الشاشة": "الوارد"}, ["نسخة التطبيق"])
     (_, create), (_, update) = ticket_api.ticket_client().calls[-2:]
     assert (create["Ticket"]["Title"], create["Ticket"]["Queue"]) == ("App crash", "Ole5 Technical")
-    assert update["Article"]["Body"].startswith("Collected: screen: Inbox\n")
+    assert update["Article"]["Body"].startswith(
+        "Required: page: Inbox; error text or screenshot: unknown\nCollected: screen: Inbox\n")
     assert f"The ticket {number} was created." in prompt_text and "This needs the support team" not in prompt_text
 
 

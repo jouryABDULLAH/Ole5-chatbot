@@ -25,9 +25,10 @@ def conversation_text(messages: list[BaseMessage]) -> str:
 
 
 def internal_note(draft, corrections: list[str], files: list[dict] = ()) -> str:
+    required = "; ".join(f"{k}: {v or 'not given'}" for k, v in draft.required.items()) or "nothing"
     collected = "; ".join(f"{k}: {v}" for k, v in draft.collected.items()) or "nothing"
     urgent = f"yes, {draft.urgent_reason}" if draft.urgent else "no"
-    lines = [f"Collected: {collected}", f"Missing: {'; '.join(draft.missing) or 'nothing'}",
+    lines = [f"Required: {required}", f"Collected: {collected}", f"Missing: {'; '.join(draft.missing) or 'nothing'}",
              f"Customer does not know: {'; '.join(draft.unknown) or 'nothing'}",
              f"Confidence: {draft.confidence or 'not set'}", f"Why this queue: {draft.queue_reason or 'not given'}",
              f"Urgent: {urgent}"]
