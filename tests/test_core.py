@@ -76,8 +76,8 @@ def test_tasks_render_without_the_support_sentences_when_a_product_has_none(monk
     monkeypatch.setattr(products, "load", lambda code: bare)
     state = {"identity": SimpleNamespace(product="OLE5", language="en"), "language": "en"}
     channel = handlers._support(state, "support_channel", handlers.CHANNEL)
-    declined = handlers.TASKS["declined"].format(channel=channel)
-    assert channel == "" and declined.endswith("cancelled or closed.")
+    none = handlers.TASKS["status_none"].format(channel=channel)
+    assert channel == "" and "Say how support works" not in none
 
 
 def test_ticket_row_is_appended():

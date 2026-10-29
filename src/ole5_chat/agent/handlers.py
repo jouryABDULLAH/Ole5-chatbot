@@ -119,8 +119,7 @@ def accept(state: ChatState) -> dict:
 
 def decline(state: ChatState) -> dict:
     update, fragment = next_issue(state, state["pending"][1:])
-    declined = TASKS["declined"].format(channel=_support(state, "support_channel", CHANNEL))
-    return {**update, "task": _then(declined, fragment)}
+    return {**update, "task": _then(TASKS["declined"], fragment)}
 
 
 def details(state: ChatState) -> dict:
@@ -162,8 +161,7 @@ def change(state: ChatState) -> dict:
 
 def cancel(state: ChatState) -> dict:
     update, fragment = next_issue({**state, "ticket_draft": None}, state["pending"][1:])
-    cancelled = TASKS["cancelled"].format(channel=_support(state, "support_channel", CHANNEL))
-    return {"ticket_draft": None, **update, "task": _then(cancelled, fragment)}
+    return {"ticket_draft": None, **update, "task": _then(TASKS["cancelled"], fragment)}
 
 
 def submit(state: ChatState) -> dict:

@@ -45,7 +45,7 @@ TASKS = {
               "has been created yet; the ticket is created only when they submit the summary. Don't say a ticket is "
               "opened, created or being opened.",
     "declined": "The customer said no to opening a ticket; none was opened. Acknowledge it in one line without saying "
-                "a ticket was cancelled or closed.{channel}",
+                "a ticket was cancelled or closed.",
     "urgent_ready": "This is urgent, so the ticket was prepared right away without the usual questions: {issue}. The "
                     "summary is shown with a Submit button. Nothing has been created yet. Say in one line that because "
                     "it is urgent the summary is ready now, and ask whether to submit the ticket for: {issue}. Don't "
@@ -74,7 +74,7 @@ TASKS = {
                "and ask whether to submit the ticket for: {issue}.",
     "created": "The ticket {number} was created on {created_at}. Tell the customer its number and the date and time it "
                "was created, and that the support team will reply by email{hours}. Nothing more about this ticket.",
-    "cancelled": "The customer cancelled the ticket. Acknowledge it in one line.{channel}",
+    "cancelled": "The customer cancelled the ticket. Acknowledge it in one line.",
     "status": "The customer asked about their tickets. Today: {today}. These are the tickets on their account, newest "
               "first, from the ticket system, one per line as number, title, date, state:\n{tickets}\nAnswer what "
               "they asked first, in one line, in sentences, not as a list copied from above. Give the number, title "
@@ -93,7 +93,7 @@ TASKS = {
 }
 
 # The product's support hours, channel and reply channel (chat.yaml), filled into the tasks above; left out when a
-# product has none.
+# product has none. The channel is said only where the customer asked about contact: status_none and the "call me" rule.
 HOURS = {"created": " during the support hours: {}",
          "status": "- Support hours, when the team replies: {}"}
 CHANNEL = " Say how support works: {}."

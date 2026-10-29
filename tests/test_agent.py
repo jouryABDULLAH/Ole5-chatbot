@@ -685,7 +685,7 @@ def test_new_path_decline_with_one_issue_empties_pending(new_path):
     state, prompt_text = new_path(sid, "لا شكراً", "decline", [AIMessage(content="تمام، تقدر تتواصل معنا في أي وقت.")])
     assert (state["phase"], state["pending"]) == ("none", [])
     assert "none was opened. Acknowledge it in one line without saying a ticket was cancelled" in prompt_text
-    assert "Say how support works: " in prompt_text and "at any time" not in prompt_text
+    assert "Say how support works" not in prompt_text and "at any time" not in prompt_text
 
 
 def test_new_path_decline_with_two_issues_offers_the_next(new_path):
@@ -926,7 +926,7 @@ def test_cancel_drops_the_draft_and_the_issue(new_path, where):
     state, prompt_text = new_path(sid, "cancel it", "cancel", [AIMessage(content="Cancelled.")])
     assert (state["ticket_draft"], state["pending"], state["phase"]) == (None, [], "none")
     assert "The customer cancelled the ticket." in prompt_text
-    assert "Say how support works: Technical support is through the ticket system only" in prompt_text
+    assert "Say how support works" not in prompt_text
 
 
 def test_submit_button_skips_the_router(new_path, model):
