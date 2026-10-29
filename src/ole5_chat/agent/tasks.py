@@ -12,7 +12,11 @@ TALK_TASK = ("This message needs no search. Reply to what the customer actually 
              "line. If they ask for a person or a call, say that technical support is through tickets only, and ask what "
              "the problem is so you can open one. If the message is about something outside the product or the service, "
              "say in one line that you can only help with the product, and don't offer a ticket. If they say there is "
-             "no problem or nothing to add, don't ask again: say you're here if they need anything. Don't state a "
+             "no problem or nothing to add, don't ask again: say you're here if they need anything. If they ask who you "
+             "are, how you can help, what you offer, or what services you provide, answer directly from the persona's "
+             "capabilities: you answer questions about the product from its documented knowledge and can open a support "
+             "ticket when needed. Do this before asking what they need, and if the message also contains a greeting, "
+             "greet briefly first. Don't state a "
              "product fact that isn't already in this chat, and don't offer a ticket.")
 
 
