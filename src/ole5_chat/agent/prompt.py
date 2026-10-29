@@ -38,8 +38,11 @@ MEANINGS = {
                 "possible, that it doesn't work; including a follow-up to an earlier answer about the product, but not a "
                 "follow-up about their ticket, and not a report that an answer didn't help. A "
                 "request to open a ticket that names a topic is a question too: the assistant searches first and "
-                "offers a ticket only when it has no answer.",
+                "offers a ticket only when it has no answer. Basic company/provider identity questions (name, website, "
+                "who develops the product) are talk instead.",
     "talk": "nothing to look up: a greeting, thanks, a question about the assistant itself (who it is, what it can do), "
+            "a basic company/provider identity question (its name, website, who develops the product), even when "
+            "the About information is unavailable. This exception does not cover contracts, policies or complaints. "
             "an acknowledgement with nothing open to agree to, a side remark, a request to repeat what the assistant "
             "just said, a question about why the assistant said or did something (\"why?\", \"what do you mean?\" "
             "about the assistant's own words, not about a ticket's status), a request to open a ticket, or a report of "
@@ -49,7 +52,7 @@ MEANINGS = {
             "or a screen named with no question or symptom about it (\"الأرشفة\", \"كلمة المرور\"), or a message not "
             "about the product at all (weather, general knowledge, another system). Once a message asks or reports "
             "something about what it "
-            "names in the product, it is a question, however short.",
+            "names in the product, it is a question, however short, except for basic company/provider identity questions.",
         
     "ticket": "the message reports a topic from this list: {always_ticket}. Or, after the assistant answered, it says the "
               "steps the assistant gave didn't help (\"لا زال لا يعمل\", \"العطل مستمر\").",
@@ -149,6 +152,9 @@ def _persona(config: products.ProductConfig, language: str) -> str:
     lines += [f"- {g}" for g in p.greetings]
     lines += ["", "Questions and problems:"] + [f"- {q}" for q in p.questions]
     lines += ["", "Voice:"] + [f"- {v}" for v in p.voice]
+    about = config.about.get(language) or config.about.get("en")
+    if about:
+        lines += ["", "About: " + about]
     return "\n".join(lines)
 
 
@@ -195,4 +201,6 @@ def classify(state: ChatState) -> str:
     required = f"## Required for each kind of problem\n\n{kinds}\n" if kinds else ""
     return _fill("classify", product_name=config.name, reason_rule=reason_rule,
                  issue=pending[0].text if pending else "none", values=_values_block(catalog),
+                 current_draft=state["ticket_draft"].model_dump_json() if state.get("ticket_draft") else "none",
+                 other_issues="\n".join(p.text for p in pending[1:]) or "none",
                  required_kinds=required, team_scopes=scopes, schema=schema_text(Classification))

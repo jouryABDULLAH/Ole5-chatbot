@@ -716,6 +716,71 @@ def test_new_path_same_unanswered_question_is_queued_once(new_path):
     assert len(state["pending"]) == 1 and state["phase"] == "offer_ticket"
 
 
+@pytest.mark.parametrize("phase", ["offer_ticket", "collect", "confirm"])
+@pytest.mark.parametrize("coverage", ["miss", "partial", "no_answer", "ungrounded"])
+def test_unanswered_side_question_instructions_keep_the_active_issue(new_path, monkeypatch, phase, coverage):
+    from ole5_chat.agent.respond import Answer
+
+    sid = chat()
+    active = "The app crashes on Inbox"
+    unanswered(new_path, sid, active)
+    if phase != "offer_ticket":
+        new_path(sid, "yes", "accept", [AIMessage(content="Preparing the app crash ticket.")],
+                 groundings=[GOOD if phase == "collect" else COMPLETE])
+    captured = []
+    structured = llm.structured
+
+    def record(system, messages, schema, **kwargs):
+        if schema is Answer:
+            captured.append(messages[-1].text)
+        return structured(system, messages, schema, **kwargs)
+
+    monkeypatch.setattr(llm, "structured", record)
+    side = "Can I export to Excel?"
+    reply = "The export question will wait. Continue the app crash ticket?"
+    if coverage == "miss":
+        state, _ = new_path(sid, side, "question", [searching(side), DONE, AIMessage(content=reply)], [miss()])
+    elif coverage == "ungrounded":
+        outputs = answer("answered", "Unsupported answer.", ["Guide"], ["Unsupported answer."]) * 2
+        state, _ = new_path(sid, side, "question", [searching(side), DONE, AIMessage(content=reply)],
+                            [hit("Guide")], outputs)
+    else:
+        state, _ = new_path(sid, side, "question", [searching(side), DONE], [hit("Guide")],
+                            answer(coverage, reply, ["Guide"]))
+    instruction = sent(llm.tool_client)[-1].text if coverage in ("miss", "ungrounded") else captured[-1]
+    assert f"Active ticket issue: {active}." in instruction
+    assert "Do not offer a separate ticket for it now" in instruction
+    assert {"offer_ticket": "Ask whether to open", "collect": "outstanding detail",
+            "confirm": "ask whether to submit"}[phase] in instruction
+    assert state["phase"] == phase
+    assert [p.text for p in state["pending"]] == [active, side]
+
+
+def test_two_unanswered_issues_accept_edit_cancel_preserves_issue_boundaries(new_path, model):
+    sid = chat()
+    active, waiting = "The app crashes on Inbox", "Can I export to Excel?"
+    unanswered(new_path, sid, active)
+    unanswered(new_path, sid, waiting)
+    state, _ = new_path(sid, "yes", "accept", [AIMessage(content="Submit the app crash ticket?")],
+                        groundings=[COMPLETE])
+    draft = state["ticket_draft"].model_dump_json()
+    state, _ = new_path(sid, "Change the priority to High", "change",
+                        [AIMessage(content="Priority updated. Submit the app crash ticket?")],
+                        groundings=[COMPLETE.model_copy(update={"priority": "High"})])
+    classify_prompt = [text for schema, text in model.calls if schema is Classification][-1]
+    assert f"The issue this ticket is for: {active}." in classify_prompt
+    assert f"Current draft for this issue: {draft}" in classify_prompt
+    assert f"Other queued issues (do not merge their details into this ticket):\n{waiting}" in classify_prompt
+    assert "does not switch the active issue" in classify_prompt
+    assert state["ticket_draft"].priority == "High"
+    assert [p.text for p in state["pending"]] == [active, waiting]
+    state, task = new_path(sid, "cancel", "cancel", [AIMessage(content="Preparation cancelled. Ticket for export?")])
+    assert state["ticket_draft"] is None and state["phase"] == "offer_ticket"
+    assert [p.text for p in state["pending"]] == [waiting]
+    assert f"This needs the support team: {waiting}" in task
+    assert state["created_tickets"] == []
+
+
 def test_plain_strips_markdown_and_leaves_text_alone():
     from ole5_chat.agent.validate import plain
     assert plain("حالتها **جديدة** الآن.") == "حالتها جديدة الآن."

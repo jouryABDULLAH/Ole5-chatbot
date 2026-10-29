@@ -33,6 +33,7 @@ class ProductConfig(BaseModel):
     required: dict[str, list[str]] = {}
     # When and how support works, by language like the introduction; stated from here, never by the model.
     support_hours: dict[str, str] = {}
+    about: dict[str, str] = {}
     support_channel: dict[str, str] = {}
     reply_channel: dict[str, str] = {}
     timezone: str = "UTC"

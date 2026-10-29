@@ -18,8 +18,10 @@ TALK_TASK = ("This message needs no search. Reply to what the customer actually 
              "are, how you can help, what you offer, or what services you provide, answer directly from the persona's "
              "capabilities: you answer questions about the product from its documented knowledge and can open a support "
              "ticket when needed. Do this before asking what they need, and if the message also contains a greeting, "
-             "greet briefly first. Don't state a "
-             "product fact that isn't already in this chat, and don't offer a ticket.")
+             "greet briefly first. For basic company/provider identity questions (name, website, who develops the "
+             "product), answer only the requested facts from the configured About text, even if they have not appeared "
+             "in the conversation. If the information is absent, say it is unavailable here; do not guess or offer a "
+             "ticket. Don't state other product facts that aren't already in this chat, and don't offer a ticket.")
 
 
 # What respond_agent is asked to do this turn, set by the handler. {issue} is pending[0].text, {new} the issue just queued.
@@ -28,7 +30,9 @@ TASKS = {
     "talk": TALK_TASK,
     "chat_offer_ticket": "Answer the customer's message as usual. A ticket offer for this issue is still open: {issue}. "
                          "If you answered something else, end by asking whether they would still like that ticket "
-                         "opened. Example: the customer asks how to reset their password while a ticket offer for "
+                         "opened, explicitly naming that issue. If the new question is unanswered, say its unresolved "
+                         "part will wait behind this issue; do not offer a second ticket now. Example: the customer "
+                         "asks how to reset their password while a ticket offer for "
                          "'dark mode' is open. Reply with the password steps, then: 'Would you still like me to open "
                          "the ticket about dark mode?'",
     "chat_ticket": "Answer the customer's message as usual. Then continue the current ticket: {current}",

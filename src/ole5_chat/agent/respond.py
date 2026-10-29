@@ -88,9 +88,28 @@ def _write(convo: list[BaseMessage], language: str, corrections: list[str]) -> s
     return text
 
 
-def _no_answer(convo: list[BaseMessage], language: str, corrections: list[str]) -> str:
+def _ticket_context(state: ChatState) -> str:
+    """Keep answer-coverage instructions from replacing an existing ticket offer."""
+    pending = state.get("pending") or []
+    if state["phase"] == "none" or not pending:
+        return ""
+    action = {
+        "offer_ticket": "Ask whether to open a ticket for this active issue, explicitly naming it.",
+        "collect": "Continue asking for the outstanding detail about this active issue.",
+        "confirm": "Keep the current summary and ask whether to submit this active issue, explicitly naming it.",
+    }[state["phase"]]
+    return (f"Active ticket issue: {pending[0].text}. "
+            "If the latest question is a different issue and is unanswered or partially answered, explain that its "
+            "unresolved part will wait behind the active issue. Do not offer a separate ticket for it now. "
+            "If it is the same issue, do not describe it as a new queued issue. " + action)
+
+
+def _no_answer(convo: list[BaseMessage], language: str, corrections: list[str],
+               ticket_context: str = "") -> str:
     """The persona's own no-answer wording, in the customer's language."""
-    convo.append(HumanMessage(content=NOTE + "You have no answer for this. Say so and offer a ticket."))
+    instruction = ("You have no answer for this. Say so. " + ticket_context if ticket_context else
+                   "You have no answer for this. Say so and offer a ticket.")
+    convo.append(HumanMessage(content=NOTE + instruction))
     return _write(convo, language, corrections)
 
 
@@ -102,14 +121,18 @@ def _ground(exchange: str, text: str, retrieval: Retrieval) -> Grounding:
 
 
 def _answer(convo, retrieval: Retrieval, exchange: str, language: str,
-            corrections: list[str]) -> tuple[str, list[str], str]:
+            corrections: list[str], ticket_context: str = "") -> tuple[str, list[str], str]:
     """The reply from DIRECT passages, with its status and the sources it names, kept only if they are DIRECT titles.
 
     A reply that states what no passage says is written once more. If it still does, it becomes the no-answer
     wording. A reply that names no source is kept: it may be a clarifying question. Called only when last_retrieval
     has DIRECT passages."""
     direct = list(dict.fromkeys(e.document for e in retrieval.direct))
-    rule = HumanMessage(content=NOTE + STATUS.format(schema=llm.schema_text(Answer)))
+    status_rule = STATUS.format(schema=llm.schema_text(Answer))
+    if ticket_context:
+        status_rule += ("\nFor this active-ticket turn, partial and no_answer describe answer coverage, not a new "
+                        "ticket offer. These instructions override the ticket-offer wording above: " + ticket_context)
+    rule = HumanMessage(content=NOTE + status_rule)
     for attempt in (1, 2):
         try:
             answer = llm.structured(convo[0].content, [*convo[1:], rule], Answer, node="respond",
@@ -137,7 +160,7 @@ def _answer(convo, retrieval: Retrieval, exchange: str, language: str,
             convo.append(HumanMessage(content=NOTE + UNSUPPORTED.format("; ".join(grounding.unsupported))))
             corrections.append("retried: unsupported")
     corrections.append("reply not grounded")
-    return _no_answer(convo, language, corrections), [], "no_answer"
+    return _no_answer(convo, language, corrections, ticket_context), [], "no_answer"
 
 
 # The respond node.
@@ -171,17 +194,19 @@ def respond_agent(state: ChatState) -> dict:
     customer = next((m.text for m in reversed(state["messages"]) if m.type == "human"), "")
     language = language_of(customer) or state["identity"].language
     convo = _convo(state, language, retrieval)
+    ticket_context = _ticket_context(state)
     corrections: list[str] = []
     sources, status = [], "answered"
     try:
         if retrieval and retrieval.direct:
-            text, sources, status = _answer(convo, retrieval, _exchange(state["messages"]), language, corrections)
+            text, sources, status = _answer(convo, retrieval, _exchange(state["messages"]), language, corrections,
+                                            ticket_context)
         elif question and retrieval and retrieval.error:
             text = SORRY[language]
             corrections.append("search failed")
         elif question:
             corrections.append("no DIRECT passage")
-            text, status = _no_answer(convo, language, corrections), "no_answer"
+            text, status = _no_answer(convo, language, corrections, ticket_context), "no_answer"
         else:
             text = _write(convo, language, corrections)
     except llm.ModelFailed as exc:
