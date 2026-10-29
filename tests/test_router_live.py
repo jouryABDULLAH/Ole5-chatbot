@@ -140,6 +140,11 @@ HELD_OUT = [
     ("none", None, GREETING, "كيف الأرشفة؟", "question"),
     ("none", None, GREETING, "الأرشفة ما تشتغل", "question"),
     ("none", None, GREETING, "متى تمطر في اسبانيا", "talk"),
+    # Near misses: another system or a general problem, judged against the product's scope. The archiving one is a
+    # known miss: an archiving question reads as being about an archiving system.
+    ("none", None, GREETING, "الواي فاي عندي ضعيف وش الحل؟", "talk"),
+    ("none", None, GREETING, "كيف أرسل إيميل من الأوتلوك؟", "talk"),
+    ("none", None, GREETING, "وش أفضل برنامج أرشفة؟", "talk"),
 ]
 
 

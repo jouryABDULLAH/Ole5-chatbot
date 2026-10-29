@@ -54,7 +54,7 @@ MEANINGS = {
     "ticket": "the message reports a topic from this list: {always_ticket}. Or, after the assistant answered, it says the "
               "steps the assistant gave didn't help (\"لا زال لا يعمل\", \"العطل مستمر\").",
     "urgent": "the message describes a situation from this list: {urgent_when}. Judge it from the impact described, "
-              "not the tone.",
+              "not the tone. One person reporting it is not urgent unless they say it affects others.",
     "status": "the customer asks about their own tickets: status, whether one was received, its number; and, after a "
               "status answer, anything about that ticket or about what the answer said: whether it's resolved, when the "
               "team replies, what a state or a word in the answer means (\"يعني ما انحلت؟\", \"ما معنى غير متوفرة؟\"), "
@@ -130,7 +130,7 @@ def router(state: ChatState) -> str:
     phase = state["phase"]
     pending = state.get("pending") or []
     last = next((m.text for m in reversed(state["messages"]) if m.type == "ai"), "none")
-    return _fill("router", product_name=config.name, phase_description=PHASES[phase],
+    return _fill("router", product_name=config.name, scope=config.scope, phase_description=PHASES[phase],
                  issue=pending[0].text if pending else "none", last_assistant=last,
                  options="\n\n".join(_option(config, phase, o) for o in OPTIONS[phase]),
                  schema=schema_text(route_schema(phase)))
@@ -144,7 +144,8 @@ def _persona(config: products.ProductConfig, language: str) -> str:
     p = config.persona
     who = f"{p.name}, " if p.name else ""
     lines = [f"You are {who}{p.identity}. You introduced yourself at the start of this chat with: "
-             f"\"{p.introduction.get(language) or p.introduction['en']}\"", "", "Greetings:"]
+             f"\"{p.introduction.get(language) or p.introduction['en']}\"", *([config.scope] if config.scope else []),
+             "", "Greetings:"]
     lines += [f"- {g}" for g in p.greetings]
     lines += ["", "Questions and problems:"] + [f"- {q}" for q in p.questions]
     lines += ["", "Voice:"] + [f"- {v}" for v in p.voice]

@@ -24,6 +24,8 @@ class ProductConfig(BaseModel):
 
     code: str
     name: str
+    # What the product is and what the assistant helps with: the router and the persona judge messages against it.
+    scope: str = ""
     persona: Persona
     always_ticket: list[str] = []
     urgent_when: list[str] = []
