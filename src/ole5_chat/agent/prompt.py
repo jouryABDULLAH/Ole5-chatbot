@@ -46,8 +46,9 @@ MEANINGS = {
             "a problem, that names no symptom and no feature, so there is nothing to search for yet (\"عندي مشكلة\", "
             "\"افتح لي تذكرة\", \"I need help\"), text that makes no sense as a message (garbled, fragments, a stray "
             "word), a request for a person, an employee, or to be called, without saying what the problem is, a feature "
-            "or a screen named with no question or symptom about it (\"الأرشفة\", \"كلمة المرور\"), or a message about "
-            "something outside the product or the service. Once a message asks or reports something about what it "
+            "or a screen named with no question or symptom about it (\"الأرشفة\", \"كلمة المرور\"), or a message not "
+            "about the product at all (weather, general knowledge, another system). Once a message asks or reports "
+            "something about what it "
             "names in the product, it is a question, however short.",
         
     "ticket": "the message reports a topic from this list: {always_ticket}. Or, after the assistant answered, it says the "
