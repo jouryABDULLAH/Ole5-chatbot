@@ -52,6 +52,7 @@ Allowed actions for this context ({context}):
 
 Rules:
 - Choose only one allowed action. Do not choose an action from another pending context.
+- Customer account details, user records, permissions, and other customer-specific information outside ticket data are out of scope. Never search for or infer them; prepare or offer a support ticket instead.
 - Match the issue before judging urgency. A distinct new issue belongs in separate_issue; impact about the active issue belongs in update_impact.
 - “I don't know” or refusal to provide the requested detail is skip_detail. A question such as “why do you need it?” or an unrelated message is not_an_answer.
 - Agreement after an offer is accept. Agreement after a displayed summary is submit only when summary_shown and submission_requested are true and the immediately preceding assistant message requested submission. A pending label alone is not consent.

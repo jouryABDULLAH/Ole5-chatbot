@@ -35,7 +35,9 @@ def make_search_tool(product: str, sink: list[Retrieval]):
         """
         result = search(question, product)
         sink.append(result)
-        log.info("search_knowledge_base  query=%r verdict=%s evidence=%s error=%s", question,
+        log_method = log.error if result.error else log.info
+        error_label = "ERROR " if result.error else ""
+        log_method("%ssearch_knowledge_base  query=%r verdict=%s evidence=%s error=%s", error_label, question,
                  result.verdict.value if result.verdict else None,
                  [(e.document, e.section, e.relation) for e in result.evidence],
                  (result.error or None) and result.error[:300])

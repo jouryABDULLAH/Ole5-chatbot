@@ -239,7 +239,7 @@ def _submit(state: AgentState, issue: dict) -> dict:
         log.info("ticket_manager_v2  submit issue=%s", issue.get("id"))
         created, corrections = tickets.submit(legacy, ticket_api.ticket_client())
     except (tickets.SubmitRefused, TicketApiError) as exc:
-        log.warning("ticket_manager_v2 submission failed: %s", exc)
+        log.error("ERROR ticket_manager_v2 submission failed: %s", exc)
         return _response(
             "The ticket could not be created. Tell the customer that submission failed and ask them to try again.",
             ticket_result={"submission_requested": True, "submission_succeeded": False, "error": str(exc)},
@@ -250,9 +250,28 @@ def _submit(state: AgentState, issue: dict) -> dict:
     queued = list(state.get("pending_issues", []))
     next_state = _activate_next(state, queued)
     log.info("ticket_manager_v2  submitted ticket=%s queued=%d", created.get("ticket_number"), len(queued))
+    card = {
+        **created,
+        "title": draft.title,
+        "summary": draft.summary,
+        "title_customer": draft.title_customer,
+        "summary_customer": draft.summary_customer,
+        "queue": draft.queue,
+        "type": draft.type,
+        "subtype": draft.subtype,
+        "priority": draft.priority,
+        "required": draft.required,
+        "collected": draft.collected,
+        "unknown": draft.unknown,
+        "collected_customer": draft.collected_customer,
+        "unknown_customer": draft.unknown_customer,
+        "attachments": [f["file_name"] for f in state.get("attachments", [])],
+        # The next assistant message announces this ticket and is appended at this index.
+        "message_index": len(state.get("messages", [])),
+    }
     return {
         **next_state,
-        "created_tickets": [*state.get("created_tickets", []), {**created, "issue_id": issue["id"]}],
+        "created_tickets": [*state.get("created_tickets", []), card],
         "attachments": [],
         "ticket_result": {
             "submission_requested": True,
@@ -282,14 +301,19 @@ def ticket_manager_node(state: AgentState) -> dict:
                 },
             }
     else:
-        schema = manager_schema(context)
-        try:
-            decision = llm.structured(manager_prompt(state, context), list(state.get("messages", [])), schema, node="ticket_manager_v2")
-            action, reason = decision.action, decision.reason
-        except llm.ModelFailed as exc:
-            log.warning("ticket_manager_v2 model failed: %s", exc)
-            action = "not_an_answer" if context == "detail" else "clarify"
-            reason = "Ticket Manager could not safely interpret the message."
+        scope_routed = "outside the chat scope" in (state.get("route_reason") or "")
+        if scope_routed:
+            action = "register_issue" if context == "none" else "separate_issue"
+            reason = "Customer-specific account or user data must go to ticket handling."
+        else:
+            schema = manager_schema(context)
+            try:
+                decision = llm.structured(manager_prompt(state, context), list(state.get("messages", [])), schema, node="ticket_manager_v2")
+                action, reason = decision.action, decision.reason
+            except llm.ModelFailed as exc:
+                log.error("ERROR ticket_manager_v2 model call failed: %s", exc)
+                action = "not_an_answer" if context == "detail" else "clarify"
+                reason = "Ticket Manager could not safely interpret the message."
     if context == "none":
         update = _apply_none(state, action)
     elif context == "offer":

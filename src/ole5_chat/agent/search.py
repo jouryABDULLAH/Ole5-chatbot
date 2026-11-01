@@ -8,6 +8,7 @@ from langchain_core.messages import SystemMessage
 
 from ole5_chat import llm
 from ole5_chat.agent import prompt
+from ole5_chat.agent.router import is_user_specific_request
 from ole5_chat.agent.state import ChatState
 from ole5_chat.config import get_settings
 from ole5_chat.knowledge.contracts import Retrieval, Verdict, merge
@@ -22,6 +23,10 @@ QUESTIONS = ("question",)
 def search(state: ChatState) -> dict:
     if state.get("next") not in QUESTIONS:
         return {}
+    latest = next((message.text for message in reversed(state.get("messages", [])) if message.type == "human"), "")
+    if is_user_specific_request(latest):
+        log.info("search  skipped: customer-specific data is outside chat scope")
+        return {"last_retrieval": None}
     sink: list[Retrieval] = []
     tool = make_search_tool(state["identity"].product, sink)
     convo = [SystemMessage(content=prompt.search(state)), *state["messages"]]
@@ -31,7 +36,7 @@ def search(state: ChatState) -> dict:
         try:
             reply = llm.invoke(convo, tool, "auto" if sink else "required")
         except llm.ModelFailed as exc:
-            log.warning("search  model failed: %s", str(exc)[:300])
+            log.error("ERROR search  model call failed: %s", str(exc)[:300])
             if sink:
                 break
             failed = Retrieval(query="", verdict=Verdict.NOT_IN_KB, error=f"search call failed: {exc}")

@@ -27,7 +27,7 @@ def classify(state: ChatState) -> dict:
         try:
             result = llm.structured(prompt.classify(state), messages, Classification, node="classify")
         except llm.ModelFailed as exc:
-            log.warning("classify  model failed, summary not built: %s", _short(str(exc)))
+            log.error("ERROR classify  model call failed, summary not built: %s", _short(str(exc)))
             return {"note": "The ticket summary could not be built this time. Say so in one line, keep what the "
                             "customer gave, and ask them to send their last message again.",
                     "corrections": state["corrections"] + [f"classify failed: {exc}"]}
@@ -46,7 +46,7 @@ def classify(state: ChatState) -> dict:
                     HumanMessage(content="These values were refused: " + "; ".join(problems)
                                  + ". Choose each from its list exactly as written.")]
     if problems:
-        log.warning("classify  values still refused, summary not built: %s", "; ".join(problems))
+        log.error("ERROR classify  values still refused, summary not built: %s", "; ".join(problems))
         return {"note": "The ticket summary could not be built this time. Say so in one line, keep what the "
                         "customer gave, and ask them to send their last message again.",
                 "corrections": state["corrections"] + [f"classify refused: {'; '.join(problems)}"]}

@@ -71,7 +71,7 @@ def submit(state: ChatState, api: TicketApi) -> tuple[dict, list[str]]:
                    article={"Subject": "Chatbot: classification", "IsVisibleForCustomer": 0,
                             "Body": internal_note(draft, state["corrections"], state["attachments"])})
     except TicketApiError as exc:
-        log.exception("tickets  TicketUpdate failed for %s", created["TicketNumber"])
+        log.exception("ERROR tickets  TicketUpdate failed for %s", created["TicketNumber"])
         corrections.append(f"TicketUpdate failed, the ticket is not classified: {exc}")
 
     created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")

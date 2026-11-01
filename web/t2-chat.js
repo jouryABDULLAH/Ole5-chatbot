@@ -258,7 +258,9 @@
         const bubble = el("div", { class: "bot", dir: "auto" }, m.text);
         if (m.sources.length) {
           const label = m.sources.length > 1 ? this.t.sources : this.t.source;
-          const links = m.sources.flatMap((s, j) => [j ? ", " : null, this.documentLink(s)]);
+          const links = (m.source_details && m.source_details.length)
+            ? m.source_details.flatMap((s, j) => [j ? ", " : null, this.documentLink(s.document, s.chunk_index)])
+            : m.sources.flatMap((s, j) => [j ? ", " : null, this.documentLink(s)]);
           bubble.append(el("div", { class: "src" }, `${label}: `, ...links));
         }
         log.append(bubble);
@@ -295,12 +297,12 @@
 
     /* A link to a cited knowledge base document. The host page may listen for the t2-document event and show the
        document itself; if it doesn't, or the click has a modifier key, the link opens the API's page in a new tab. */
-    documentLink(title) {
-      const href = `${this.api}/chat/kb/${encodeURIComponent(this.view.product)}/${encodeURIComponent(title)}`;
+    documentLink(title, chunkIndex = null) {
+      const href = `${this.api}/chat/kb/${encodeURIComponent(this.view.product)}/${encodeURIComponent(title)}${chunkIndex === null ? "" : `#chunk-${chunkIndex}`}`;
       return el("a", { href, target: "_blank", rel: "noopener", onclick: (e) => {
         if (e.ctrlKey || e.metaKey || e.shiftKey) return;
         const event = new CustomEvent("t2-document", { bubbles: true, composed: true, cancelable: true,
-                                                        detail: { product: this.view.product, title } });
+                                                        detail: { product: this.view.product, title, chunkIndex } });
         if (!this.dispatchEvent(event)) e.preventDefault();
       } }, title);
     }

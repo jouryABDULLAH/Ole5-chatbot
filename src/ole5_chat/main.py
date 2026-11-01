@@ -70,7 +70,7 @@ def warm_knowledge() -> None:
             retriever.warm(sorted(set(s.kb_tenants.values())))
             log.info("kb  ready tenants=%s", sorted(set(s.kb_tenants.values())))
         except Exception:
-            log.exception("kb  warm-up failed")
+            log.exception("ERROR kb  warm-up failed")
 
     log.info("kb  loading models in the background")
     threading.Thread(target=load, daemon=True).start()

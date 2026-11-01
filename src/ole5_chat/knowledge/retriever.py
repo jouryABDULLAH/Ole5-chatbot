@@ -87,6 +87,7 @@ def _to_evidence(chunk: Any) -> Evidence:
         relation=(getattr(chunk, "relation", None) or "UNKNOWN").upper(),
         score=int(getattr(chunk, "score", 0) or 0),
         reason=getattr(chunk, "reason", "") or "",
+        chunk_index=meta.get("chunk_index"),
     )
 
 
@@ -124,7 +125,7 @@ def retrieve(question: str, tenant_name: str) -> Retrieval:
         result = _find(tenant_name, question)
     except Exception as exc:
         elapsed = int((time.perf_counter() - started) * 1000)
-        log.exception("kb  tenant=%s failed after ms=%d", tenant_name, elapsed)
+        log.exception("ERROR kb  tenant=%s retrieval failed after ms=%d", tenant_name, elapsed)
         return Retrieval(query=question, verdict=Verdict.NOT_IN_KB, elapsed_ms=elapsed,
                          error=f"{type(exc).__name__}: {exc}")
 
@@ -152,10 +153,45 @@ def retrieve(question: str, tenant_name: str) -> Retrieval:
 
     if not evidence and (retrieval.stop_reason in UNRELIABLE_STOPS or retrieval.warnings):
         retrieval.error = f"retrieval incomplete: {retrieval.stop_reason}"
-        log.warning("kb  incomplete stop=%s warnings=%s query=%r", retrieval.stop_reason, retrieval.warnings,
-                    question[:80])
+        log.error("ERROR kb  incomplete retrieval stop=%s warnings=%s query=%r", retrieval.stop_reason,
+                  retrieval.warnings, question[:80])
 
     log.info("kb  tenant=%s verdict=%s chunks=%d direct=%d ms=%d stop=%s queries_tried=%s",
              tenant_name, retrieval.verdict.value, len(evidence), len(retrieval.direct), elapsed,
              retrieval.stop_reason, retrieval.queries_tried)
+    return retrieval
+
+
+def retrieve_direct(question: str, tenant_name: str) -> Retrieval:
+    """Run one raw RAGent2 ranking call without the agentic find loop.
+
+    Raw search has no relevance threshold, so non-empty results are treated as
+    answer evidence only when the backend marks a passage DIRECT. Otherwise the
+    result is retained as partial context for the normal unresolved path.
+    """
+    started = time.perf_counter()
+    try:
+        with suppress_tracing():
+            passages = tenant(tenant_name).search(question, use_reranker=False)
+    except Exception as exc:
+        elapsed = int((time.perf_counter() - started) * 1000)
+        log.exception("ERROR kb  tenant=%s direct retrieval failed after ms=%d", tenant_name, elapsed)
+        return Retrieval(query=question, verdict=Verdict.NOT_IN_KB, elapsed_ms=elapsed,
+                         error=f"{type(exc).__name__}: {exc}")
+
+    evidence: list[Evidence] = []
+    for passage in passages:
+        item = _to_evidence(passage)
+        # tenant.search() returns ranked passages without find()'s grading step.
+        # In direct mode these are candidates supplied to Respond; keep the
+        # mode explicit so evaluations can compare it with agentic grading.
+        if item.relation == "UNKNOWN":
+            item.relation = "DIRECT"
+        evidence.append(item)
+    elapsed = int((time.perf_counter() - started) * 1000)
+    retrieval = Retrieval(query=question, verdict=_verdict(evidence), evidence=evidence,
+                          queries_tried=[question], elapsed_ms=elapsed,
+                          stop_reason="direct_search")
+    log.info("kb  tenant=%s mode=direct verdict=%s chunks=%d ms=%d", tenant_name,
+             retrieval.verdict.value, len(evidence), elapsed)
     return retrieval

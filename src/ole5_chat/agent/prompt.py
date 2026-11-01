@@ -34,7 +34,10 @@ PHASES = {
 }
 
 MEANINGS = {
-    "question": "names something in the product and asks or reports something about it: how, why, whether it's "
+    "question": "asks a general product question answerable from product knowledge, or reports a product problem. "
+                "It does not ask for the customer's own account, profile, permissions, configuration, or other user-specific data. "
+                "For those user-specific requests choose ticket without searching. "
+                "A question names something in the product and asks or reports something about it: how, why, whether it's "
                 "possible, that it doesn't work; including a follow-up to an earlier answer about the product, but not a "
                 "follow-up about their ticket, and not a report that an answer didn't help. A "
                 "request to open a ticket that names a topic is a question too: the assistant searches first and "
@@ -54,7 +57,9 @@ MEANINGS = {
             "something about what it "
             "names in the product, it is a question, however short, except for basic company/provider identity questions.",
         
-    "ticket": "the message reports a topic from this list: {always_ticket}. Or, after the assistant answered, it says the "
+    "ticket": "the message asks about the customer's own account, profile, permissions, configuration, or other user-specific "
+              "information outside ticket data; asks for a support person; reports a topic from this list: {always_ticket}; "
+              "or, after the assistant answered, it says the "
               "steps the assistant gave didn't help (\"لا زال لا يعمل\", \"العطل مستمر\").",
     "urgent": "the message describes a situation from this list: {urgent_when}. Judge it from the impact described, "
               "not the tone. One person reporting it is not urgent unless they say it affects others.",
@@ -133,7 +138,11 @@ def router(state: ChatState) -> str:
     phase = state["phase"]
     pending = state.get("pending") or []
     last = next((m.text for m in reversed(state["messages"]) if m.type == "ai"), "none")
-    return _fill("router", product_name=config.name, scope=config.scope, phase_description=PHASES[phase],
+    scope = ("Scope: answer general product questions only from product knowledge, and use ticket data only for ticket "
+             "operations. Never search for or infer a customer's own account details, user records, profile, permissions, "
+             "configuration, or other customer-specific information outside ticket data. Route those requests to ticketing.\n\n"
+             + config.scope)
+    return _fill("router", product_name=config.name, scope=scope, phase_description=PHASES[phase],
                  issue=pending[0].text if pending else "none", last_assistant=last,
                  options="\n\n".join(_option(config, phase, o) for o in OPTIONS[phase]),
                  schema=schema_text(route_schema(phase)))

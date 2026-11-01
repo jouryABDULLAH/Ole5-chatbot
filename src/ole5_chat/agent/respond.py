@@ -147,7 +147,7 @@ def _answer(convo, retrieval: Retrieval, exchange: str, language: str,
         try:
             grounding = _ground(exchange, answer.reply, retrieval)
         except llm.ModelFailed as exc:
-            log.warning("respond_agent  grounding call failed: %s", str(exc)[:300])
+            log.error("ERROR respond_agent  grounding call failed: %s", str(exc)[:300])
             corrections.append("grounding call failed")
             return answer.reply, sources, answer.status
         log.info("respond_agent  attempt=%d status=%s sources=%s unsupported=%s", attempt, answer.status, sources,
@@ -210,7 +210,7 @@ def respond_agent(state: ChatState) -> dict:
         else:
             text = _write(convo, language, corrections)
     except llm.ModelFailed as exc:
-        log.warning("respond_agent  model failed, sorry sent: %s", str(exc)[:300])
+        log.error("ERROR respond_agent  model call failed, sorry sent: %s", str(exc)[:300])
         text, sources, status = SORRY[language], [], "answered"
         corrections.append(f"respond failed: {exc}")
     

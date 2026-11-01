@@ -16,6 +16,8 @@ def ticket_status_prompt(state: AgentState) -> str:
 
 Choose lookup_status when the customer asks for the current status, receipt, number, or progress of their own existing ticket. Choose explain_status when the relevant status is already identified and the customer asks what it means. Choose clarify only when the ticket reference or status cannot be identified safely.
 
+Historical ticket lookup does not automatically trigger a new-ticket offer. An unavailable historical status must be reported as unavailable. Never claim that support is working on the issue without an authorized status result. Do not interpret a request for more details about an old ticket as consent to open a new ticket.
+
 Approved status definitions: {statuses}
 Known created tickets: {state.get('created_tickets') or 'none'}
 Latest customer message: {context['latest_customer_message'] or 'none'}

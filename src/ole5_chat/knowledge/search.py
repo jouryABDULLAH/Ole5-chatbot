@@ -9,5 +9,7 @@ def search(question: str, product: str) -> Retrieval:
     s = get_settings()
     tenant = s.kb_tenants.get(product.upper())
     if s.kb_backend == "ragent2" and tenant:
+        if s.kb_retrieval_mode == "direct":
+            return retriever.retrieve_direct(question, tenant)
         return retriever.retrieve(question, tenant)
     return stub.search(question)

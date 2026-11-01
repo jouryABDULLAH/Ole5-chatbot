@@ -21,6 +21,7 @@ class Evidence:
     relation: str
     score: int
     reason: str
+    chunk_index: int | None = None
 
     @property
     def language(self) -> str | None:

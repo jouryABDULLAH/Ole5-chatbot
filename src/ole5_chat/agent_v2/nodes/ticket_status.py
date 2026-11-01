@@ -27,7 +27,7 @@ def ticket_status_node(state: AgentState) -> dict:
             TicketStatusDecision, node="ticket_status_v2"
         )
     except llm.ModelFailed as exc:
-        log.warning("ticket_status_v2 model failed: %s", exc)
+        log.error("ERROR ticket_status_v2 model call failed: %s", exc)
         return {"ticket_status_result": {"action": "clarify", "reason": "Status interpretation failed; ask for a ticket reference."}}
 
     if decision.action == "explain_status":
@@ -45,7 +45,7 @@ def ticket_status_node(state: AgentState) -> dict:
     try:
         found = ticket_status.my_tickets(state["identity"].email, ticket_client())
     except (TicketApiError, OSError, KeyError) as exc:
-        log.warning("ticket_status_v2 lookup failed: %s", exc)
+        log.error("ERROR ticket_status_v2 lookup failed: %s", exc)
         return {"ticket_status_result": {"action": "lookup_status", "lookup_succeeded": False, "error": str(exc)}}
     log.info("ticket_status_v2  action=lookup_status tickets=%d", len(found))
     return {

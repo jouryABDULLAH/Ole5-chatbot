@@ -27,12 +27,15 @@ class AgentState(MessagesState, total=False):
     attachments: list[dict]
     created_tickets: list[dict]
     last_answer_evidence: dict | None
+    sources: list[str]
+    source_details: list[dict]
 
     # Current-turn routing and workflow state.
     router_decision: Route | None
     route_reason: str | None
     explicit_ticket_request: bool
     current_request: str | None
+    search_scope: Literal["product", "outside_scope"] | None
     current_references: list[dict]
     search_outcome: SearchOutcome | None
     unresolved_information: dict | None
@@ -62,10 +65,13 @@ def initial_state(identity: Identity) -> AgentState:
         attachments=[],
         created_tickets=[],
         last_answer_evidence=None,
+        sources=[],
+        source_details=[],
         router_decision=None,
         route_reason=None,
         explicit_ticket_request=False,
         current_request=None,
+        search_scope=None,
         current_references=[],
         search_outcome=None,
         unresolved_information=None,

@@ -140,7 +140,13 @@ def _view(session_id: str, state: ChatState) -> SessionView:
             draft = TicketDraft(**values)
 
     who = state["identity"]
-    created = [CreatedTicket(**{k: v for k, v in t.items() if k != "ticket_id"}) for t in state.get("created_tickets", [])]
+    created = []
+    for ticket in state.get("created_tickets", []):
+        # Persisted graph records can contain API/internal fields such as ticket_id and created_at.
+        # Only expose the stable customer card contract; older checkpoints get a safe message index.
+        fields = {key: value for key, value in ticket.items() if key in CreatedTicket.model_fields}
+        fields.setdefault("message_index", max(len(state.get("messages", [])) - 1, 0))
+        created.append(CreatedTicket(**fields))
     numbers = [t.ticket_number for t in created]
     return SessionView(session_id=session_id, product=who.product, product_name=products.load(who.product).name,
                        language=who.language,
@@ -258,7 +264,8 @@ def read_document(product: str, title: str) -> HTMLResponse:
         raise HTTPException(status_code=404, detail="Document not found")
     render = MarkdownIt().render
     head, *chunks = CHUNK_MARK.split(path.read_text(encoding="utf-8"))
-    body = render(head) + "".join(f'<section class="chunk">{render(c)}</section>' for c in chunks if c.strip())
+    body = render(head) + "".join(f'<a id="chunk-{i}"></a><section class="chunk">{render(c)}</section>'
+                                  for i, c in enumerate(chunks) if c.strip())
     return HTMLResponse(KB_PAGE.format(title=title, body=body))
 
 

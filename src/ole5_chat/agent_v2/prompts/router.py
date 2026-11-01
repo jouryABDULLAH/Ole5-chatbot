@@ -77,6 +77,10 @@ def router_prompt(state: AgentState) -> str:
 Classify the latest customer message, not an older customer message. Use the full conversation and the separately labelled previous assistant message to resolve what the latest message refers to. Do not choose a ticket operation, mutate state, answer the customer, search the knowledge base, or call an API.
 
 Product scope: {config.scope or 'none'}
+Knowledge-base boundary: the knowledge base covers {config.name} product documentation. Ticketing procedures,
+support hours, reply channels, and ticket status are handled from configured support information or ticket data,
+not by product search.
+Chat scope: product knowledge and ticket operations only. Account details, user records, profiles, permissions, configuration, and other customer-specific information outside ticket data go directly to ticket handling; never route them to knowledge search.
 About: {about}
 Always-ticket topics: {join_values(config.always_ticket)}
 Urgent situations: {join_values(config.urgent_when)}
@@ -92,6 +96,8 @@ Rules:
 - A pending response is valid only when pending customer response is present. If absent, do not return pending_response.
 - A short value such as a browser name can be pending_response when the previous assistant asked for it; the same word with no pending question is other.
 - A new product question during ticket preparation is question, not pending_response. A greeting, thanks, About/capability question, support-process question, rephrase, or unclear message is other and must not mutate ticket state.
+- If the latest message refers to something the assistant displayed and the reference is ambiguous, choose other and let Respond ask one focused clarification. Do not route it to Search.
+- A question asking whether the assistant can access or explain ticket information is other. Only perform a ticket lookup when the customer explicitly asks to show, list, check, or retrieve ticket data, or asks for the status of a specific ticket. For example, "Can I inquire about the tickets I created?" is other, while "Show me the tickets I created" and "What is the status of ticket T-123?" are ticket_status.
 - Set explicit_ticket_request=true only when the customer explicitly asks to prepare/open a ticket for the current named issue. Keep it false for policy-based escalation, urgency, status, acceptance, detail answers, rephrasing, and mere mentions of tickets. A named ordinary issue still routes to question so Search runs first.
 - If the latest message has no safe interpretation, choose other. Do not invent a ticket subject or operation.
 

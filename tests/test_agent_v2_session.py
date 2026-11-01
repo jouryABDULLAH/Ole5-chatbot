@@ -1,10 +1,14 @@
 from unittest.mock import patch
+import re
 
-from langchain_core.messages import HumanMessage
+from fastapi.testclient import TestClient
+from langchain_core.messages import AIMessage, HumanMessage
 
 from ole5_chat import api
 from ole5_chat.agent_v2 import session
-from ole5_chat.agent_v2.contracts import PendingCustomerResponse
+from ole5_chat.agent_v2.contracts import PendingCustomerResponse, RouterDecisionWithoutPending, manager_schema
+from ole5_chat.agent_v2.nodes.router import router_node
+from ole5_chat.agent.contracts import Classification
 from ole5_chat.identity import Identity
 
 
@@ -72,6 +76,114 @@ def test_api_switch_and_v2_state_view(monkeypatch):
     from ole5_chat.config import get_settings
 
     get_settings.cache_clear()
+
+
+def test_v2_ticket_submission_returns_valid_customer_ticket_card(model, monkeypatch):
+    from ole5_chat import llm
+    from ole5_chat.config import get_settings
+
+    class Writer:
+        def __call__(self, temperature):
+            return self
+
+        def bind_tools(self, tools, tool_choice=None):
+            return self
+
+        def invoke(self, messages):
+            prompt = messages[0].content
+            match = re.search(r"Confirm that ticket ([^ ]+) was created", prompt)
+            number = match.group(1) if match else "the ticket"
+            return AIMessage(content=f"Your ticket number is {number}.")
+
+    monkeypatch.setenv("AGENT_GRAPH", "v2")
+    get_settings.cache_clear()
+    monkeypatch.setattr(llm, "tool_client", Writer())
+    client = TestClient(api.app)
+
+    start = client.post("/chat/sessions", json={"email": "ole5@example.com"})
+    assert start.status_code == 200
+    session_id = start.json()["session_id"]
+
+    model.add(
+        RouterDecisionWithoutPending(decision="escalation", explicit_ticket_request=True,
+                                     reason="Customer requested a ticket."),
+        manager_schema("none")(action="register_issue", reason="Register the requested issue."),
+        Classification(
+            queue="Ole5 Technical", type="Bug", subtype="Software malfunction",
+            reason="Issue - calendar synchronization", priority="Medium", title="Calendar synchronization issue",
+            summary="The customer reports a calendar synchronization issue.",
+            title_customer="Calendar synchronization issue",
+            summary_customer="The customer reports a calendar synchronization issue.",
+            confidence="high", queue_reason="The issue concerns technical behavior",
+            collected={"page": "Calendar"},
+            required={"page": "Calendar", "error text or screenshot": "provided"},
+        ),
+    )
+    ready = client.post(f"/chat/sessions/{session_id}/messages", json={
+        "text": "Please create a ticket for a calendar synchronization issue."
+    })
+    assert ready.status_code == 200
+    assert ready.json()["phase"] == "confirm"
+
+    submitted = client.post(f"/chat/sessions/{session_id}/submit")
+    assert submitted.status_code == 200, submitted.text
+    view = submitted.json()
+    assert view["phase"] == "none"
+    assert view["ticket_number"] in view["messages"][-1]["text"]
+    card = view["created_tickets"][-1]
+    assert card["ticket_number"] == view["ticket_number"]
+    assert card["title"] == "Calendar synchronization issue"
+    assert card["message_index"] == len(view["messages"]) - 1
+    assert "created_at" not in card and "issue_id" not in card
+
+    listed = client.get("/chat/tickets", params={"session_id": session_id})
+    assert listed.status_code == 200
+    assert any(ticket["ticket_number"] == view["ticket_number"] for ticket in listed.json())
+
+
+def test_v2_user_specific_data_bypasses_knowledge_router(model):
+    state = {
+        "identity": _identity(),
+        "messages": [HumanMessage(content="What permissions does my account have?")],
+        "pending_customer_response": None,
+    }
+    result = router_node(state)
+    assert result["router_decision"] == "escalation"
+    assert "outside the chat scope" in result["route_reason"]
+    assert model.calls == []
+
+
+def test_v2_user_specific_question_goes_to_ticket_offer_without_search(model, monkeypatch):
+    from ole5_chat import llm
+    from ole5_chat.config import get_settings
+
+    class Writer:
+        def __call__(self, temperature):
+            return self
+
+        def bind_tools(self, tools, tool_choice=None):
+            self.bound_tools = tools
+            return self
+
+        def invoke(self, messages):
+            return AIMessage(content="I cannot access account details here. Would you like a support ticket?")
+
+    monkeypatch.setenv("AGENT_GRAPH", "v2")
+    get_settings.cache_clear()
+    writer = Writer()
+    monkeypatch.setattr(llm, "tool_client", writer)
+    client = TestClient(api.app)
+    session_id = client.post("/chat/sessions", json={"email": "ole5@example.com"}).json()["session_id"]
+
+    response = client.post(f"/chat/sessions/{session_id}/messages", json={
+        "text": "What permissions does my account have?"
+    })
+    assert response.status_code == 200
+    view = response.json()
+    assert view["phase"] == "offer_ticket"
+    assert "ticket" in view["messages"][-1]["text"].lower()
+    assert model.calls == []
+    assert not getattr(writer, "bound_tools", None)
     assert api._session_backend() is session
 
     state = {

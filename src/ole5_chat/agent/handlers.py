@@ -119,7 +119,8 @@ def accept(state: ChatState) -> dict:
 
 def decline(state: ChatState) -> dict:
     update, fragment = next_issue(state, state["pending"][1:])
-    return {**update, "task": _then(TASKS["declined"], fragment)}
+    contact = _support(state, "support_channel", "If the customer still needs help, explain how to reach support: {}.")
+    return {**update, "task": _then(" ".join(part for part in (TASKS["declined"], contact) if part), fragment)}
 
 
 def details(state: ChatState) -> dict:
@@ -161,7 +162,9 @@ def change(state: ChatState) -> dict:
 
 def cancel(state: ChatState) -> dict:
     update, fragment = next_issue({**state, "ticket_draft": None}, state["pending"][1:])
-    return {"ticket_draft": None, **update, "task": _then(TASKS["cancelled"], fragment)}
+    contact = _support(state, "support_channel", "If the customer still needs help, explain how to reach support: {}.")
+    task = " ".join(part for part in (TASKS["cancelled"], contact) if part)
+    return {"ticket_draft": None, **update, "task": _then(task, fragment)}
 
 
 def submit(state: ChatState) -> dict:
@@ -169,7 +172,7 @@ def submit(state: ChatState) -> dict:
         tickets.check(state)
         ticket, corrections = tickets.submit(state, ticket_api.ticket_client())
     except (tickets.SubmitRefused, TicketApiError) as exc:
-        log.warning("handlers  ticket not created: %s", exc)
+        log.error("ERROR handlers  ticket not created: %s", exc)
         return {"note": NOT_CREATED, "task": TASKS["confirm"].format(issue=state["pending"][0].text),
                 "corrections": state["corrections"] + [f"submit failed: {exc}"]}
     # The creation time in the product's timezone; tickets.xlsx keeps it in UTC.
@@ -204,7 +207,7 @@ def status(state: ChatState) -> dict:
     try:
         found = ticket_status.my_tickets(state["identity"].email, ticket_api.ticket_client())
     except Exception as exc:  # A missing, locked or corrupt sheet: the only thing to do is say try again.
-        log.warning("handlers  tickets not read: %s", exc)
+        log.error("ERROR handlers  tickets not read: %s", exc)
         return {"task": _then(NOT_READ, back), "corrections": state["corrections"] + [f"status lookup failed: {exc}"]}
     recent = sorted(found, key=lambda t: t["created_at"], reverse=True)
     lines = "\n".join(f"- {t['ticket_number']}, {t['title']}, {t['created_at'][:10]}, {t['state'] or 'unknown'}"

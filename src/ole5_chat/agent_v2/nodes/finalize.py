@@ -14,7 +14,8 @@ def finalize_node(state: AgentState) -> dict:
              state.get("validation_outcome"), len(state.get("current_references", [])),
              len(state.get("created_tickets", [])))
     result = {
-        "messages": [AIMessage(content=state.get("reply") or "")],
+        "messages": [AIMessage(content=state.get("reply") or "", additional_kwargs={
+            "sources": state.get("sources", []), "source_details": state.get("source_details", [])})],
         "router_decision": None,
         "input_event": None,
         "route_reason": None,
@@ -22,6 +23,7 @@ def finalize_node(state: AgentState) -> dict:
         "current_request": None,
         "current_references": [],
         "search_outcome": None,
+        "search_scope": None,
         "unresolved_information": None,
         "ticket_result": None,
         "ticket_status_result": None,
@@ -30,6 +32,8 @@ def finalize_node(state: AgentState) -> dict:
         "reply": None,
         "validation_outcome": None,
         "validation_reason": None,
+        "sources": [],
+        "source_details": [],
     }
     if state.get("current_references"):
         result["last_answer_evidence"] = {"evidence": state["current_references"]}
