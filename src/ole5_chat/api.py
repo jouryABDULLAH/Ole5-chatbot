@@ -9,6 +9,7 @@ from langchain_core.messages import BaseMessage
 from pydantic import BaseModel, ConfigDict, Field
 
 from ole5_chat import attachments, products, sessions
+from ole5_chat.agent_v2 import session as v2_sessions
 from ole5_chat.attachments import AttachmentRefused
 from ole5_chat.config import get_settings
 from ole5_chat.agent.contracts import Phase
@@ -108,14 +109,43 @@ def _attachment(f: dict) -> AttachmentView:
     return AttachmentView(id=f["id"], file_name=f["file_name"], size=f["size"])
 
 
+def _session_backend():
+    """Select the session/graph implementation for all chat endpoints."""
+
+    return v2_sessions if get_settings().agent_graph == "v2" else sessions
+
+
+def _v2_phase(state: dict) -> str:
+    pending = state.get("pending_customer_response")
+    if pending is not None:
+        return {"offer": "offer_ticket", "detail": "collect", "summary": "confirm"}[pending.kind]
+    return "none"
+
+
 def _view(session_id: str, state: ChatState) -> SessionView:
-    who, draft = state["identity"], state.get("ticket_draft")
-    created = [CreatedTicket(**{k: v for k, v in t.items() if k != "ticket_id"}) for t in state["created_tickets"]]
+    if "phase" in state:
+        phase = state["phase"]
+        draft = state.get("ticket_draft")
+    else:
+        from ole5_chat.agent.state import TicketDraft
+
+        phase = _v2_phase(state)
+        raw_draft = state.get("ticket_draft")
+        draft = None
+        if raw_draft:
+            fields = set(TicketDraft.model_fields)
+            values = {key: value for key, value in raw_draft.items() if key in fields}
+            values.setdefault("product", state["identity"].product)
+            values.setdefault("missing", [])
+            draft = TicketDraft(**values)
+
+    who = state["identity"]
+    created = [CreatedTicket(**{k: v for k, v in t.items() if k != "ticket_id"}) for t in state.get("created_tickets", [])]
     numbers = [t.ticket_number for t in created]
     return SessionView(session_id=session_id, product=who.product, product_name=products.load(who.product).name,
                        language=who.language,
-                       phase=state["phase"], messages=[_line(m) for m in state["messages"]],
-                       ticket_draft=draft, draft_ready=state["phase"] == "confirm",
+                       phase=phase, messages=[_line(m) for m in state["messages"]],
+                       ticket_draft=draft, draft_ready=phase == "confirm",
                        ticket_number=numbers[-1] if numbers else None, ticket_numbers=numbers, created_tickets=created,
                        attachments=[_attachment(f) for f in state.get("attachments") or []])
 
@@ -124,7 +154,7 @@ def _view(session_id: str, state: ChatState) -> SessionView:
 @app.post("/chat/sessions")
 def start_session(body: StartSession) -> SessionView:
     try:
-        session_id, state = sessions.start(body.email)
+        session_id, state = _session_backend().start(body.email)
     except NotRegistered as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     return _view(session_id, state)
@@ -133,8 +163,8 @@ def start_session(body: StartSession) -> SessionView:
 @app.get("/chat/sessions/{session_id}")
 def read_session(session_id: str) -> SessionView:
     try:
-        return _view(session_id, sessions.get(session_id))
-    except sessions.SessionNotFound as exc:
+        return _view(session_id, _session_backend().get(session_id))
+    except _session_backend().SessionNotFound as exc:
         raise HTTPException(status_code=404, detail="Session not found") from exc
 
 
@@ -143,18 +173,18 @@ def send_message(session_id: str, body: NewMessage) -> SessionView:
     if not body.text.strip() and not body.attachment_ids:
         raise HTTPException(status_code=422, detail="The message is empty")
     try:
-        return _view(session_id, sessions.send(session_id, body.text.strip(), body.attachment_ids))
-    except sessions.SessionNotFound as exc:
+        return _view(session_id, _session_backend().send(session_id, body.text.strip(), body.attachment_ids))
+    except _session_backend().SessionNotFound as exc:
         raise HTTPException(status_code=404, detail="Session not found") from exc
-    except sessions.AttachmentNotFound as exc:
+    except _session_backend().AttachmentNotFound as exc:
         raise HTTPException(status_code=404, detail="Attachment not found") from exc
 
 
 @app.post("/chat/sessions/{session_id}/submit")
 def submit(session_id: str) -> SessionView:
     try:
-        return _view(session_id, sessions.submit(session_id))
-    except sessions.SessionNotFound as exc:
+        return _view(session_id, _session_backend().submit(session_id))
+    except _session_backend().SessionNotFound as exc:
         raise HTTPException(status_code=404, detail="Session not found") from exc
     except SubmitRefused as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -165,8 +195,8 @@ async def upload_attachment(session_id: str, file: UploadFile) -> AttachmentView
     limit = int(get_settings().attachment_max_mb * 1024 * 1024)
     data = await file.read(limit + 1)
     try:
-        return _attachment(sessions.attach(session_id, file.filename or "file", data))
-    except sessions.SessionNotFound as exc:
+        return _attachment(_session_backend().attach(session_id, file.filename or "file", data))
+    except _session_backend().SessionNotFound as exc:
         raise HTTPException(status_code=404, detail="Session not found") from exc
     except AttachmentRefused as exc:
         raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
@@ -175,8 +205,8 @@ async def upload_attachment(session_id: str, file: UploadFile) -> AttachmentView
 @app.delete("/chat/sessions/{session_id}/attachments/{att_id}", status_code=204)
 def delete_attachment(session_id: str, att_id: str) -> Response:
     try:
-        removed = sessions.detach(session_id, att_id)
-    except sessions.SessionNotFound as exc:
+        removed = _session_backend().detach(session_id, att_id)
+    except _session_backend().SessionNotFound as exc:
         raise HTTPException(status_code=404, detail="Session not found") from exc
     if not removed:
         raise HTTPException(status_code=404, detail="Attachment not found")
@@ -235,7 +265,7 @@ def read_document(product: str, title: str) -> HTMLResponse:
 @app.get("/chat/tickets")
 def my_tickets(session_id: str) -> list[TicketView]:
     try:
-        email = sessions.current_identity(session_id).email
-    except sessions.SessionNotFound as exc:
+        email = _session_backend().current_identity(session_id).email
+    except _session_backend().SessionNotFound as exc:
         raise HTTPException(status_code=404, detail="Session not found") from exc
     return [TicketView(**t) for t in ticket_status.my_tickets(email, ticket_api.ticket_client())]
