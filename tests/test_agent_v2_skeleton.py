@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from ole5_chat.agent.contracts import manager_schema, router_schema
 from ole5_chat.agent.context import previous_assistant_message, router_context
-from ole5_chat.agent.graph import after_router, after_search, build
+from ole5_chat.agent.graph import after_router, build
 from ole5_chat.agent.nodes.router import router_node
 from ole5_chat.agent.nodes.finalize import finalize_node
 from ole5_chat.agent.nodes.ticket_operator import ticket_operator_node
@@ -20,18 +20,11 @@ def test_new_graph_compiles():
 
 
 def test_router_routes_have_single_owner_boundary():
-    assert after_router({"router_decision": "question"}) == "search"
-    assert after_router({"router_decision": "pending_response"}) == "ticket_operator"
-    assert after_router({"router_decision": "escalation"}) == "ticket_operator"
-    assert after_router({"router_decision": "ticket_enquiry"}) == "ticket_enquiry"
-    assert after_router({"router_decision": "other"}) == "respond"
-
-
-def test_search_outcomes_have_explicit_edges():
-    assert after_search({"search_outcome": "answered"}) == "respond"
-    assert after_search({"search_outcome": "failed"}) == "respond"
-    assert after_search({"search_outcome": "partial"}) == "ticket_operator"
-    assert after_search({"search_outcome": "no_answer"}) == "ticket_operator"
+    assert after_router({"intent": "question"}) == "search"
+    assert after_router({"intent": "pending_response"}) == "ticket_operator"
+    assert after_router({"intent": "escalation"}) == "ticket_operator"
+    assert after_router({"intent": "ticket_enquiry"}) == "ticket_enquiry"
+    assert after_router({"intent": "other"}) == "respond"
 
 
 def test_context_labels_latest_customer_and_previous_assistant():
@@ -80,12 +73,28 @@ def test_router_node_writes_decision_fields():
     with patch("ole5_chat.agent.nodes.router.llm.structured", return_value=decision):
         result = router_node(state)
     assert result == {
-        "router_decision": "question",
         "intent": "question",
         "next_target": "search",
         "route_reason": "Product question needs knowledge search.",
         "explicit_ticket_request": False,
     }
+
+
+def test_router_dispatches_search_result_to_the_next_owner():
+    state = _state([HumanMessage(content="Can it translate text?")])
+    state.update(intent="question", search_result={"outcome": "partial", "references": []}, search_outcome="partial")
+    result = router_node(state)
+    assert result["next_target"] == "ticket_operator"
+    assert "response_packet" not in result
+
+
+def test_router_builds_response_packet_after_worker_result():
+    state = _state([HumanMessage(content="Can it translate text?")])
+    state.update(intent="question", ticket_operator_result={"action": "register_issue"}, manager_action="register_issue")
+    result = router_node(state)
+    assert result["next_target"] == "respond"
+    assert result["response_packet"]["intent"] == "question"
+    assert result["response_packet"]["ticket_operator"]["action"] == "register_issue"
 
 
 def test_router_updates_current_intent_when_selecting_next_target():
@@ -105,7 +114,7 @@ def test_router_model_failure_uses_safe_other_route():
     state = _state([HumanMessage(content="???")])
     with patch("ole5_chat.agent.nodes.router.llm.structured", side_effect=__import__("ole5_chat.llm", fromlist=["ModelFailed"]).ModelFailed("offline")):
         result = router_node(state)
-    assert result["router_decision"] == "other"
+    assert result["intent"] == "other"
     assert result["explicit_ticket_request"] is False
 
 
@@ -123,18 +132,18 @@ def test_finalize_appends_reply_and_retains_answer_evidence():
         reply="Open Reports.",
         current_references=[{"document": "guide.md", "text": "Open Reports.", "relation": "DIRECT"}],
         search_outcome="answered",
-        router_decision="question",
+        intent="question",
     )
     result = finalize_node(state)
     assert result["messages"][0].content == "Open Reports."
     assert result["last_answer_evidence"]["evidence"][0]["document"] == "guide.md"
     assert result["current_references"] == []
-    assert result["router_decision"] is None
+    assert result["intent"] is None
 
 
 def test_manager_registers_issue_and_opens_offer_pending_state():
     state = _state([HumanMessage(content="The archive button does not work")])
-    state.update(router_decision="escalation", current_request="The archive button does not work")
+    state.update(intent="escalation", current_request="The archive button does not work")
     decision = type("Decision", (), {"action": "register_issue", "reason": "New issue."})()
     with patch("ole5_chat.agent.nodes.ticket_operator.llm.structured", return_value=decision):
         result = ticket_operator_node(state)
@@ -145,7 +154,7 @@ def test_manager_registers_issue_and_opens_offer_pending_state():
 
 def test_manager_unanswered_search_explains_missing_kb_answer_before_offer():
     state = _state([HumanMessage(content="Can the system translate correspondence automatically?")])
-    state.update(router_decision="question", current_request="Can the system translate correspondence automatically?",
+    state.update(intent="question", current_request="Can the system translate correspondence automatically?",
                  search_outcome="partial", current_references=[{"relation": "INFERENTIAL"}])
     decision = type("Decision", (), {"action": "register_issue", "reason": "No supported answer."})()
     with patch("ole5_chat.agent.nodes.ticket_operator.llm.structured", return_value=decision):

@@ -57,7 +57,7 @@ def test_username_remains_arabic_when_manager_advances(model, next_field):
 ])
 def test_conversational_messages_use_language_detector(text, route, action):
     state = conversation(text)
-    state.update(router_decision=route, manager_action=action,
+    state.update(intent=route, manager_action=action,
                  answered_detail=PendingCustomerResponse(kind="detail", issue_id="issue-1", item="error text"))
     with patch.object(respond, "language_of", return_value="en") as detector:
         assert respond._expected_language(state) == "en"
@@ -68,7 +68,7 @@ def test_conversational_messages_use_language_detector(text, route, action):
                                       ("error code", "E403"), ("filename", "screen.png")])
 def test_literal_values_preserve_language(item, text):
     state = conversation(text)
-    state.update(router_decision="pending_response", manager_action="provide",
+    state.update(intent="pending_response", manager_action="provide",
                  answered_detail=PendingCustomerResponse(kind="detail", issue_id="issue-1", item=item))
     with patch.object(respond, "language_of") as detector:
         assert respond._expected_language(state) == "ar"

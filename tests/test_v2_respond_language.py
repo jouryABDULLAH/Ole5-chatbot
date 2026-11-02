@@ -14,7 +14,7 @@ def state(text):
     return {
         "identity": Identity(customer_id="test@example.com", email="test@example.com",
                              name="Test", organization="Test", product="OLE5", language="ar"),
-        "messages": [HumanMessage(content=text)], "router_decision": "other",
+        "messages": [HumanMessage(content=text)], "intent": "other",
     }
 
 
@@ -62,7 +62,7 @@ def test_username_detail_keeps_established_arabic_language():
     values = state("ahmad123")
     values.update({
         "language": "ar",
-        "router_decision": "pending_response",
+        "intent": "pending_response",
         "manager_action": "provide",
         "answered_detail": PendingCustomerResponse(
             kind="detail", issue_id="issue-1", item="username"
@@ -80,7 +80,7 @@ def test_new_english_question_still_switches_language_during_ticket_prep():
     values = state("How do I reset my password?")
     values.update({
         "language": "ar",
-        "router_decision": "question",
+        "intent": "question",
         "pending_customer_response": PendingCustomerResponse(
             kind="detail", issue_id="issue-1", item="username"
         ),

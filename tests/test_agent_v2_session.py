@@ -146,7 +146,7 @@ def test_v2_user_specific_data_bypasses_knowledge_router(model):
         "pending_customer_response": None,
     }
     result = router_node(state)
-    assert result["router_decision"] == "escalation"
+    assert result["intent"] == "escalation"
     assert "outside the chat scope" in result["route_reason"]
     assert model.calls == []
 
