@@ -17,6 +17,9 @@ from ole5_chat.agent.state import AgentState
 
 
 def after_router(state: AgentState) -> str:
+    target = state.get("next_target")
+    if target:
+        return target
     decision = state.get("intent") or state.get("router_decision")
     if decision == "question":
         return "search"
@@ -69,9 +72,9 @@ def build(checkpointer=None):
     graph.add_conditional_edges(
         "router", after_router, ["search", "ticket_operator", "ticket_enquiry", "respond"]
     )
-    graph.add_conditional_edges("search", after_search, ["respond", "ticket_operator"])
-    graph.add_edge("ticket_operator", "respond")
-    graph.add_edge("ticket_enquiry", "respond")
+    graph.add_edge("search", "router")
+    graph.add_edge("ticket_operator", "router")
+    graph.add_edge("ticket_enquiry", "router")
     graph.add_edge("respond", "validate")
     graph.add_conditional_edges("validate", after_validate, ["respond", "finalize"])
     graph.add_edge("finalize", END)
