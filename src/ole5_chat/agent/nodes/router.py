@@ -57,11 +57,10 @@ def _response_packet(state: AgentState) -> dict:
             "references": references,
             "scope": state.get("search_scope"),
         } if state.get("search_outcome") else None),
-        ticket_operator=state.get("ticket_operator_result") or ({
-            "action": state.get("manager_action"),
-            "reason": state.get("manager_reason"),
-            "ticket_result": state.get("ticket_result"),
-        } if state.get("manager_action") or state.get("ticket_result") else None),
+        # Only the structured result emitted by the current Ticket Operator
+        # worker is an authorization for Respond. Do not resurrect the
+        # turn-scoped ticket_result from an earlier turn.
+        ticket_operator=state.get("ticket_operator_result"),
         ticket_enquiry=state.get("ticket_enquiry_result"),
         created_ticket=created[-1] if created else None,
         pending_customer_response=state.get("pending_customer_response"),

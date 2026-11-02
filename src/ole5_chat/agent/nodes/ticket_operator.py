@@ -107,9 +107,14 @@ def _prepare(state: AgentState, issue: dict, *, skip_collection: bool = False, u
         draft = draft.model_copy(update={"urgent": True, "urgent_reason": draft.urgent_reason or issue["description"]})
     missing = [key for key, value in draft.required.items() if value is None]
     if skip_collection or urgent or not missing:
-        return _summary(
-            state, issue, draft,
+        instruction = (
+            "Because this is an urgent situation, prepare the ticket directly without the usual "
+            "ticket offer. Show the customer the summary and ask for confirmation before submission."
+            if urgent else
             f"The ticket summary is ready. Ask whether to submit it for: {issue['description']}."
+        )
+        return _summary(
+            state, issue, draft, instruction
         )
     item = missing[0]
     return _response(

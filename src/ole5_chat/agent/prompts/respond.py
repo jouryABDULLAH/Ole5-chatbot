@@ -67,11 +67,13 @@ def respond_prompt(state: AgentState, language: str | None = None) -> str:
     language = language or ("ar" if any("\u0600" <= char <= "\u06ff" for char in latest) else "en" if any(char.isascii() and char.isalpha() for char in latest) else (state.get("language") or state["identity"].language or "ar"))
     route = packet.get("intent") or context["intent"] or "other"
     outcome = packet_search.get("outcome") or context["search_outcome"] or "none"
+    current_operator_result = context.get("ticket_operator_result")
+    operator_authorized = route in {"question", "escalation", "pending_response"} and bool(current_operator_result)
     if route == "question" and outcome == "answered":
         task = "Answer the customer's product question using only the DIRECT passages. If they do not fully answer the question, say only what is supported and do not invent the missing part."
-    elif packet_enquiry or context["ticket_enquiry_result"]:
+    elif route == "ticket_enquiry" and (packet_enquiry or context["ticket_enquiry_result"]):
         task = "Answer the customer's ticket-status question using only the approved ticket status result and data. If clarification is required, ask only for the missing ticket reference. Preserve any active ticket preparation. Historical lookup does not automatically trigger a new-ticket offer. Report unavailable status as unavailable, and never claim support is working on the issue without an authorized status result."
-    elif packet_operator.get("ticket_result") or context["ticket_result"]:
+    elif operator_authorized:
         task = "Follow the authorized Ticket Operator response instruction/result below. Express it naturally in the customer's language. Do not change the workflow action, claim an API result that is not present, or say a ticket was created unless the result confirms creation."
         if outcome in {"partial", "no_answer"} and not any(item.get("relation") == "DIRECT" for item in references):
             task = "State clearly that the available knowledge base did not provide a supported answer, then follow the authorized Ticket Operator response instruction/result below. " + task.split(". ", 1)[1]
@@ -135,7 +137,7 @@ Active issue: {context['active_issue'] or 'none'}
 Search outcome: {outcome}
 Response packet: {packet or 'none'}
 Manager action: {packet_operator.get('action') or context['manager_action'] or 'none'}
-Manager instruction/result: {packet_operator.get('ticket_result') or context['ticket_result'] or 'none'}
+    Manager instruction/result: {(current_operator_result or {}).get('ticket_result') if isinstance(current_operator_result, dict) else 'none'}
 Actual previously created ticket records: {context['created_tickets']}
 Ticket enquiry result: {packet_enquiry or context['ticket_enquiry_result'] or 'none'}
 Current evidence:
