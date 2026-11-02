@@ -58,17 +58,22 @@ def _conversation_text(messages) -> str:
 def respond_prompt(state: AgentState, language: str | None = None) -> str:
     config = products.load(state["identity"].product)
     context = respond_context(state)
+    packet = context["response_packet"] or {}
+    packet_search = packet.get("search") or {}
+    packet_operator = packet.get("ticket_operator") or {}
+    packet_enquiry = packet.get("ticket_enquiry")
+    references = packet_search.get("references") or context["current_references"]
     latest = context["latest_customer_message"] or ""
     language = language or ("ar" if any("\u0600" <= char <= "\u06ff" for char in latest) else "en" if any(char.isascii() and char.isalpha() for char in latest) else (state.get("language") or state["identity"].language or "ar"))
-    route = context["intent"] or "other"
-    outcome = context["search_outcome"] or "none"
+    route = packet.get("intent") or context["intent"] or "other"
+    outcome = packet_search.get("outcome") or context["search_outcome"] or "none"
     if route == "question" and outcome == "answered":
         task = "Answer the customer's product question using only the DIRECT passages. If they do not fully answer the question, say only what is supported and do not invent the missing part."
-    elif context["ticket_enquiry_result"]:
+    elif packet_enquiry or context["ticket_enquiry_result"]:
         task = "Answer the customer's ticket-status question using only the approved ticket status result and data. If clarification is required, ask only for the missing ticket reference. Preserve any active ticket preparation. Historical lookup does not automatically trigger a new-ticket offer. Report unavailable status as unavailable, and never claim support is working on the issue without an authorized status result."
-    elif context["ticket_result"]:
+    elif packet_operator.get("ticket_result") or context["ticket_result"]:
         task = "Follow the authorized Ticket Operator response instruction/result below. Express it naturally in the customer's language. Do not change the workflow action, claim an API result that is not present, or say a ticket was created unless the result confirms creation."
-        if outcome in {"partial", "no_answer"} and not any(item.get("relation") == "DIRECT" for item in state.get("current_references", [])):
+        if outcome in {"partial", "no_answer"} and not any(item.get("relation") == "DIRECT" for item in references):
             task = "State clearly that the available knowledge base did not provide a supported answer, then follow the authorized Ticket Operator response instruction/result below. " + task.split(". ", 1)[1]
     elif route == "other":
         task = "Respond to the customer's actual conversational message. Handle greetings, thanks, capabilities/About, configured support-process facts, rephrasing from retained evidence, off-topic messages, and unclear input according to the persona. Ask only one focused clarification when needed."
@@ -128,12 +133,13 @@ Conversation history (oldest first):
 Pending customer response: {pending_text}
 Active issue: {context['active_issue'] or 'none'}
 Search outcome: {outcome}
-Manager action: {context['manager_action'] or 'none'}
-Manager instruction/result: {context['ticket_result'] or 'none'}
+Response packet: {packet or 'none'}
+Manager action: {packet_operator.get('action') or context['manager_action'] or 'none'}
+Manager instruction/result: {packet_operator.get('ticket_result') or context['ticket_result'] or 'none'}
 Actual previously created ticket records: {context['created_tickets']}
-Ticket enquiry result: {context['ticket_enquiry_result'] or 'none'}
+Ticket enquiry result: {packet_enquiry or context['ticket_enquiry_result'] or 'none'}
 Current evidence:
-{_evidence_text(context['current_references'])}
+{_evidence_text(references)}
 Retained evidence from the latest supported answer (use only when rephrasing an `other` turn):
 {_evidence_text((context['last_answer_evidence'] or {}).get('evidence', []) if route == "other" and isinstance(context['last_answer_evidence'], dict) else [])}
 

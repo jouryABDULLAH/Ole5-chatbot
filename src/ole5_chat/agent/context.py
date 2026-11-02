@@ -74,6 +74,7 @@ def respond_context(state: AgentState) -> dict:
         "manager_reason": state.get("manager_reason"),
         "ticket_result": state.get("ticket_result"),
         "intent": state.get("intent") or state.get("router_decision"),
+        "response_packet": state.get("response_packet"),
         "route_reason": state.get("route_reason"),
         "explicit_ticket_request": state.get("explicit_ticket_request", False),
     }
