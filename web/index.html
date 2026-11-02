@@ -47,6 +47,9 @@
     .tickets .state { padding: 0 8px; border-radius: 999px; background: var(--soft); color: var(--accent); font-size: 13px; }
     .tickets .date { color: var(--muted); font-size: 13px; }
     .tickets .empty { padding: 10px 14px; }
+    .search-controls { display:flex; align-items:center; gap:10px; margin-top:18px; padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:#fff; }
+    .search-controls label { color:var(--muted); font-size:14px; }
+    .search-controls select { padding:6px 8px; border:1px solid var(--line); border-radius:7px; background:#fff; font:inherit; }
     @media (max-width: 800px) { .docs { grid-template-columns: 1fr; } }
     @media (max-width: 600px) { header, main { padding-inline: 16px; } main { padding-block: 24px; } }
   </style>
@@ -56,6 +59,14 @@
   <main>
     <h1>Support</h1>
     <p>This page stands in for the ticket system. Open the chat to ask a question or report a problem. To see the sign-in step in Arabic, add <a href="?lang=ar">?lang=ar</a> to the address.</p>
+    <div class="search-controls" aria-label="Knowledge search mode">
+      <label for="search-mode">Knowledge search</label>
+      <select id="search-mode">
+        <option value="settings">Use settings</option>
+        <option value="find">find() · KB_TOP_K=10</option>
+        <option value="search">search() · KB_TOP_K=5</option>
+      </select>
+    </div>
     <section class="docs" aria-labelledby="docs-title">
       <nav><h2 id="docs-title">Knowledge base</h2><ul id="doc-list"></ul>
         <details class="tickets" open>
@@ -69,6 +80,17 @@
   <t2-chat></t2-chat>
   <script>
     const PRODUCT = "OLE5";
+    const searchMode = document.getElementById("search-mode");
+    fetch("/chat/search-settings").then((r) => r.ok ? r.json() : null).then((settings) => {
+      if (settings) searchMode.value = settings.mode;
+    });
+    searchMode.addEventListener("change", () => {
+      searchMode.disabled = true;
+      fetch("/chat/search-settings", { method: "POST", headers: { "Content-Type": "application/json" },
+             body: JSON.stringify({ mode: searchMode.value }) })
+        .catch(() => {})
+        .finally(() => { searchMode.disabled = false; });
+    });
     const lang = new URLSearchParams(location.search).get("lang");
     const chat = document.querySelector("t2-chat");
     if (lang) chat.setAttribute("lang", lang);

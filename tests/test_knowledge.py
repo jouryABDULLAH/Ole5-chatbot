@@ -33,6 +33,10 @@ def fake_find(monkeypatch):
                 raise value
             return value
 
+        def search(self, question, **kwargs):
+            value = self.find(question, **kwargs)
+            return value.chunks if hasattr(value, "chunks") else value
+
     monkeypatch.setattr(retriever, "tenant", lambda name: Tenant())
     return holder
 

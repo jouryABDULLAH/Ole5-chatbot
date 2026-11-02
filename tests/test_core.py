@@ -1,4 +1,4 @@
-"""Sign-in against customers.xlsx, value lists, chat.yaml, and the session API."""
+﻿"""Sign-in against customers.xlsx, value lists, chat.yaml, and the session API."""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -69,17 +69,6 @@ def test_support_hours_and_channel_load_for_both_products_and_default_to_empty()
     assert (bare.support_hours, bare.support_channel, bare.timezone) == ({}, {}, "UTC")
 
 
-def test_tasks_render_without_the_support_sentences_when_a_product_has_none(monkeypatch):
-    from types import SimpleNamespace
-    from ole5_chat.agent import handlers
-    bare = products.load("OLE5").model_copy(update={"support_hours": {}, "support_channel": {}})
-    monkeypatch.setattr(products, "load", lambda code: bare)
-    state = {"identity": SimpleNamespace(product="OLE5", language="en"), "language": "en"}
-    channel = handlers._support(state, "support_channel", handlers.CHANNEL)
-    none = handlers.TASKS["status_none"].format(channel=channel)
-    assert channel == "" and "Say how support works" not in none
-
-
 def test_ticket_row_is_appended():
     sheets.add_ticket({"ticket_id": "g1", "ticket_number": "T-1", "customer_email": "ole5@example.com",
                        "product": "OLE5", "title": "t", "created_at": "2026-10-19"})
@@ -139,3 +128,5 @@ def test_knowledge_document_is_served_rendered(tmp_path, monkeypatch):
     assert client.get("/chat/kb/OLE5/..%2F..%2Fetc").status_code == 404
     assert client.get("/chat/kb/OLE5").json() == ["نظام OLE5 — قاعدة المعرفة"]
     assert client.get("/chat/kb/RICH").status_code == 404
+
+

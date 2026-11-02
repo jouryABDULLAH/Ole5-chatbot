@@ -19,7 +19,7 @@ class LogHighlighter(ReprHighlighter):
         *ReprHighlighter.highlights,
         r"(?P<key>\b[a-z_]+)=",
         r"step=(?P<step>[a-z_]+)",
-        r"^(?P<node>message|greet|router|router_v2|handlers|respond_agent|respond_v2|post_check|classify|validate|validate_v2|finalize_v2|search|search_v2|ticket_manager_v2|ticket_status_v2|tickets|llm)\b",
+        r"^(?P<node>message|greet|router|router|handlers|respond_agent|respond|post_check|classify|validate|validate|finalize|search|search|ticket_operator|ticket_enquiry|tickets|llm)\b",
     ]
 
 

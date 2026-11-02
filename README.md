@@ -1,4 +1,4 @@
-# Ole5 chat
+﻿# Ole5 chat
 
 A support chat for Ole5 and RiCH customers. It answers questions from the product's knowledge base, cites the documents it used, and prepares a support ticket when it has no answer or the problem needs the team. The service is a FastAPI app; the chat is a web component (`web/t2-chat.js`) that any page can embed and that talks only to the HTTP API.
 
@@ -109,7 +109,8 @@ RUN_LIVE=1 pytest tests/test_router_live.py -s
 | Path | What it holds |
 |---|---|
 | `src/ole5_chat/api.py` | The HTTP API: sessions, messages, attachments, submit, documents, tickets. |
-| `src/ole5_chat/agent/` | The conversation graph: router, handlers, search, respond, validate. |
+| `src/ole5_chat/agent/` | The owner-routing conversation graph: Router, Search, Ticket Manager, Ticket Status, Respond, Validate and Finalize. |
+| `src/ole5_chat/support_core/` | Reusable ticket models, classification, catalog validation and semantic prompt helpers used by v2. |
 | `src/ole5_chat/knowledge/` | Knowledge search over RAGent2, and the stub. |
 | `src/ole5_chat/tickets/` | The Ticket API client, its mock, submit and status lookup. |
 | `products/<code>/chat.yaml` | Each product's persona, ticket topics and urgency rules. |
@@ -118,3 +119,4 @@ RUN_LIVE=1 pytest tests/test_router_live.py -s
 | `kb_export/` | The knowledge base documents as Markdown, served to the page. |
 | `web/` | The stand-in page and the chat widget. |
 | `evals/`, `scripts/` | Evaluation suites and scripts that run conversations through the graph. |
+

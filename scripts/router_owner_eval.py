@@ -1,4 +1,4 @@
-"""Live Router/Manager interpretation evaluation; no graph, retrieval or ticket calls.
+﻿"""Live Router/Manager interpretation evaluation; no graph, retrieval or ticket calls.
 
 Offline review: python scripts/router_owner_eval.py --list-cases
 Offline checks: python scripts/router_owner_eval.py --self-test
@@ -587,7 +587,7 @@ def call_model(layer: str, c: Case, system: str) -> dict:
 
 
 def request_flag(output: dict):
-    """Read current outputs and historical v1 saved outputs without changing old results."""
+    """Read current outputs and historical saved outputs without changing old results."""
     return output.get("explicit_ticket_request", output.get("wants_ticket"))
 
 
@@ -623,7 +623,7 @@ def render_report(payload: dict) -> str:
            f"Prompt variant: `{payload.get('prompt_variant', 'full')}`. Case group: `{payload.get('case_group', 'all')}`.", "",
            "A case passes only when all configured repetitions are correct. Trials are production-wrapper calls; "
            "the wrapper can retry internally. Counts below separate trial metrics from all-repetitions case metrics.", "",
-           "Scoring policy: question-only-request-flag-v1. The explicit preparation flag is scored only on "
+           "Scoring policy: question-only-request-flag. The explicit preparation flag is scored only on "
            "cases whose EXPECTED route is question, regardless of the predicted route. Other routes ignore "
            "the flag for correctness. Routes and call errors are still scored on every eligible case. "
            "Historical results rendered here are rescored under this policy; this is not evidence of a model improvement.", "",
@@ -672,7 +672,7 @@ def render_report(payload: dict) -> str:
                    f"{ratio(sum(pred(v)=='clarify' for _,v in yes), len(yes))} | "
                    f"{ratio(sum(pred(v)=='other' for _,v in non_other), len(non_other)) if layer=='router' else 'n/a'} |")
     out += ["", "## Explicit preparation request flag errors", "",
-            "Current field: `explicit_ticket_request`; historical v1 field: `wants_ticket`. Expected meanings are unchanged.",
+            "Current field: `explicit_ticket_request`; historical field: `wants_ticket`. Expected meanings are unchanged.",
             "", "| Case / trial | Type | Expected | Returned | Reason |", "|---|---|---|---|---|"]
     router_pairs = [(r,i,t["router"]) for r in rows if r["case"]["expect_route"] == "question"
                     for i,t in enumerate(r["trials"],1) if "router" in t]
@@ -833,7 +833,7 @@ def main() -> None:
     if not settings.groq_api_key:
         parser.error("GROQ_API_KEY is not set; no calls made")
     payload = {"schema_version": 4, "prompt_revision": "boundary-clarification-v4-prompt-variants-and-state-fixtures",
-               "scoring_policy": "question-only-request-flag-v1", "started_at": datetime.now(timezone.utc).isoformat(),
+               "scoring_policy": "question-only-request-flag", "started_at": datetime.now(timezone.utc).isoformat(),
                "status": "running", "runs": args.runs, "layer": args.layer,
                "prompt_variant": args.prompt_variant, "case_group": args.case_group,
                "case_count": sum(bool(c.expect_action) for c in cases) if args.layer == "manager" else len(cases),
@@ -880,3 +880,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

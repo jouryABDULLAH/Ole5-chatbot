@@ -1,9 +1,9 @@
-import logging
+﻿import logging
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from ole5_chat import llm
-from ole5_chat.agent_v2.prompts.search import search_prompt
+from ole5_chat.agent.prompts.search import search_prompt
 from ole5_chat.identity import Identity
 from ole5_chat.knowledge.tool import make_search_tool
 
@@ -37,3 +37,5 @@ for run in range(3):
         print("TEXT", result.text)
     except Exception as exc:
         print(type(exc).__name__, str(exc)[:1000])
+
+

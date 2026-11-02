@@ -1,62 +1,84 @@
-"""The conversation graph, one invoke per customer message. The first run sends the persona's introduction from chat.yaml, with no model call. Every later message goes to the router, which picks next from the options of the conversation's phase. The handler for next applies it to the state and sets the task (a Submit button turn arrives with next already set and skips the router), search runs the searches the message needs, respond_agent writes the reply, post_check queues a question the reply offered a ticket for, and validate posts the reply."""
+﻿"""Graph skeleton for the new owner-routing design."""
 
-import logging
+from collections.abc import Callable
 
-from langchain_core.messages import AIMessage
 from langgraph.graph import END, START, StateGraph
 
-from ole5_chat import products
-from ole5_chat.agent import handlers
-from ole5_chat.agent.respond import respond_agent
-from ole5_chat.agent.search import search
-from ole5_chat.agent.router import router
-from ole5_chat.agent.state import ChatState
-
-log = logging.getLogger(__name__)
-
-HANDLER_NODES = tuple(dict.fromkeys(handlers.HANDLERS.values()))
-
-
-def route(state: ChatState) -> str:
-    """greet on the first run; a button turn arrives with next already set and skips the router."""
-    if not state["messages"]:
-        return "greet"
-    return handlers.handler(state) if state.get("next") else "router"
+from ole5_chat.agent.nodes import (
+    finalize_node,
+    respond_node,
+    router_node,
+    search_node,
+    ticket_operator_node,
+    ticket_enquiry_node,
+    validate_node,
+)
+from ole5_chat.agent.state import AgentState
 
 
-def after_router(state: ChatState) -> str:
-    """A failed route has no next and goes straight to validate with the try-again reply."""
-    return handlers.handler(state) if state.get("next") else "validate"
+def after_router(state: AgentState) -> str:
+    decision = state.get("router_decision")
+    if decision == "question":
+        return "search"
+    if decision == "pending_response" or decision == "escalation":
+        return "ticket_operator"
+    if decision == "ticket_enquiry":
+        return "ticket_enquiry"
+    if decision == "other":
+        return "respond"
+    raise ValueError("Router must set router_decision before graph routing")
 
 
-def greet(state: ChatState) -> dict:
-    who = state["identity"]
-    log.info("greet  product=%s language=%s", who.product, who.language)
-    return {"messages": [AIMessage(content=products.load(who.product).greet(who.language))],
-            "sources": [], "reply": None}
+def entry_route(state: AgentState) -> str:
+    """Route an explicit Submit-button event directly to Ticket Operator."""
+
+    return "ticket_operator" if state.get("input_event") == "submit" else "router"
 
 
-def validate(state: ChatState) -> dict:
-    reply = state["reply"]
-    log.info("validate  phase=%s pending=%d sources=%s", state["phase"], len(state["pending"]), reply.sources)
-    return {"messages": [AIMessage(content=reply.say, additional_kwargs={"sources": reply.sources})],
-            "sources": reply.sources, "last_retrieval": None,
-            "note": None, "task": None, "next": None, "offered": False}
+def after_search(state: AgentState) -> str:
+    outcome = state.get("search_outcome")
+    if outcome in {"answered", "failed"}:
+        return "respond"
+    if outcome in {"partial", "no_answer"}:
+        return "ticket_operator"
+    raise ValueError("Search must set search_outcome before graph routing")
 
 
-def build(checkpointer):
-    g = StateGraph(ChatState)
-    for name, node in (("greet", greet), ("router", router), ("search", search), ("respond_agent", respond_agent),
-                       ("post_check", handlers.post_check), ("validate", validate)):
-        g.add_node(name, node)
-    for name in HANDLER_NODES:
-        g.add_node(name, getattr(handlers, name))
-        g.add_edge(name, "search")
-    g.add_conditional_edges(START, route, ["greet", "router", *HANDLER_NODES])
-    g.add_conditional_edges("router", after_router, [*HANDLER_NODES, "validate"])
-    g.add_edge("search", "respond_agent")
-    g.add_edge("respond_agent", "post_check")
-    g.add_edge("post_check", "validate")
-    g.add_edge("validate", END)
-    g.add_edge("greet", END)
-    return g.compile(checkpointer=checkpointer)
+def after_validate(state: AgentState) -> str:
+    """Only a requested, budgeted repair returns to Respond."""
+    return "respond" if state.get("validation_outcome") == "repair" else "finalize"
+
+
+def build(checkpointer=None):
+    """Compile the graph."""
+
+    graph = StateGraph(AgentState)
+    nodes: dict[str, Callable[[AgentState], dict]] = {
+        "router": router_node,
+        "search": search_node,
+        "ticket_operator": ticket_operator_node,
+        "ticket_enquiry": ticket_enquiry_node,
+        "respond": respond_node,
+        "validate": validate_node,
+        "finalize": finalize_node,
+    }
+    for name, node in nodes.items():
+        graph.add_node(name, node)
+
+    graph.add_conditional_edges(START, entry_route, ["router", "ticket_operator"])
+    graph.add_conditional_edges(
+        "router", after_router, ["search", "ticket_operator", "ticket_enquiry", "respond"]
+    )
+    graph.add_conditional_edges("search", after_search, ["respond", "ticket_operator"])
+    graph.add_edge("ticket_operator", "respond")
+    graph.add_edge("ticket_enquiry", "respond")
+    graph.add_edge("respond", "validate")
+    graph.add_conditional_edges("validate", after_validate, ["respond", "finalize"])
+    graph.add_edge("finalize", END)
+    return graph.compile(checkpointer=checkpointer)
+
+
+graph = build()
+
+
+

@@ -6,6 +6,7 @@
       signinTitle: "Chat with support", signinBody: "Enter the email you use for support.",
       email: "Email", cont: "Continue", checking: "Checking",
       placeholder: "Write a message", send: "Send", writing: "Writing a reply",
+      progress: { understanding: "Understanding your request…", searching: "Searching the knowledge base…", ticket: "Preparing support details…", answering: "Preparing the answer…", checking: "Checking the answer…", done: "Completed", error: "Unable to complete the request." },
       source: "Source", sources: "Sources",
       summary: "Ticket summary", submit: "Submit ticket", submitting: "Submitting", submitted: "Ticket {number} submitted", submittedButton: "Submitted",
       fields: { queue: "Queue", type: "Type", subtype: "Subtype", priority: "Priority", title: "Title", summary: "Summary",
@@ -19,6 +20,7 @@
       tooMany: "No more files can be attached to this ticket.",
     },
     ar: {
+      progress: { understanding: "أفهم طلبك…", searching: "أبحث في قاعدة المعرفة…", ticket: "أجهز تفاصيل طلب الدعم…", answering: "أجهز الإجابة…", checking: "أتحقق من الإجابة…", done: "اكتمل الطلب", error: "تعذر إكمال الطلب." },
       open: "محادثة", close: "إغلاق المحادثة", title: "الدعم",
       signinTitle: "تحدث مع الدعم", signinBody: "أدخل البريد الإلكتروني الذي تستخدمه للدعم.",
       email: "البريد الإلكتروني", cont: "متابعة", checking: "جارٍ التحقق",
@@ -187,6 +189,11 @@
       this.busy = false;
       this.error = "";
       this.pending = [];
+      this.progress = null;
+      this.progressTimer = null;
+      this.progressSource = null;
+      this.progressElement = null;
+      this.progressLanguage = null;
     }
 
     get api() { return (this.getAttribute("api") || "").replace(/\/$/, ""); }
@@ -208,6 +215,8 @@
       /* Keep what was typed across a re-render, but not from the email field into the message box or back. */
       const typed = this.root.querySelector("textarea, input:not([type=file])");
       if (typed && typed.tagName === (this.view ? "TEXTAREA" : "INPUT")) this.draft = typed.value;
+      /* render() replaces the shadow DOM, so any progress label from the old tree is no longer valid. */
+      this.progressElement = null;
       this.setAttribute("dir", this.lang === "ar" ? "rtl" : "ltr");
       this.root.replaceChildren(el("style", {}, CSS), this.open ? this.panel() : this.launcher());
       const field = this.root.querySelector("textarea, input:not([type=file])");
@@ -268,8 +277,15 @@
       if (this.view.draft_ready && this.view.ticket_draft) {
         log.append(this.card(this.view.ticket_draft, (this.view.attachments || []).map((f) => f.file_name)));
       }
-      if (this.busy) log.append(el("div", { class: "writing" }, el("span", { class: "dots", "aria-hidden": "true" },
-                                    el("i"), el("i"), el("i")), this.t.writing));
+      if (this.busy) {
+        const key = this.progress && this.progress.key;
+        const progressText = TEXT[this.progress?.language || this.lang] || TEXT.en;
+        const label = (key && progressText.progress[key]) || this.t.writing;
+        const progressLabel = el("span", { class: "progress-label" }, label);
+        this.progressElement = progressLabel;
+        log.append(el("div", { class: "writing", "aria-live": "polite" }, el("span", { class: "dots", "aria-hidden": "true" },
+                                      el("i"), el("i"), el("i")), progressLabel));
+      }
       if (this.error) log.append(el("p", { class: "error", role: "alert" }, this.error));
       log.append(el("button", { class: "restart", type: "button", onclick: () => this.restart() }, this.t.restart));
 
@@ -393,6 +409,8 @@
     async send(text) {
       text = text.trim();
       if ((!text && !this.pending.length) || this.busy) return;
+      /* Use the outgoing message for the first progress label; the session language may still reflect the prior turn. */
+      this.progressLanguage = this.detectLanguage(text);
       const before = this.view;
       const shown = this.pending.length ? `${text}\n[attached: ${this.pending.map((f) => f.name).join(", ")}]` : text;
       this.view = { ...before, messages: [...before.messages, { author: "customer", text: shown, sources: [] }] };
@@ -404,32 +422,97 @@
           const added = await upload(this.api, `/chat/sessions/${before.session_id}/attachments`, file);
           ids.push(added.id);
         }
+        this.watchProgress(before.session_id, this.progressLanguage);
         this.view = await call(this.api, "POST", `/chat/sessions/${before.session_id}/messages`,
                                { text, attachment_ids: ids });
         this.pending = [];
       } catch (err) {
-        if (err.status === 404) { this.restart(); return; }
+        if (err.status === 404) { this.stopProgress(); this.restart(); return; }
         this.view = before;
         this.draft = text;
         this.error = err.status === 413 ? this.t.tooBig : err.status === 415 ? this.t.badType
                    : err.status === 409 ? this.t.tooMany : this.explain(err);
       }
+      this.stopProgress();
       this.busy = false; this.render(); this.focusInput();
     }
 
     async submitTicket() {
       if (this.busy) return;
       this.busy = true; this.error = ""; this.render();
+      this.watchProgress(this.view.session_id, this.lang);
       try {
         this.view = await call(this.api, "POST", `/chat/sessions/${this.view.session_id}/submit`);
       } catch (err) {
-        if (err.status === 404) { this.restart(); return; }
+        if (err.status === 404) { this.stopProgress(); this.restart(); return; }
         this.error = err.detail || this.explain(err);
       }
+      this.stopProgress();
       this.busy = false; this.render();
     }
 
+    detectLanguage(text) {
+      const arabic = (text.match(/[\u0600-\u06ff]/g) || []).length;
+      const latin = (text.match(/[A-Za-z]/g) || []).length;
+      if (arabic > latin) return "ar";
+      if (latin > arabic) return "en";
+      return this.lang;
+    }
+
+    watchProgress(sessionId, language = this.lang) {
+      this.stopProgress();
+      this.progressLanguage = language;
+      this.progress = { key: "understanding", language };
+      this.render();
+      const token = {};
+      this.progressToken = token;
+      const streamUrl = `${this.api}/chat/sessions/${encodeURIComponent(sessionId)}/progress/stream`;
+      if (typeof EventSource === "function") {
+        const source = new EventSource(streamUrl);
+        this.progressSource = source;
+        source.onmessage = (event) => {
+          if (!this.busy || this.progressToken !== token) return;
+          try {
+            const value = JSON.parse(event.data);
+            if (value.key !== "done" && value.key !== "error") this.updateProgress(value);
+          } catch (_) { /* Ignore malformed progress events; the message request remains authoritative. */ }
+        };
+        source.onerror = () => {
+          source.close();
+          if (this.progressSource === source) this.progressSource = null;
+        };
+        return;
+      }
+      /* Test/legacy fallback for environments without EventSource. Browsers use SSE. */
+      const read = () => fetch(`${this.api}/chat/sessions/${encodeURIComponent(sessionId)}/progress`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((value) => { if (value && this.busy && this.progressToken === token && value.key !== "done") this.updateProgress(value); })
+        .catch(() => {});
+      read();
+      this.progressTimer = setInterval(read, 350);
+    }
+
+    updateProgress(value) {
+      /* Keep the UI in the outgoing message language until the request finishes. */
+      this.progress = { ...value, language: this.progressLanguage || value.language || this.lang };
+      if (!this.progressElement) return;
+      const progressText = TEXT[this.progress.language] || TEXT.en;
+      this.progressElement.textContent = (this.progress.key && progressText.progress[this.progress.key]) || this.t.writing;
+    }
+
+    stopProgress() {
+      this.progressToken = null;
+      if (this.progressSource) this.progressSource.close();
+      this.progressSource = null;
+      if (this.progressTimer) clearInterval(this.progressTimer);
+      this.progressTimer = null;
+      this.progress = null;
+      this.progressElement = null;
+      this.progressLanguage = null;
+    }
+
     restart() {
+      this.stopProgress();
       store.set(null);
       this.view = null; this.busy = false; this.error = ""; this.draft = "";
       this.render(); this.focusInput();

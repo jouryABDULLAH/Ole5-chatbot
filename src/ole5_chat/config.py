@@ -27,7 +27,6 @@ class Settings(BaseSettings):
     qdrant_session_cookie: str = "ole5_session"
     kb_backend: Literal["stub", "ragent2"] = "stub"
     kb_retrieval_mode: Literal["agentic", "direct"] = "agentic"
-    agent_graph: Literal["v1", "v2"] = "v1"
     kb_tenants: dict[str, str] = {"OLE5": "ole5"}
     embedding_service_url: str = "https://ds.t2.sa/text_embed"
     kb_candidate_pool: int = 30
@@ -38,7 +37,7 @@ class Settings(BaseSettings):
     qdrant_timeout: float = 60.0
     kb_find_timeout: float = 260.0
     kb_find_retries: int = 1
-    kb_max_searches: int = 4
+    kb_max_searches: int = 2 #4
     collect_rounds: int = 3  # questions asked in collect at most; then the summary is shown with what is missing
 
     sheets_dir: Path = ROOT / "sheets"
@@ -58,6 +57,34 @@ class Settings(BaseSettings):
     ticket_api_url: str | None = None
     ticket_api_user: str | None = None
     ticket_api_password: SecretStr | None = None
+
+
+_SEARCH_DEFAULTS: tuple[str, int] | None = None
+
+
+def search_settings() -> tuple[str, int]:
+    """Return the effective retrieval mode and result count."""
+    global _SEARCH_DEFAULTS
+    settings = get_settings()
+    if _SEARCH_DEFAULTS is None:
+        _SEARCH_DEFAULTS = (settings.kb_retrieval_mode, settings.kb_top_k)
+    return settings.kb_retrieval_mode, settings.kb_top_k
+
+
+def set_search_settings(mode: Literal["agentic", "direct"] | None = None, top_k: int | None = None) -> tuple[str, int]:
+    """Apply a process-local UI override, or restore the values from settings when both are omitted."""
+    global _SEARCH_DEFAULTS
+    settings = get_settings()
+    if _SEARCH_DEFAULTS is None:
+        _SEARCH_DEFAULTS = (settings.kb_retrieval_mode, settings.kb_top_k)
+    if mode is None and top_k is None:
+        selected_mode, selected_top_k = _SEARCH_DEFAULTS
+    else:
+        selected_mode = mode or settings.kb_retrieval_mode
+        selected_top_k = top_k if top_k is not None else (10 if selected_mode == "agentic" else 5)
+    settings.kb_retrieval_mode = selected_mode
+    settings.kb_top_k = selected_top_k
+    return search_settings()
 
 
 @lru_cache(maxsize=1)

@@ -69,6 +69,12 @@ def tenant(name: str) -> Any:
     return ragent().tenant(name)
 
 
+def reset() -> None:
+    """Rebuild cached RAGent2 objects after a search setting changes."""
+    tenant.cache_clear()
+    ragent.cache_clear()
+
+
 def warm(tenants: list[str]) -> None:
     rag = ragent()
     for part in ("client", "embedder", "retriever", "find_model"):

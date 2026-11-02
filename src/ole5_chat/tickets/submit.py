@@ -1,4 +1,4 @@
-"""The Submit flow: checks the ready draft again, creates the ticket with the summary and the conversation, classifies it with an internal note that links the attached files, records it in tickets.xlsx and the files in attachments.xlsx, and returns the ticket."""
+﻿"""The Submit flow: checks the ready draft again, creates the ticket with the summary and the conversation, classifies it with an internal note that links the attached files, records it in tickets.xlsx and the files in attachments.xlsx, and returns the ticket."""
 
 import logging
 from datetime import datetime, timezone
@@ -6,9 +6,9 @@ from datetime import datetime, timezone
 from langchain_core.messages import BaseMessage
 
 from ole5_chat import attachments, sheets, values
-from ole5_chat.agent.contracts import Classification
-from ole5_chat.agent.state import ChatState
-from ole5_chat.agent.validate import check_ticket
+from ole5_chat.support_core.contracts import Classification
+from ole5_chat.support_core.state import ChatState
+from ole5_chat.support_core.validate import check_ticket
 from ole5_chat.tickets.client import TicketApi, TicketApiError
 
 log = logging.getLogger(__name__)
@@ -84,3 +84,5 @@ def submit(state: ChatState, api: TicketApi) -> tuple[dict, list[str]]:
     log.info("tickets  created number=%s product=%s queue=%s", created["TicketNumber"], who.product, draft.queue)
     ticket = {"ticket_id": created["TicketID"], "ticket_number": created["TicketNumber"], "created_at": created_at}
     return ticket, corrections
+
+

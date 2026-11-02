@@ -1,14 +1,14 @@
-from unittest.mock import patch
+﻿from unittest.mock import patch
 import re
 
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage, HumanMessage
 
 from ole5_chat import api
-from ole5_chat.agent_v2 import session
-from ole5_chat.agent_v2.contracts import PendingCustomerResponse, RouterDecisionWithoutPending, manager_schema
-from ole5_chat.agent_v2.nodes.router import router_node
-from ole5_chat.agent.contracts import Classification
+from ole5_chat.agent import session
+from ole5_chat.agent.contracts import PendingCustomerResponse, RouterDecisionWithoutPending, manager_schema
+from ole5_chat.agent.nodes.router import router_node
+from ole5_chat.support_core.contracts import Classification
 from ole5_chat.identity import Identity
 
 
@@ -43,11 +43,11 @@ def test_send_sets_message_event_and_passes_customer_message(monkeypatch):
 
     captured = {}
 
-    def invoke(values, config):
+    def stream(values, config, stream_mode="updates"):
         captured.update(values)
-        return {**session.get(session_id), "messages": [HumanMessage(content="Chrome")]}
+        yield {"router": {}}
 
-    monkeypatch.setattr(session._graph, "invoke", invoke)
+    monkeypatch.setattr(session._graph, "stream", stream)
     session.send(session_id, "Chrome")
     assert captured["input_event"] == "message"
     assert captured["messages"][0].content == "Chrome"
@@ -62,17 +62,16 @@ def test_submit_sets_submit_event_without_calling_router(monkeypatch):
 
     captured = {}
 
-    def invoke(values, config):
+    def stream(values, config, stream_mode="updates"):
         captured.update(values)
-        return session.get(session_id)
+        yield {"ticket_operator": {}}
 
-    monkeypatch.setattr(session._graph, "invoke", invoke)
+    monkeypatch.setattr(session._graph, "stream", stream)
     session.submit(session_id)
     assert captured == {"input_event": "submit"}
 
 
 def test_api_switch_and_v2_state_view(monkeypatch):
-    monkeypatch.setenv("AGENT_GRAPH", "v2")
     from ole5_chat.config import get_settings
 
     get_settings.cache_clear()
@@ -95,7 +94,6 @@ def test_v2_ticket_submission_returns_valid_customer_ticket_card(model, monkeypa
             number = match.group(1) if match else "the ticket"
             return AIMessage(content=f"Your ticket number is {number}.")
 
-    monkeypatch.setenv("AGENT_GRAPH", "v2")
     get_settings.cache_clear()
     monkeypatch.setattr(llm, "tool_client", Writer())
     client = TestClient(api.app)
@@ -168,7 +166,6 @@ def test_v2_user_specific_question_goes_to_ticket_offer_without_search(model, mo
         def invoke(self, messages):
             return AIMessage(content="I cannot access account details here. Would you like a support ticket?")
 
-    monkeypatch.setenv("AGENT_GRAPH", "v2")
     get_settings.cache_clear()
     writer = Writer()
     monkeypatch.setattr(llm, "tool_client", writer)
@@ -182,7 +179,9 @@ def test_v2_user_specific_question_goes_to_ticket_offer_without_search(model, mo
     view = response.json()
     assert view["phase"] == "offer_ticket"
     assert "ticket" in view["messages"][-1]["text"].lower()
-    assert model.calls == []
+    # Response guards run, but no Router, Search or classification model is needed.
+    from ole5_chat.agent.contracts import Language, TicketActionCheck
+    assert all(schema in (Language, TicketActionCheck) for schema, _ in model.calls)
     assert not getattr(writer, "bound_tools", None)
     assert api._session_backend() is session
 
@@ -197,3 +196,8 @@ def test_v2_user_specific_question_goes_to_ticket_offer_without_search(model, mo
     view = api._view("v2-session", state)
     assert view.phase == "offer_ticket"
     get_settings.cache_clear()
+
+
+
+
+

@@ -4,22 +4,24 @@ import re
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Response, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from langchain_core.messages import BaseMessage
 from pydantic import BaseModel, ConfigDict, Field
 
-from ole5_chat import attachments, products, sessions
-from ole5_chat.agent_v2 import session as v2_sessions
+from ole5_chat import attachments, products
+from ole5_chat.agent import session as agent_sessions
 from ole5_chat.attachments import AttachmentRefused
-from ole5_chat.config import get_settings
-from ole5_chat.agent.contracts import Phase
-from ole5_chat.agent.state import ChatState, TicketDraft
+from ole5_chat.config import get_settings, search_settings, set_search_settings
+from ole5_chat.agent.state import AgentState
+from ole5_chat.support_core.state import TicketDraft
 from ole5_chat.identity import NotRegistered
 from ole5_chat.tickets import client as ticket_api
-from ole5_chat.tickets import status as ticket_status
+from ole5_chat.tickets import status as ticket_api_status
 from ole5_chat.tickets.submit import SubmitRefused
 
 app = FastAPI(title="Ole5 chat", telemetry={"tracing": False})
+
+Phase = Literal["none", "offer_ticket", "collect", "confirm"]
 
 
 class StartSession(BaseModel):
@@ -33,6 +35,52 @@ class NewMessage(BaseModel):
 
     text: str = Field(max_length=4000)
     attachment_ids: list[str] = []
+
+
+class SearchSettingsUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["settings", "find", "search"]
+
+
+@app.get("/chat/search-settings")
+def get_search_settings():
+    mode, top_k = search_settings()
+    return {"mode": "find" if mode == "agentic" else "search", "retrieval_mode": mode, "top_k": top_k}
+
+
+@app.get("/chat/sessions/{session_id}/progress")
+def session_progress(session_id: str):
+    try:
+        return _session_backend().progress(session_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="session not found")
+
+
+@app.get("/chat/sessions/{session_id}/progress/stream")
+def session_progress_stream(session_id: str):
+    try:
+        backend = _session_backend()
+        backend.get(session_id)
+        events = backend.progress_stream(session_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="session not found")
+    return StreamingResponse(events, media_type="text/event-stream", headers={
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",
+    })
+
+
+@app.post("/chat/search-settings")
+def update_search_settings(update: SearchSettingsUpdate):
+    if update.mode == "settings":
+        mode, top_k = set_search_settings()
+    else:
+        retrieval_mode = "agentic" if update.mode == "find" else "direct"
+        mode, top_k = set_search_settings(retrieval_mode, 10 if update.mode == "find" else 5)
+    from ole5_chat.knowledge import retriever
+    retriever.reset()
+    return {"mode": "find" if mode == "agentic" else "search", "retrieval_mode": mode, "top_k": top_k}
 
 
 class Line(BaseModel):
@@ -110,34 +158,28 @@ def _attachment(f: dict) -> AttachmentView:
 
 
 def _session_backend():
-    """Select the session/graph implementation for all chat endpoints."""
+    """Return the v2 session adapter used by every chat endpoint."""
 
-    return v2_sessions if get_settings().agent_graph == "v2" else sessions
+    return agent_sessions
 
 
-def _v2_phase(state: dict) -> str:
+def _phase(state: dict) -> str:
     pending = state.get("pending_customer_response")
     if pending is not None:
         return {"offer": "offer_ticket", "detail": "collect", "summary": "confirm"}[pending.kind]
     return "none"
 
 
-def _view(session_id: str, state: ChatState) -> SessionView:
-    if "phase" in state:
-        phase = state["phase"]
-        draft = state.get("ticket_draft")
-    else:
-        from ole5_chat.agent.state import TicketDraft
-
-        phase = _v2_phase(state)
-        raw_draft = state.get("ticket_draft")
-        draft = None
-        if raw_draft:
-            fields = set(TicketDraft.model_fields)
-            values = {key: value for key, value in raw_draft.items() if key in fields}
-            values.setdefault("product", state["identity"].product)
-            values.setdefault("missing", [])
-            draft = TicketDraft(**values)
+def _view(session_id: str, state: AgentState) -> SessionView:
+    phase = _phase(state)
+    raw_draft = state.get("ticket_draft")
+    draft = None
+    if raw_draft:
+        fields = set(TicketDraft.model_fields)
+        values = {key: value for key, value in raw_draft.items() if key in fields}
+        values.setdefault("product", state["identity"].product)
+        values.setdefault("missing", [])
+        draft = TicketDraft(**values)
 
     who = state["identity"]
     created = []
@@ -275,4 +317,8 @@ def my_tickets(session_id: str) -> list[TicketView]:
         email = _session_backend().current_identity(session_id).email
     except _session_backend().SessionNotFound as exc:
         raise HTTPException(status_code=404, detail="Session not found") from exc
-    return [TicketView(**t) for t in ticket_status.my_tickets(email, ticket_api.ticket_client())]
+    return [TicketView(**t) for t in ticket_api_status.my_tickets(email, ticket_api.ticket_client())]
+
+
+
+
