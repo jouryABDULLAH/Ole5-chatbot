@@ -19,7 +19,7 @@ def _definitions(state: AgentState) -> list[dict]:
     ]
 
 
-def ticket_enquiry_node(state: AgentState) -> dict:
+def _ticket_enquiry_node(state: AgentState) -> dict:
     log.info("ticket_enquiry  customer=%s", state["identity"].email)
     try:
         decision = llm.structured(
@@ -57,6 +57,14 @@ def ticket_enquiry_node(state: AgentState) -> dict:
             "definitions": _definitions(state),
         }
     }
+
+
+def ticket_enquiry_node(state: AgentState) -> dict:
+    """Run Ticket Enquiry and expose its structured result to the orchestrator."""
+
+    result = _ticket_enquiry_node(state)
+    result["ticket_enquiry_result"] = result.get("ticket_enquiry_result")
+    return result
 
 
 

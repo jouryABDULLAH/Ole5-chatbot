@@ -41,10 +41,12 @@ class AgentState(MessagesState, total=False):
     explicit_ticket_request: bool
     current_request: str | None
     search_scope: Literal["product", "outside_scope"] | None
+    search_result: dict | None
     current_references: list[dict]
     search_outcome: SearchOutcome | None
     unresolved_information: dict | None
     ticket_result: dict | None
+    ticket_operator_result: dict | None
     ticket_enquiry_result: dict | None
     manager_action: str | None
     manager_reason: str | None
@@ -84,10 +86,12 @@ def initial_state(identity: Identity) -> AgentState:
         explicit_ticket_request=False,
         current_request=None,
         search_scope=None,
+        search_result=None,
         current_references=[],
         search_outcome=None,
         unresolved_information=None,
         ticket_result=None,
+        ticket_operator_result=None,
         ticket_enquiry_result=None,
         manager_action=None,
         manager_reason=None,

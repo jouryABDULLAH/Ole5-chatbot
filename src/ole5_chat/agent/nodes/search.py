@@ -22,7 +22,7 @@ _OUTSIDE_PRODUCT_SCOPE = re.compile(
     re.IGNORECASE)
 
 
-def search_node(state: AgentState) -> dict:
+def _search_node(state: AgentState) -> dict:
     request = state.get("current_request") or next(
         (str(message.content) for message in reversed(state.get("messages", [])) if message.type == "human"), ""
     )
@@ -130,6 +130,20 @@ def search_node(state: AgentState) -> dict:
         "search_scope": "product",
         "unresolved_information": None if outcome == "answered" else {"request": request, "retrieval": retrieval.as_json()},
     }
+
+
+def search_node(state: AgentState) -> dict:
+    """Run Search and expose its complete structured result to the orchestrator."""
+
+    result = _search_node(state)
+    result["search_result"] = {
+        "request": result.get("current_request"),
+        "outcome": result.get("search_outcome"),
+        "references": result.get("current_references", []),
+        "scope": result.get("search_scope"),
+        "unresolved_information": result.get("unresolved_information"),
+    }
+    return result
 
 
 

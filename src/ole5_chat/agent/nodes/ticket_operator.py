@@ -317,7 +317,7 @@ def _submit(state: AgentState, issue: dict) -> dict:
     }
 
 
-def ticket_operator_node(state: AgentState) -> dict:
+def _ticket_operator_node(state: AgentState) -> dict:
     context = _context(state)
     log.info("ticket_operator  context=%s event=%s active=%s pending=%d", context,
              state.get("input_event"), bool(state.get("active_issue")), len(state.get("pending_issues", [])))
@@ -360,6 +360,18 @@ def ticket_operator_node(state: AgentState) -> dict:
     return {"manager_action": action, "manager_reason": reason, **update,
             # Capture the field answered before _prepare advances or clears it.
             "answered_detail": state.get("pending_customer_response") if context == "detail" and action == "provide" else None}
+
+
+def ticket_operator_node(state: AgentState) -> dict:
+    """Run Ticket Operator and expose its structured result to the orchestrator."""
+
+    result = _ticket_operator_node(state)
+    result["ticket_operator_result"] = {
+        "action": result.get("manager_action"),
+        "reason": result.get("manager_reason"),
+        "ticket_result": result.get("ticket_result"),
+    }
+    return result
 
 
 
