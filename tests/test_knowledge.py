@@ -78,12 +78,13 @@ def test_considered_lists_graded_documents_not_returned(fake_find):
 
 def test_backend_switch(monkeypatch, fake_find):
     fake_find["value"] = result(chunk("DIRECT", "KB-REAL"))
-    assert search.search("password", "OLE5").documents == ["STUB-01 Signing in"]
+    question = "كيف احفظ الرسالة كمسودة بدلًا من إرسالها"
+    assert search.search(question, "OLE5").documents == ["دليل استخدام نظام OLE5 — الإجراءات والشاشات"]
 
     monkeypatch.setenv("KB_BACKEND", "ragent2")
     get_settings.cache_clear()
-    assert search.search("password", "OLE5").documents == ["KB-REAL"]
-    assert search.search("password", "RICH").documents == ["STUB-01 Signing in"]
+    assert search.search(question, "OLE5").documents == ["KB-REAL"]
+    assert search.search(question, "RICH").documents == ["دليل استخدام نظام OLE5 — الإجراءات والشاشات"]
 
 
 def test_rejected_tool_call_is_retried_once(fake_find):

@@ -103,7 +103,7 @@ def test_v2_ticket_submission_returns_valid_customer_ticket_card(model, monkeypa
     session_id = start.json()["session_id"]
 
     model.add(
-        RouterDecisionWithoutPending(decision="escalation", explicit_ticket_request=True,
+        RouterDecisionWithoutPending(intent="escalation", next_target="ticket_operator", explicit_ticket_request=True,
                                      reason="Customer requested a ticket."),
         manager_schema("none")(action="register_issue", reason="Register the requested issue."),
         Classification(

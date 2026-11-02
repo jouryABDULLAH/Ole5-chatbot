@@ -20,14 +20,17 @@ class AgentState(MessagesState, total=False):
     # Persistent conversation/workflow state.
     identity: Identity
     language: str | None
+
     active_issue: dict | None
     pending_issues: list[dict]
     ticket_draft: dict | None
     pending_customer_response: PendingCustomerResponse | None
+    
     summary_shown: bool
     submission_requested: bool
     attachments: list[dict]
     created_tickets: list[dict]
+    
     last_answer_evidence: dict | None
     sources: list[str]
     source_details: list[dict]
@@ -38,20 +41,26 @@ class AgentState(MessagesState, total=False):
     response_packet: ResponsePacket | None
     route_reason: str | None
     explicit_ticket_request: bool
+    
     current_request: str | None
+    
     search_scope: Literal["product", "outside_scope"] | None
     search_result: dict | None
     current_references: list[dict]
     search_outcome: SearchOutcome | None
     unresolved_information: dict | None
+    
     ticket_result: dict | None
     ticket_operator_result: dict | None
     ticket_enquiry_result: dict | None
+    
     manager_action: str | None
     manager_reason: str | None
+    
     answered_detail: PendingCustomerResponse | None
     grounding_failed: bool
     reply: str | None
+    
     validation_outcome: ValidationOutcome | None
     validation_reason: str | None
     validation_note: str | None

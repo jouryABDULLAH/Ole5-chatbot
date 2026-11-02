@@ -68,6 +68,7 @@ def respond_context(state: AgentState) -> dict:
         "current_references": state.get("current_references", []),
         "last_answer_evidence": state.get("last_answer_evidence"),
         "search_outcome": state.get("search_outcome"),
+        "ticket_operator_result": state.get("ticket_operator_result"),
         "ticket_enquiry_result": state.get("ticket_enquiry_result"),
         "manager_action": state.get("manager_action"),
         "created_tickets": state.get("created_tickets", []),

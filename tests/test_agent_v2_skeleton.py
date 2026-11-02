@@ -40,8 +40,8 @@ def test_contracts_scope_manager_actions_by_pending_context():
     assert "accept" in manager_schema("offer").model_fields["action"].annotation.__args__
     assert "submit" in manager_schema("summary").model_fields["action"].annotation.__args__
     assert "submit" not in manager_schema("offer").model_fields["action"].annotation.__args__
-    assert "pending_response" in router_schema(True).model_fields["decision"].annotation.__args__
-    assert "pending_response" not in router_schema(False).model_fields["decision"].annotation.__args__
+    assert "pending_response" in router_schema(True).model_fields["intent"].annotation.__args__
+    assert "pending_response" not in router_schema(False).model_fields["intent"].annotation.__args__
 
 
 def _state(messages, pending=None):
@@ -68,7 +68,7 @@ def test_router_prompt_labels_latest_message_and_pending_context():
 def test_router_node_writes_decision_fields():
     state = _state([HumanMessage(content="How do I export a report?")])
     decision = type("Decision", (), {
-        "decision": "question", "explicit_ticket_request": False,
+        "intent": "question", "next_target": "search", "explicit_ticket_request": False,
         "reason": "Product question needs knowledge search.",
     })()
     with patch("ole5_chat.agent.nodes.router.llm.structured", return_value=decision):
@@ -103,7 +103,7 @@ def test_other_route_does_not_rehydrate_stale_ticket_result():
     state.update(intent="other", manager_action="submit",
                  ticket_result={"submission_succeeded": False})
     decision = type("Decision", (), {
-        "decision": "other", "explicit_ticket_request": False,
+        "intent": "other", "next_target": "respond", "explicit_ticket_request": False,
         "reason": "Prompt-injection request is outside scope.",
     })()
     with patch("ole5_chat.agent.nodes.router.llm.structured", return_value=decision):
@@ -118,7 +118,7 @@ def test_router_updates_current_intent_when_selecting_next_target():
     state = _state([HumanMessage(content="How do I export a report?")])
     state["intent"] = "other"
     decision = type("Decision", (), {
-        "decision": "question", "explicit_ticket_request": False,
+        "intent": "question", "next_target": "search", "explicit_ticket_request": False,
         "reason": "Follow-up needs knowledge search.",
     })()
     with patch("ole5_chat.agent.nodes.router.llm.structured", return_value=decision):

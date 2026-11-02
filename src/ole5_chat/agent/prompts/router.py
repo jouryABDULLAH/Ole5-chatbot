@@ -92,6 +92,12 @@ Previous assistant message: {context['previous_assistant_message'] or 'none'}
 Route definitions and examples:
 {route_lines}
 
+Allowed next_target values:
+- search: send an in-scope product question to Search.
+- ticket_operator: send a pending response or escalation to Ticket Operator.
+- ticket_enquiry: send an explicit ticket lookup or status request to Ticket Enquiry.
+- respond: send greetings, capability questions, support-process questions, and completed worker results to Respond.
+
 Rules:
 - A pending response is valid only when pending customer response is present. If absent, do not return pending_response.
 - A short value such as a browser name can be pending_response when the previous assistant asked for it; the same word with no pending question is other.
@@ -101,7 +107,7 @@ Rules:
 - Set explicit_ticket_request=true only when the customer explicitly asks to prepare/open a ticket for the current named issue. Keep it false for policy-based escalation, urgency, status, acceptance, detail answers, rephrasing, and mere mentions of tickets. A named ordinary issue still routes to question so Search runs first.
 - If the latest message has no safe interpretation, choose other. Do not invent a ticket subject or operation.
 
-Return JSON only with decision, explicit_ticket_request, and reason. The reason should briefly explain the relationship between the latest message and the selected route. Respond in {language}."""
+Return JSON only with intent, next_target, explicit_ticket_request, and reason. The intent describes what the customer wants; next_target is the graph node that should receive the state next. The reason should briefly explain both choices. Respond in {language}."""
 
 
 

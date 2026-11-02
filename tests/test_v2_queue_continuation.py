@@ -33,7 +33,7 @@ def test_queue_handoff(model, kind, action, next_kind):
         summary_shown=kind == "summary", submission_requested=kind == "summary",
     )
     if action != "submit":
-        model.add(RouterDecision(decision="pending_response", explicit_ticket_request=False, reason=action),
+        model.add(RouterDecision(intent="pending_response", next_target="ticket_operator", explicit_ticket_request=False, reason=action),
                   manager_schema(kind)(action=action, reason=action))
     draft = TicketDraft(product="OLE5", title=next_issue["description"], classified=True,
                         required={"browser": None})

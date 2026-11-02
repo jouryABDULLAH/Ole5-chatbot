@@ -53,7 +53,8 @@ class ResponsePacket(BaseModel):
 class RouterDecision(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    decision: Route
+    intent: Route
+    next_target: NextTarget
     explicit_ticket_request: bool
     reason: str
 
@@ -61,7 +62,8 @@ class RouterDecision(BaseModel):
 class RouterDecisionWithoutPending(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    decision: RouteWithoutPending
+    intent: RouteWithoutPending
+    next_target: NextTarget
     explicit_ticket_request: bool
     reason: str
 

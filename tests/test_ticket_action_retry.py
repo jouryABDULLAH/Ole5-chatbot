@@ -22,7 +22,9 @@ def test_ticket_lie_gets_only_one_response_retry(model, rejected_twice, route):
                                    organization="Test", product="OLE5", language="ar"))
     state["messages"] = [AIMessage(content="تم فتح تذكرة."), HumanMessage(content=(
         "افتح لي تذكرة عن عدم إمكانية حذف المراسلات" if route == "question" else "هل أنت متأكد؟"))]
-    model.add(RouterDecisionWithoutPending(decision=route, explicit_ticket_request=route == "question", reason="Test"))
+    target = "search" if route == "question" else "respond"
+    model.add(RouterDecisionWithoutPending(intent=route, next_target=target,
+                                           explicit_ticket_request=route == "question", reason="Test"))
     model.add(TicketActionCheck(violations=["No actual ticket was created. Answer from evidence."]),
               TicketActionCheck(violations=["Still no actual creation result."] if rejected_twice else []))
     model.add(Grounding(unsupported=[]), Grounding(unsupported=[]))

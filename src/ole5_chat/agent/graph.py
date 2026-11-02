@@ -18,6 +18,7 @@ from ole5_chat.agent.state import AgentState
 
 def after_router(state: AgentState) -> str:
     target = state.get("next_target")
+    
     if target:
         return target
     decision = state.get("intent")

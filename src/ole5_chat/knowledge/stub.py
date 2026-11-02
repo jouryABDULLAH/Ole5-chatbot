@@ -1,27 +1,73 @@
-"""Stand-in knowledge base for development: a few fixed passages matched by keyword. Every title starts with STUB so it is never mistaken for the real one."""
+"""Deterministic Arabic retrieval fixtures copied verbatim from kb_export.
+
+Use KB_BACKEND=stub and KB_RETRIEVAL_MODE=direct for fast graph tests.
+Only the documented questions match; unknown questions return no evidence.
+"""
+
+from dataclasses import replace
 
 from ole5_chat.knowledge.contracts import Evidence, Retrieval, Verdict
 
+
+def _normalize(question: str) -> str:
+    """Ignore whitespace and trailing question marks, without broad keyword matching."""
+    return " ".join(question.split()).rstrip("؟?").rstrip()
+
+
+# Export chunk labels identify the snapshots, not vector-store chunk_index values.
 PASSAGES = [
-    (("password", "كلمة المرور", "كلمة السر"), Evidence(
-        text="To reset your password, choose Forgot password on the sign-in page and enter your username. "
-             "A reset link is sent to your registered email and stays valid for 30 minutes.",
-        document="STUB-01 Signing in", section="Resetting a password",
-        source_file="STUB-01-EN-signing-in.md", relation="DIRECT", score=3,
-        reason="Gives the steps to reset a password")),
-    (("archive", "أرشيف", "أرشفة"), Evidence(
-        text="The Archive screen lists correspondence that has been closed.",
-        document="STUB-02 Archive", section="Overview",
-        source_file="STUB-02-EN-archive.md", relation="INFERENTIAL", score=2,
-        reason="On the subject of the archive, but does not answer how to use it")),
+    # _chunk_003_
+    ("كيف احفظ الرسالة كمسودة بدلًا من إرسالها", Evidence(
+        text="حقول شاشة إنشاء المراسلة الداخلية\nالحقول بالترتيب كما تظهر في الشاشة:\n\n1. **إلى** — كتابة بريد الإدارة المراد الإرسال إليها أو اسم الشخص، أو الضغط على (+) لتظهر نافذة بأسماء الإدارات حسب الهيكل أو بأسماء الأشخاص.\n2. **الموضوع** — عنوان المراسلة الموجهة.\n3. **تصنيف المراسلات** — كتابة اسم التصنيف يدوياً، أو اختيار تصنيف أو أكثر من التصنيفات الموجودة بالضغط على (+).\n4. **الخصائص** — تفصيلها في القسم التالي.\n5. **المحتوى** — نص المراسلة. إذا كانت المراسلة لا تحتاج مرفقات أو مراسلات مرتبطة، تنتهي هنا مرحلة الإنشاء بالضغط على زر \"إرسال\" في الأسفل.\n6. **المرفقات الإلكترونية** — اختيارية.\n7. **المراسلات المرتبطة** — اختيارية.\n\nفي أسفل الشاشة: زر \"إرسال\" لإرسال المراسلة، وزر \"حفظ\" لنقلها إلى المسودات والعودة إليها لاحقاً بدلاً من إرسالها.",
+        document="دليل استخدام نظام OLE5 — الإجراءات والشاشات",
+        section="حقول شاشة إنشاء المراسلة الداخلية",
+        source_file=None,
+        relation="DIRECT",
+        score=3,
+        reason="مقطع مطابق للسؤال من بيانات الاختبار الثابتة.",
+    )),
+    # _chunk_018_
+    ("كيف انشئ علامة مائية في النظام", Evidence(
+        text="الطباعة والعلامة المائية\n- **نوافذ الطباعة لا تفتح** : المتصفح يحجب النوافذ المنبثقة؛ يُسمح بها في إعدادات المتصفح.\n- **طباعة صفحة فارغة إضافية** : تحديد نطاق الصفحات في إعدادات الطباعة ليكون الصفحة الأولى فقط.\n- **المحتوى يُطبع معكوساً** : مراجعة إعدادات اتجاه الطابعة في خصائصها.\n- **الطباعة بدون علامة مائية** : تُدار من إعدادات النظام ← قسم النقاط الأمنية، حيث يمكن إضافة استثناء للمستخدمين المصرَّح لهم.\n- **العلامة المائية تغطي النص عند عرض المرفقات** : يُستخدم شعار بشفافية أعلى، ويُتحقق من أن صورة الشعار بخلفية شفافة.\n- إضافة العلامة المائية: إعدادات النظام ← أسفل الصفحة ← العلامة المائية ← رفع الشعار ← حفظ.",
+        document="نظام OLE5 — حلول المشكلات الشائعة",
+        section="الطباعة والعلامة المائية",
+        source_file=None,
+        relation="DIRECT",
+        score=3,
+        reason="مقطع مطابق للسؤال من بيانات الاختبار الثابتة.",
+    )),
+    # _chunk_006_
+    ("هل يدعم النظام بيانات التسليم للمراسلات الورقية؟", Evidence(
+        text="بيانات التسليم والمراسلات العينية\n- يوفر النظام آلية للتحقق من استلام المرفقات العينية من خلال بيانات التسليم الموقعة وإمكانية إرفاقها في النظام.\n- يتيح النظام تأكيد الاستلام الإلكتروني للمراسلة العينية.\n- يتيح النظام طباعة بيان تسليم للمراسلة العينية بعد إرسالها وتخصيص المستقبلين داخل البيان.\n- يدعم النظام QR code عن طريق بيان التسليم.\n- يتيح النظام عرض وإدارة جميع بيانات التسليم بشكل مركزي على مستوى كل مراسلات النظام أو الإدارات الرئيسية، مع إمكانية رفع وعرض بيان التسليم للمراسلات الورقية في النظام.\n- يتيح النظام البحث عن بيان تسليم معين.\n- يتيح النظام المسح المتعدد لبيانات التسليم، بحيث يرفع المستخدم عدة بيانات تسليم معاً وتُضاف آلياً إلى كل بيان حسب رقمه دون تدخل منه.",
+        document="نظام OLE5 — قاعدة المعرفة",
+        section="بيانات التسليم والمراسلات العينية",
+        source_file=None,
+        relation="DIRECT",
+        score=3,
+        reason="مقطع مطابق للسؤال من بيانات الاختبار الثابتة.",
+    )),
+    # _chunk_007_
+    ("هل أستطيع ترتيب المراسلات حسب تاريخ آخر إجراء عليها؟", Evidence(
+        text="تنظيم صندوق البريد والمراسلات\n- يمكن تغيير حالة المراسلة إلى غير مقروءة.\n- يمكن حذف المراسلة واستعادتها.\n- يمكن إضافة علامة تفضيل للمراسلة.\n- يمكن إضافة علامة متابعة للمراسلة لمتابعتها.\n- يمكن عرض تاريخ آخر إجراء على المراسلة.\n- يمكن ترتيب المراسلات حسب الأقدم أو الأحدث أو آخر إجراء.\n- يمكن نقل المراسلة من ملف لآخر.\n- يمكن ربط المعاملات بموعد، وذلك بتحديد تاريخ ووقت للموعد.\n- يمكن الاطلاع على إجراءات المعاملة.\n- يمكن عرض كل تاريخ المراسلة الصادرة والواردة ومعرفة نشأة المراسلة وكل الخطابات المرتبطة بها.\n- يمكن استعراض المعاملات السرية حسب الصلاحية.\n- يتيح النظام خاصية تصدير المجموعات لجهة داخلية أو خارجية.\n- خاصية مجموعات التعاميم: إرسال قائمة محددة وبنطاق محدد على مستوى النظام، وقابلة للاستخدام من أكثر من جهة.\n- خاصية النسخة الإلحاقية: عمل نسخة عن المراسلة للاطلاع على مراسلة أصلية دون التأثير على المراسلة الأصلية.\n- يوجد خاصية للردود السريعة الجاهزة للرد أو الإضافة على المحتوى، تخفف الكتابة على المستخدم.",
+        document="نظام OLE5 — قاعدة المعرفة",
+        section="تنظيم صندوق البريد والمراسلات",
+        source_file=None,
+        relation="DIRECT",
+        score=3,
+        reason="مقطع مطابق للسؤال من بيانات الاختبار الثابتة.",
+    )),
 ]
 
 
 def search(question: str) -> Retrieval:
-    text = question.casefold()
-    found = [e for words, e in PASSAGES if any(w in text for w in words)]
-    if any(e.relation == "DIRECT" for e in found):
-        verdict = Verdict.ANSWERABLE
-    else:
-        verdict = Verdict.PARTIAL if found else Verdict.NOT_IN_KB
-    return Retrieval(query=question, verdict=verdict, evidence=found, queries_tried=[question])
+    """Return a fresh evidence snapshot, never a prewritten customer reply."""
+    normalized = _normalize(question)
+    found = [replace(evidence) for expected, evidence in PASSAGES
+             if normalized == _normalize(expected)]
+    return Retrieval(
+        query=question,
+        verdict=Verdict.ANSWERABLE if found else Verdict.NOT_IN_KB,
+        evidence=found,
+        queries_tried=[question],
+        stop_reason="stub_fixture" if found else "stub_unmatched",
+    )
