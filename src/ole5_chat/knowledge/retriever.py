@@ -56,13 +56,27 @@ def ragent() -> Any:
         qdrant_api_key=qdrant_key or None,
         embedding_service_url=s.embedding_service_url,
         embedding_service_timeout=s.kb_embed_timeout,
-        candidate_pool_size=s.kb_candidate_pool,
-        hybrid_prefetch_limit=s.kb_candidate_pool,
+        candidate_pool_size=s.voice_kb_candidate_pool if voice else s.kb_candidate_pool,
+        hybrid_prefetch_limit=(
+            s.voice_kb_hybrid_prefetch_limit if voice else s.kb_candidate_pool
+        ),
         top_k=s.voice_kb_top_k if voice else s.kb_top_k,
-        tool_call_repair_attempts=s.kb_tool_repair_attempts,
+        tool_call_repair_attempts=(
+            s.voice_kb_tool_repair_attempts if voice else s.kb_tool_repair_attempts
+        ),
         max_search_rounds=s.voice_kb_max_rounds if voice else s.kb_max_rounds,
         grading_max_concurrency=s.voice_kb_grading_concurrency if voice else s.kb_grading_concurrency,
         find_timeout_seconds=s.voice_kb_find_timeout if voice else s.kb_find_timeout,
+        search_passages_call_limit=(
+            s.voice_kb_search_passages_call_limit if voice else 3
+        ),
+        search_agent_call_limit=(
+            s.voice_kb_search_agent_call_limit if voice else 6
+        ),
+        find_model_attempts=(s.voice_kb_find_model_attempts if voice else 3),
+        find_model_output_repairs=(
+            s.voice_kb_find_model_output_repairs if voice else 1
+        ),
     ))
 
 
@@ -114,8 +128,13 @@ def _short(text: str, limit: int = 160) -> str:
 
 
 def _find(name: str, question: str):
-    """One find() call, repeated once on two transient failures: Groq rejecting the search agent's tool call (the model sometimes puts several queries as a list in one call), and the embedding gateway timing out."""
-    retries = get_settings().kb_find_retries
+    """Run find(), retrying only configured transient failures."""
+    settings = get_settings()
+    retries = (
+        settings.voice_kb_find_retries
+        if settings.kb_retrieval_mode == "agentic_fast"
+        else settings.kb_find_retries
+    )
     for attempt in range(retries + 1):
         try:
             with suppress_tracing():

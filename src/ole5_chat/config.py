@@ -43,6 +43,16 @@ class Settings(BaseSettings):
     voice_kb_max_rounds: int = 2
     voice_kb_grading_concurrency: int = 8
     voice_kb_find_timeout: float = 60.0
+    # Additional RAGent2 limits for the opt-in fast profile. The normal
+    # agentic profile keeps its broader search and retry budgets unchanged.
+    voice_kb_candidate_pool: int = 10
+    voice_kb_hybrid_prefetch_limit: int = 10
+    voice_kb_search_passages_call_limit: int = 1
+    voice_kb_search_agent_call_limit: int = 2
+    voice_kb_find_model_attempts: int = 2
+    voice_kb_find_model_output_repairs: int = 0
+    voice_kb_tool_repair_attempts: int = 1
+    voice_kb_find_retries: int = 0
     kb_max_searches: int = 2 #4
     collect_rounds: int = 3  # questions asked in collect at most; then the summary is shown with what is missing
 
