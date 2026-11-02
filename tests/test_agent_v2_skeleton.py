@@ -81,9 +81,24 @@ def test_router_node_writes_decision_fields():
         result = router_node(state)
     assert result == {
         "router_decision": "question",
+        "intent": "question",
+        "next_target": "search",
         "route_reason": "Product question needs knowledge search.",
         "explicit_ticket_request": False,
     }
+
+
+def test_router_updates_current_intent_when_selecting_next_target():
+    state = _state([HumanMessage(content="How do I export a report?")])
+    state["intent"] = "other"
+    decision = type("Decision", (), {
+        "decision": "question", "explicit_ticket_request": False,
+        "reason": "Follow-up needs knowledge search.",
+    })()
+    with patch("ole5_chat.agent.nodes.router.llm.structured", return_value=decision):
+        result = router_node(state)
+    assert result["next_target"] == "search"
+    assert result["intent"] == "question"
 
 
 def test_router_model_failure_uses_safe_other_route():

@@ -6,6 +6,7 @@ from langgraph.graph import MessagesState
 
 from ole5_chat.agent.contracts import (
     PendingCustomerResponse,
+    NextTarget,
     Route,
     ResponsePacket,
     SearchOutcome,
@@ -33,6 +34,8 @@ class AgentState(MessagesState, total=False):
 
     # Current-turn routing and workflow state.
     router_decision: Route | None
+    intent: Route | None
+    next_target: NextTarget | None
     response_packet: ResponsePacket | None
     route_reason: str | None
     explicit_ticket_request: bool
@@ -74,6 +77,8 @@ def initial_state(identity: Identity) -> AgentState:
         sources=[],
         source_details=[],
         router_decision=None,
+        intent=None,
+        next_target=None,
         response_packet=None,
         route_reason=None,
         explicit_ticket_request=False,

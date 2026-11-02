@@ -60,7 +60,7 @@ def respond_prompt(state: AgentState, language: str | None = None) -> str:
     context = respond_context(state)
     latest = context["latest_customer_message"] or ""
     language = language or ("ar" if any("\u0600" <= char <= "\u06ff" for char in latest) else "en" if any(char.isascii() and char.isalpha() for char in latest) else (state.get("language") or state["identity"].language or "ar"))
-    route = context["router_decision"] or "other"
+    route = context["intent"] or "other"
     outcome = context["search_outcome"] or "none"
     if route == "question" and outcome == "answered":
         task = "Answer the customer's product question using only the DIRECT passages. If they do not fully answer the question, say only what is supported and do not invent the missing part."

@@ -17,7 +17,7 @@ from ole5_chat.agent.state import AgentState
 
 
 def after_router(state: AgentState) -> str:
-    decision = state.get("router_decision")
+    decision = state.get("intent") or state.get("router_decision")
     if decision == "question":
         return "search"
     if decision == "pending_response" or decision == "escalation":
@@ -26,7 +26,7 @@ def after_router(state: AgentState) -> str:
         return "ticket_enquiry"
     if decision == "other":
         return "respond"
-    raise ValueError("Router must set router_decision before graph routing")
+    raise ValueError("Router must set intent before graph routing")
 
 
 def entry_route(state: AgentState) -> str:

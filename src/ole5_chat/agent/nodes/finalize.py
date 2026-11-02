@@ -10,13 +10,15 @@ log = logging.getLogger(__name__)
 
 
 def finalize_node(state: AgentState) -> dict:
-    log.info("finalize  route=%s validation=%s refs=%d created=%d", state.get("router_decision"),
+    log.info("finalize  intent=%s validation=%s refs=%d created=%d", state.get("intent") or state.get("router_decision"),
              state.get("validation_outcome"), len(state.get("current_references", [])),
              len(state.get("created_tickets", [])))
     result = {
         "messages": [AIMessage(content=state.get("reply") or "", additional_kwargs={
             "sources": state.get("sources", []), "source_details": state.get("source_details", [])})],
         "router_decision": None,
+        "intent": None,
+        "next_target": None,
         "response_packet": None,
         "input_event": None,
         "route_reason": None,
