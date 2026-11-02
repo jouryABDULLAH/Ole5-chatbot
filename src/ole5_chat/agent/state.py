@@ -33,7 +33,6 @@ class AgentState(MessagesState, total=False):
     source_details: list[dict]
 
     # Current-turn routing and workflow state.
-    router_decision: Route | None
     intent: Route | None
     next_target: NextTarget | None
     response_packet: ResponsePacket | None
@@ -78,7 +77,6 @@ def initial_state(identity: Identity) -> AgentState:
         last_answer_evidence=None,
         sources=[],
         source_details=[],
-        router_decision=None,
         intent=None,
         next_target=None,
         response_packet=None,

@@ -26,7 +26,6 @@ def _route_update(state: AgentState, decision: str, reason: str, explicit: bool,
     """Set the current-turn intent and its next graph destination."""
 
     update = {
-        "router_decision": decision,
         "next_target": target or _NEXT_TARGET[decision],
         "route_reason": reason,
         "explicit_ticket_request": explicit,

@@ -31,7 +31,7 @@ _VALUE_FIELD_RE = re.compile(
 
 def _is_detail_value(state: AgentState, latest: str) -> bool:
     """Recognize a pending ticket value without treating normal sentences as values."""
-    if (state.get("intent") or state.get("router_decision")) != "pending_response" or state.get("manager_action") != "provide":
+    if state.get("intent") != "pending_response" or state.get("manager_action") != "provide":
         return False
     pending = state.get("answered_detail")
     item = str(getattr(pending, "item", "") or "")
@@ -115,7 +115,7 @@ def _grounding_input(state: AgentState, reply: str) -> str:
 
 def _grounded_reply(state: AgentState, reply: str, language: str | None = None) -> str | None:
     """Keep an answered product reply tied to this turn's retrieved passages."""
-    if (state.get("intent") or state.get("router_decision")) != "question" or state.get("search_outcome") != "answered":
+    if state.get("intent") != "question" or state.get("search_outcome") != "answered":
         return reply
     if not any(item.get("relation") == "DIRECT" for item in state.get("current_references", [])):
         log.warning("grounding skipped enforcement: answered without DIRECT evidence")
@@ -154,7 +154,7 @@ def _grounded_reply(state: AgentState, reply: str, language: str | None = None) 
 
 
 def respond_node(state: AgentState) -> dict:
-    log.info("respond  intent=%s search=%s manager=%s status=%s", state.get("intent") or state.get("router_decision"),
+    log.info("respond  intent=%s search=%s manager=%s status=%s", state.get("intent"),
              state.get("search_outcome"), state.get("manager_action"),
              bool(state.get("ticket_enquiry_result")))
     language = _expected_language(state)
