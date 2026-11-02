@@ -40,13 +40,13 @@ class NewMessage(BaseModel):
 class SearchSettingsUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    mode: Literal["settings", "find", "search"]
+    mode: Literal["settings", "find", "agentic_fast", "search"]
 
 
 @app.get("/chat/search-settings")
 def get_search_settings():
     mode, top_k = search_settings()
-    return {"mode": "find" if mode == "agentic" else "search", "retrieval_mode": mode, "top_k": top_k}
+    return {"mode": "find" if mode == "agentic" else "agentic_fast" if mode == "agentic_fast" else "search", "retrieval_mode": mode, "top_k": top_k}
 
 
 @app.get("/chat/sessions/{session_id}/progress")
@@ -76,11 +76,11 @@ def update_search_settings(update: SearchSettingsUpdate):
     if update.mode == "settings":
         mode, top_k = set_search_settings()
     else:
-        retrieval_mode = "agentic" if update.mode == "find" else "direct"
-        mode, top_k = set_search_settings(retrieval_mode, 10 if update.mode == "find" else 5)
+        retrieval_mode = {"find": "agentic", "agentic_fast": "agentic_fast", "search": "direct"}[update.mode]
+        mode, top_k = set_search_settings(retrieval_mode)
     from ole5_chat.knowledge import retriever
     retriever.reset()
-    return {"mode": "find" if mode == "agentic" else "search", "retrieval_mode": mode, "top_k": top_k}
+    return {"mode": "find" if mode == "agentic" else "agentic_fast" if mode == "agentic_fast" else "search", "retrieval_mode": mode, "top_k": top_k}
 
 
 class Line(BaseModel):

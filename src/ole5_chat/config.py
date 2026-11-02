@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     qdrant_login_password: SecretStr | None = None
     qdrant_session_cookie: str = "ole5_session"
     kb_backend: Literal["stub", "ragent2"] = "stub"
-    kb_retrieval_mode: Literal["agentic", "direct"] = "agentic"
+    kb_retrieval_mode: Literal["agentic", "agentic_fast", "direct"] = "agentic"
     kb_tenants: dict[str, str] = {"OLE5": "ole5"}
     embedding_service_url: str = "https://ds.t2.sa/text_embed"
     kb_candidate_pool: int = 30
@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     qdrant_timeout: float = 60.0
     kb_find_timeout: float = 260.0
     kb_find_retries: int = 1
+    kb_grading_concurrency: int = 4
+    # Optional lighter RAGent2 profile for voice/latency-sensitive testing.
+    voice_kb_top_k: int = 8
+    voice_kb_max_rounds: int = 2
+    voice_kb_grading_concurrency: int = 8
+    voice_kb_find_timeout: float = 60.0
     kb_max_searches: int = 2 #4
     collect_rounds: int = 3  # questions asked in collect at most; then the summary is shown with what is missing
 
@@ -68,10 +74,11 @@ def search_settings() -> tuple[str, int]:
     settings = get_settings()
     if _SEARCH_DEFAULTS is None:
         _SEARCH_DEFAULTS = (settings.kb_retrieval_mode, settings.kb_top_k)
-    return settings.kb_retrieval_mode, settings.kb_top_k
+    top_k = settings.voice_kb_top_k if settings.kb_retrieval_mode == "agentic_fast" else settings.kb_top_k
+    return settings.kb_retrieval_mode, top_k
 
 
-def set_search_settings(mode: Literal["agentic", "direct"] | None = None, top_k: int | None = None) -> tuple[str, int]:
+def set_search_settings(mode: Literal["agentic", "agentic_fast", "direct"] | None = None, top_k: int | None = None) -> tuple[str, int]:
     """Apply a process-local UI override, or restore the values from settings when both are omitted."""
     global _SEARCH_DEFAULTS
     settings = get_settings()
@@ -81,7 +88,10 @@ def set_search_settings(mode: Literal["agentic", "direct"] | None = None, top_k:
         selected_mode, selected_top_k = _SEARCH_DEFAULTS
     else:
         selected_mode = mode or settings.kb_retrieval_mode
-        selected_top_k = top_k if top_k is not None else (10 if selected_mode == "agentic" else 5)
+        selected_top_k = top_k if top_k is not None else (
+            settings.voice_kb_top_k if selected_mode == "agentic_fast"
+            else 10 if selected_mode == "agentic" else 5
+        )
     settings.kb_retrieval_mode = selected_mode
     settings.kb_top_k = selected_top_k
     return search_settings()

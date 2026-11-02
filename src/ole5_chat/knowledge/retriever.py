@@ -47,6 +47,7 @@ def ragent() -> Any:
     except ImportError as exc:
         raise KnowledgeUnavailable("ragent2 is not installed in this environment") from exc
     qdrant_key = s.qdrant_api_key.get_secret_value() if s.qdrant_api_key else ""
+    voice = s.kb_retrieval_mode == "agentic_fast"
     return Ragent(client=qdrant_client(), reranker=NoRerank(), settings=RagSettings(
         groq_api_key=s.groq_api_key.get_secret_value(),
         groq_api_base=s.groq_api_base,
@@ -57,10 +58,11 @@ def ragent() -> Any:
         embedding_service_timeout=s.kb_embed_timeout,
         candidate_pool_size=s.kb_candidate_pool,
         hybrid_prefetch_limit=s.kb_candidate_pool,
-        top_k=s.kb_top_k,
+        top_k=s.voice_kb_top_k if voice else s.kb_top_k,
         tool_call_repair_attempts=s.kb_tool_repair_attempts,
-        max_search_rounds=s.kb_max_rounds,
-        find_timeout_seconds=s.kb_find_timeout,
+        max_search_rounds=s.voice_kb_max_rounds if voice else s.kb_max_rounds,
+        grading_max_concurrency=s.voice_kb_grading_concurrency if voice else s.kb_grading_concurrency,
+        find_timeout_seconds=s.voice_kb_find_timeout if voice else s.kb_find_timeout,
     ))
 
 
