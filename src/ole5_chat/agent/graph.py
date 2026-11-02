@@ -20,7 +20,7 @@ def after_router(state: AgentState) -> str:
     target = state.get("next_target")
     if target:
         return target
-    decision = state.get("intent") or state.get("router_decision")
+    decision = state.get("intent")
     if decision == "question":
         return "search"
     if decision == "pending_response" or decision == "escalation":
@@ -36,15 +36,6 @@ def entry_route(state: AgentState) -> str:
     """Route an explicit Submit-button event directly to Ticket Operator."""
 
     return "ticket_operator" if state.get("input_event") == "submit" else "router"
-
-
-def after_search(state: AgentState) -> str:
-    outcome = state.get("search_outcome")
-    if outcome in {"answered", "failed"}:
-        return "respond"
-    if outcome in {"partial", "no_answer"}:
-        return "ticket_operator"
-    raise ValueError("Search must set search_outcome before graph routing")
 
 
 def after_validate(state: AgentState) -> str:
