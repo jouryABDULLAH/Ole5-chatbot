@@ -33,6 +33,22 @@ class PendingCustomerResponse(BaseModel):
     item: str | None = None
 
 
+class ResponsePacket(BaseModel):
+    """Structured, non-rephrased context that Router sends to Respond."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    customer_message: str
+    language: Literal["ar", "en"] | None = None
+    intent: Route | None = None
+    search: dict | None = None
+    ticket_operator: dict | None = None
+    ticket_enquiry: dict | None = None
+    created_ticket: dict | None = None
+    pending_customer_response: PendingCustomerResponse | None = None
+    sources: list[str] = []
+
+
 class RouterDecision(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 

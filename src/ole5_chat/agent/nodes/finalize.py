@@ -17,6 +17,7 @@ def finalize_node(state: AgentState) -> dict:
         "messages": [AIMessage(content=state.get("reply") or "", additional_kwargs={
             "sources": state.get("sources", []), "source_details": state.get("source_details", [])})],
         "router_decision": None,
+        "response_packet": None,
         "input_event": None,
         "route_reason": None,
         "explicit_ticket_request": False,
