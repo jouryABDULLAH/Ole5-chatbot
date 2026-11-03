@@ -32,7 +32,8 @@ def test_username_remains_arabic_when_manager_advances(model, next_field):
                  pending_customer_response=PendingCustomerResponse(kind="detail", issue_id="issue-1", item="username"),
                  ticket_draft=TicketDraft(product="OLE5", required={"username": None}).model_dump())
     model.add(RouterDecision(intent="pending_response", next_target="ticket_operator", explicit_ticket_request=False, reason="Requested username"),
-              manager_schema("detail")(action="provide", reason="Username supplied"))
+              manager_schema("detail")(action="provide", reason="Username supplied"),
+              RouterDecision(intent="pending_response", next_target="respond", explicit_ticket_request=False, reason="Ticket detail was processed."))
     required = {"username": "ahmad123"}
     if next_field:
         required[next_field] = None
@@ -79,6 +80,7 @@ def test_literal_values_preserve_language(item, text):
 def test_grounding_graph_never_publishes_rejected_answer(model, failure, caplog):
     state = conversation("How do I archive a record?", "en")
     model.add(RouterDecisionWithoutPending(intent="question", next_target="search", explicit_ticket_request=False, reason="Product question"))
+    model.add(RouterDecisionWithoutPending(intent="question", next_target="respond", explicit_ticket_request=False, reason="Search returned the product result."))
     model.add(Grounding(unsupported=["Invented limit"]))
     if failure == "rejected":
         model.add(Grounding(unsupported=["Invented limit"]))

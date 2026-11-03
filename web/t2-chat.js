@@ -6,7 +6,7 @@
       signinTitle: "Chat with support", signinBody: "Enter the email you use for support.",
       email: "Email", cont: "Continue", checking: "Checking",
       placeholder: "Write a message", send: "Send", writing: "Writing a reply",
-      progress: { understanding: "Understanding your request…", searching: "Searching the knowledge base…", ticket: "Preparing support details…", answering: "Preparing the answer…", checking: "Checking the answer…", done: "Completed", error: "Unable to complete the request." },
+      progress: { understanding: "Understanding your request…", searching: "Searching the knowledge base…", ticket_enquiry: "Reviewing ticket information and policy…", ticket: "Preparing support details…", answering: "Preparing the answer…", checking: "Checking the answer…", done: "Completed", error: "Unable to complete the request." },
       source: "Source", sources: "Sources",
       summary: "Ticket summary", submit: "Submit ticket", submitting: "Submitting", submitted: "Ticket {number} submitted", submittedButton: "Submitted",
       fields: { queue: "Queue", type: "Type", subtype: "Subtype", priority: "Priority", title: "Title", summary: "Summary",
@@ -20,7 +20,7 @@
       tooMany: "No more files can be attached to this ticket.",
     },
     ar: {
-      progress: { understanding: "أفهم طلبك…", searching: "أبحث في قاعدة المعرفة…", ticket: "أجهز تفاصيل طلب الدعم…", answering: "أجهز الإجابة…", checking: "أتحقق من الإجابة…", done: "اكتمل الطلب", error: "تعذر إكمال الطلب." },
+      progress: { understanding: "أفهم طلبك…", searching: "أبحث في قاعدة المعرفة…", ticket_enquiry: "أراجع سياسة ومعلومات التذاكر…", ticket: "أجهز تفاصيل طلب الدعم…", answering: "أجهز الإجابة…", checking: "أتحقق من الإجابة…", done: "اكتمل الطلب", error: "تعذر إكمال الطلب." },
       open: "محادثة", close: "إغلاق المحادثة", title: "الدعم",
       signinTitle: "تحدث مع الدعم", signinBody: "أدخل البريد الإلكتروني الذي تستخدمه للدعم.",
       email: "البريد الإلكتروني", cont: "متابعة", checking: "جارٍ التحقق",

@@ -8,7 +8,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from ole5_chat import llm
 from ole5_chat.support_core.state import TicketDraft
 from ole5_chat.agent.graph import build
-from ole5_chat.agent.contracts import PendingCustomerResponse, RouterDecision, manager_schema
+from ole5_chat.agent.contracts import PendingCustomerResponse, RouterDecision, RouterDecisionWithoutPending, manager_schema
 from ole5_chat.agent.nodes import ticket_operator as manager
 from ole5_chat.agent.state import initial_state
 from ole5_chat.identity import Identity
@@ -35,6 +35,10 @@ def test_queue_handoff(model, kind, action, next_kind):
     if action != "submit":
         model.add(RouterDecision(intent="pending_response", next_target="ticket_operator", explicit_ticket_request=False, reason=action),
                   manager_schema(kind)(action=action, reason=action))
+    return_schema = RouterDecisionWithoutPending if next_kind == "empty" else RouterDecision
+    model.add(return_schema(intent="escalation" if next_kind == "empty" else "pending_response",
+                            next_target="respond", explicit_ticket_request=False,
+                            reason="Ticket Operator completed this turn."))
     draft = TicketDraft(product="OLE5", title=next_issue["description"], classified=True,
                         required={"browser": None})
     captured = []
@@ -63,6 +67,8 @@ def test_queue_handoff(model, kind, action, next_kind):
          patch.object(llm, "invoke", side_effect=writer):
         result = build().invoke(state)
     assert submit.call_count == (1 if action == "submit" else 0)
+    assert sum(schema in (RouterDecision, RouterDecisionWithoutPending)
+               for schema, _ in model.calls) == (1 if action == "submit" else 2)
     assert len(result["created_tickets"]) == (1 if action == "submit" else 0)
     if action == "submit":
         assert "Confirm that ticket T-1 was created for Old archive issue" in captured[0]

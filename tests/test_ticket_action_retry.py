@@ -25,6 +25,9 @@ def test_ticket_lie_gets_only_one_response_retry(model, rejected_twice, route):
     target = "search" if route == "question" else "respond"
     model.add(RouterDecisionWithoutPending(intent=route, next_target=target,
                                            explicit_ticket_request=route == "question", reason="Test"))
+    if route == "question":
+        model.add(RouterDecisionWithoutPending(intent="question", next_target="respond",
+                                              explicit_ticket_request=True, reason="Search completed."))
     model.add(TicketActionCheck(violations=["No actual ticket was created. Answer from evidence."]),
               TicketActionCheck(violations=["Still no actual creation result."] if rejected_twice else []))
     model.add(Grounding(unsupported=[]), Grounding(unsupported=[]))

@@ -11,6 +11,7 @@ from ole5_chat.agent.contracts import (
     ResponsePacket,
     SearchOutcome,
     ValidationOutcome,
+    WorkerName,
 )
 from ole5_chat.identity import Identity
 
@@ -38,6 +39,7 @@ class AgentState(MessagesState, total=False):
     # Current-turn routing and workflow state.
     intent: Route | None
     next_target: NextTarget | None
+    last_worker: WorkerName | None
     response_packet: ResponsePacket | None
     route_reason: str | None
     explicit_ticket_request: bool
@@ -88,6 +90,7 @@ def initial_state(identity: Identity) -> AgentState:
         source_details=[],
         intent=None,
         next_target=None,
+        last_worker=None,
         response_packet=None,
         route_reason=None,
         explicit_ticket_request=False,

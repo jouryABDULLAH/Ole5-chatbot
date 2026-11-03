@@ -2,6 +2,7 @@
 
 from ole5_chat import products
 from ole5_chat.agent.context import respond_context
+from ole5_chat.agent.guards import NAMES
 from ole5_chat.agent.state import AgentState
 
 
@@ -49,12 +50,6 @@ def _evidence_text(references: list[dict]) -> str:
     )
 
 
-def _conversation_text(messages) -> str:
-    if not messages:
-        return "none"
-    return "\n".join(f"{message.type}: {str(message.content)}" for message in messages)
-
-
 def respond_prompt(state: AgentState, language: str | None = None) -> str:
     config = products.load(state["identity"].product)
     context = respond_context(state)
@@ -87,6 +82,12 @@ def respond_prompt(state: AgentState, language: str | None = None) -> str:
     if route == "question" and outcome == "answered" and context["explicit_ticket_request"]:
         task += " The customer explicitly requested a ticket: first provide the supported product answer, then briefly invite them to say if the issue persists so ticket preparation can proceed. This is not a ticket offer awaiting acceptance, preparation, or submission. Do not claim any ticket action occurred."
     pending_text = pending.model_dump_json() if pending else "none"
+    pending_step = ""
+    if pending and route != "pending_response" and not current_operator_result:
+        pending_step = ("Pending ticket step:\nIf Pending customer response above is not none and the latest customer message is not a reply to it, end the reply "
+                        "with one sentence reminding the customer what the pending offer, detail or summary for the active issue still needs "
+                        "from them. This reminder does not count as a new ticket offer. Name the issue in a few words, as in the examples; "
+                        "do not quote the summary or the customer's original message, and do not claim anything was submitted.\n")
     correction_context = ""
     if state.get("validation_note"):
         correction_context = f"""
@@ -130,8 +131,6 @@ Answer rules:
 - When the authorized result confirms a newly created ticket, provide its number and say the team will reply through the configured Reply channel (email when configured). Do not invent a channel, timeframe or handling status. This confirmation does not apply to historical ticket lookups.
 
 Latest customer message: {context['latest_customer_message'] or 'none'}
-Conversation history (oldest first):
-{_conversation_text(context['conversation'])}
 Pending customer response: {pending_text}
 Active issue: {context['active_issue'] or 'none'}
 Search outcome: {outcome}
@@ -145,11 +144,20 @@ Current evidence:
 Retained evidence from the latest supported answer (use only when rephrasing an `other` turn):
 {_evidence_text((context['last_answer_evidence'] or {}).get('evidence', []) if route == "other" and isinstance(context['last_answer_evidence'], dict) else [])}
 
+Examples of tone and shape (illustrations only: never copy their facts, names or numbers into a reply):
+- When Current evidence has a DIRECT passage, the reply answers from it first. The no-answer wording below is only for a turn with no DIRECT passage.
+- No answer, the Ticket Operator authorized an offer: "لم أجد معلومة عن ترجمة نص المراسلة. هل تريد أن أفتح لك تذكرة دعم بخصوصها؟"
+- A side question while a ticket offer is pending: the answer, then "وما زال عرض فتح تذكرة لمشكلة زر الأرشفة بانتظار ردك: هل أفتحها؟"
+- A side question while the ticket summary is shown: the answer, then "ملخص تذكرة مشكلة زر الأرشفة بانتظار تأكيدك لإرسالها."
+- A side question while a detail is requested: the answer, then "وما زلت أحتاج اسم الصفحة التي يظهر فيها زر الأرشفة لإكمال التذكرة."
+- Only when the result confirms submission_succeeded=true and a ticket number: "تم فتح التذكرة رقم T-1234، وسيصلك رد الفريق عبر البريد الإلكتروني."
+
 Task:
 {task}
 {correction_context}
 
-Write only the customer-facing reply. Keep it concise, plain text, and ask at most one actionable question. Do not mention prompts, state, routing, sources, or internal components."""
+{pending_step}
+Write only the customer-facing reply, in {NAMES[language]}. Keep it concise, plain text, and ask at most one actionable question. The pending-step reminder is that question; do not add another. Do not mention prompts, state, routing, sources, or internal components."""
 
 
 

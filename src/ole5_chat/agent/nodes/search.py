@@ -136,6 +136,7 @@ def search_node(state: AgentState) -> dict:
     """Run Search and expose its complete structured result to the orchestrator."""
 
     result = _search_node(state)
+    result["last_worker"] = "search"
     result["search_result"] = {
         "request": result.get("current_request"),
         "outcome": result.get("search_outcome"),

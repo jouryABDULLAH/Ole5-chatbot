@@ -21,6 +21,7 @@ Historical creation claims must match actual created_tickets or approved ticket_
 do not treat an unrelated old ticket as the current issue's new ticket.
 Cancelling preparation is not cancelling an existing ticket.
 Offers, requested details and summaries require Manager instructions or the pending workflow.
+Asking the customer to confirm a displayed or pending summary, or reminding them of a pending offer, detail or summary, is allowed.
 Do not offer, prepare, open, create, or ask whether to open a ticket unless Ticket Operator
 authorized that offer through ticket_result or the pending workflow. A product answer with
 no manager result must not contain a ticket offer. The explicit-ticket-request persistence
@@ -41,7 +42,7 @@ def violations(state: dict, reply: str) -> list[str]:
     facts = {key: state.get(key) for key in (
         "manager_action", "ticket_result", "ticket_enquiry_result", "created_tickets",
         "active_issue", "pending_customer_response", "summary_shown", "ticket_draft",
-        "explicit_ticket_request", "search_outcome",
+        "explicit_ticket_request", "search_outcome", "intent", "last_worker", "ticket_operator_result",
     )}
     facts.update(reply=reply, conversation=[{"role": m.type, "text": str(m.content)}
                                            for m in state.get("messages", [])],
@@ -65,6 +66,9 @@ def fallback(state: dict) -> str:
     number = (result.get("ticket") or {}).get("ticket_number")
     if result.get("submission_succeeded") is True and number:
         return f"تم إنشاء التذكرة رقم {number}." if arabic else f"Ticket {number} was created."
+    pending = state.get("pending_customer_response")
+    if pending is not None and pending.kind == "summary":
+        return "هذا ملخص التذكرة، هل تريد إرسالها؟" if arabic else "Here is the ticket summary. Do you want to submit it?"
     if result.get("submission_succeeded") is False:
         return "لم يتم تأكيد إنشاء التذكرة؛ لم تنجح عملية الإرسال." if arabic else "Ticket creation was not confirmed; submission was unsuccessful."
     return ("لا أستطيع تأكيد تنفيذ هذا الإجراء على التذكرة من النتائج المتاحة."

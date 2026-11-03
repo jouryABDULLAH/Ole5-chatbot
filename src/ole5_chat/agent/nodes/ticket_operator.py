@@ -183,7 +183,7 @@ def _queue_new(state: AgentState, text: str, source: str = "no_answer", urgent: 
 def _apply_none(state: AgentState, action: str) -> dict:
     text = state.get("current_request") or _latest_customer(state)
     if action == "clarify":
-        return _response("Ask which issue the customer wants help with.")
+        return _response(f"Ask one focused question about what the customer needs regarding: {text}.")
     source = {"urgent_issue": "urgent", "failed_solution": "failed_solution"}.get(action, "no_answer")
     urgent = action == "urgent_issue"
     active = state.get("active_issue")
@@ -371,6 +371,7 @@ def ticket_operator_node(state: AgentState) -> dict:
     """Run Ticket Operator and expose its structured result to the orchestrator."""
 
     result = _ticket_operator_node(state)
+    result["last_worker"] = "ticket_operator"
     result["ticket_operator_result"] = {
         "action": result.get("manager_action"),
         "reason": result.get("manager_reason"),

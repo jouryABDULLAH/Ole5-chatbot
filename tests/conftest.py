@@ -62,6 +62,8 @@ class ScriptedModel:
             text = messages[-1].text
             return Language(language="ar" if re.search(r"[\u0600-\u06FF]", text) else "en" if re.search(r"[A-Za-z]", text) else "none")
         if not self.queue.get(schema):
+            if schema.__name__.startswith("RouterDecision"):
+                raise AssertionError(f"Unexpected Router call: nothing scripted for {schema.__name__}")
             raise llm.ModelFailed(f"nothing scripted for {schema.__name__}")
         result = self.queue[schema].pop(0)
         problem = check(result) if check else None

@@ -6,7 +6,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from ole5_chat import api
 from ole5_chat.agent import session
-from ole5_chat.agent.contracts import PendingCustomerResponse, RouterDecisionWithoutPending, manager_schema
+from ole5_chat.agent.contracts import PendingCustomerResponse, RouterDecision, RouterDecisionWithoutPending, manager_schema
 from ole5_chat.agent.nodes.router import router_node
 from ole5_chat.support_core.contracts import Classification
 from ole5_chat.identity import Identity
@@ -117,6 +117,10 @@ def test_v2_ticket_submission_returns_valid_customer_ticket_card(model, monkeypa
             required={"page": "Calendar", "error text or screenshot": "provided"},
         ),
     )
+    model.add(RouterDecision(intent="escalation", next_target="respond", explicit_ticket_request=True,
+                             reason="Ticket summary prepared."),
+              RouterDecisionWithoutPending(intent="escalation", next_target="respond",
+                                           explicit_ticket_request=True, reason="Ticket submitted."))
     ready = client.post(f"/chat/sessions/{session_id}/messages", json={
         "text": "Please create a ticket for a calendar synchronization issue."
     })
@@ -145,10 +149,14 @@ def test_v2_user_specific_data_bypasses_knowledge_router(model):
         "messages": [HumanMessage(content="What permissions does my account have?")],
         "pending_customer_response": None,
     }
+    model.add(RouterDecisionWithoutPending(
+        intent="escalation", next_target="ticket_operator", explicit_ticket_request=False,
+        reason="Customer-specific account or user data is outside the chat scope.",
+    ))
     result = router_node(state)
     assert result["intent"] == "escalation"
     assert "outside the chat scope" in result["route_reason"]
-    assert model.calls == []
+    assert model.calls
 
 
 def test_v2_user_specific_question_goes_to_ticket_offer_without_search(model, monkeypatch):
@@ -171,6 +179,13 @@ def test_v2_user_specific_question_goes_to_ticket_offer_without_search(model, mo
     monkeypatch.setattr(llm, "tool_client", writer)
     client = TestClient(api.app)
     session_id = client.post("/chat/sessions", json={"email": "ole5@example.com"}).json()["session_id"]
+    model.add(RouterDecisionWithoutPending(
+        intent="escalation", next_target="ticket_operator", explicit_ticket_request=False,
+        reason="Customer-specific account or user data is outside the chat scope.",
+    ), RouterDecision(
+        intent="escalation", next_target="respond", explicit_ticket_request=False,
+        reason="Ticket Operator prepared the authorized response.",
+    ))
 
     response = client.post(f"/chat/sessions/{session_id}/messages", json={
         "text": "What permissions does my account have?"
@@ -179,9 +194,10 @@ def test_v2_user_specific_question_goes_to_ticket_offer_without_search(model, mo
     view = response.json()
     assert view["phase"] == "offer_ticket"
     assert "ticket" in view["messages"][-1]["text"].lower()
-    # Response guards run, but no Router, Search or classification model is needed.
+    # Router classifies both the incoming turn and the completed Ticket Operator result.
     from ole5_chat.agent.contracts import Language, TicketActionCheck
-    assert all(schema in (Language, TicketActionCheck) for schema, _ in model.calls)
+    assert all(schema in (RouterDecision, RouterDecisionWithoutPending, Language, TicketActionCheck)
+               for schema, _ in model.calls)
     assert not getattr(writer, "bound_tools", None)
     assert api._session_backend() is session
 

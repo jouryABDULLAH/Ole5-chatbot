@@ -30,7 +30,7 @@ _VALUE_FIELD_RE = re.compile(
 
 
 def _is_detail_value(state: AgentState, latest: str) -> bool:
-    """Recognize a pending ticket value without treating normal sentences as values."""
+    """Recognize a short pending ticket value such as a username without treating normal sentences as values."""
     if state.get("intent") != "pending_response" or state.get("manager_action") != "provide":
         return False
     pending = state.get("answered_detail")
@@ -75,9 +75,21 @@ def _language_mismatch(text: str, expected: str) -> bool:
     return (expected == "ar" and has_latin and not has_arabic) or (expected == "en" and has_arabic and not has_latin)
 
 
+def _messages(state: AgentState) -> list:
+    """The chat, plus a closing note when a ticket step is waiting and this turn is not a reply to it."""
+    messages = list(state.get("messages", []))
+    pending = state.get("pending_customer_response")
+    if pending and state.get("intent") != "pending_response" and not state.get("ticket_operator_result"):
+        issue = (state.get("active_issue") or {}).get("description") or "the active issue"
+        messages.append(HumanMessage(content=(
+            f"Note from the system, not the customer: a ticket {pending.kind} for \"{issue}\" is still waiting "
+            "for the customer. After answering, remind the customer in one sentence what it still needs from them.")))
+    return messages
+
+
 def _correct_language(state: AgentState, reply: str, language: str) -> str:
     """Keep the cheap script check and add semantic detection for mixed scripts."""
-    conversation = [SystemMessage(content=respond_prompt(state, language)), *state.get("messages", [])]
+    conversation = [SystemMessage(content=respond_prompt(state, language)), *_messages(state)]
     for attempt in range(LANGUAGE_RETRIES + 1):
         mismatch = _language_mismatch(reply, language) or language_problem(reply, language)
         if not mismatch:
@@ -139,7 +151,7 @@ def _grounded_reply(state: AgentState, reply: str, language: str | None = None) 
             return None
         try:
             reply = llm.invoke([
-                SystemMessage(content=respond_prompt(state, language)), *state.get("messages", []),
+                SystemMessage(content=respond_prompt(state, language)), *_messages(state),
                 AIMessage(content=reply),
                 HumanMessage(content=(
                     "Rewrite the reply using only the current retrieved passages. Remove every unsupported "
@@ -160,7 +172,7 @@ def respond_node(state: AgentState) -> dict:
     language = _expected_language(state)
     try:
         reply = llm.invoke(
-            [SystemMessage(content=respond_prompt(state, language)), *state.get("messages", [])]
+            [SystemMessage(content=respond_prompt(state, language)), *_messages(state)]
         ).text.strip()
     except llm.ModelFailed as exc:
         log.error("ERROR respond model call failed; sending safe fallback: %s", exc)

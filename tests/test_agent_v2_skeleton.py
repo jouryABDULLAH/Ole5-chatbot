@@ -84,7 +84,12 @@ def test_router_node_writes_decision_fields():
 def test_router_dispatches_search_result_to_the_next_owner():
     state = _state([HumanMessage(content="Can it translate text?")])
     state.update(intent="question", search_result={"outcome": "partial", "references": []}, search_outcome="partial")
-    result = router_node(state)
+    decision = type("Decision", (), {
+        "intent": "question", "next_target": "ticket_operator", "explicit_ticket_request": False,
+        "reason": "Search was partial; ticket handling should continue.",
+    })()
+    with patch("ole5_chat.agent.nodes.router.llm.structured", return_value=decision):
+        result = router_node(state)
     assert result["next_target"] == "ticket_operator"
     assert "response_packet" not in result
 
@@ -92,9 +97,14 @@ def test_router_dispatches_search_result_to_the_next_owner():
 def test_router_builds_response_packet_after_worker_result():
     state = _state([HumanMessage(content="Can it translate text?")])
     state.update(intent="question", ticket_operator_result={"action": "register_issue"}, manager_action="register_issue")
-    result = router_node(state)
+    decision = type("Decision", (), {
+        "intent": "escalation", "next_target": "respond", "explicit_ticket_request": False,
+        "reason": "Ticket Operator completed the authorized action.",
+    })()
+    with patch("ole5_chat.agent.nodes.router.llm.structured", return_value=decision):
+        result = router_node(state)
     assert result["next_target"] == "respond"
-    assert result["response_packet"]["intent"] == "question"
+    assert result["response_packet"]["intent"] == "escalation"
     assert result["response_packet"]["ticket_operator"]["action"] == "register_issue"
 
 

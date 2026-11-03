@@ -33,8 +33,48 @@ def previous_assistant_message(messages: Iterable[BaseMessage]) -> str:
     return ""
 
 
+def _router_search_summary(state: AgentState) -> dict | None:
+    result = state.get("search_result") or {}
+    references = result.get("references") or state.get("current_references", [])
+    outcome = result.get("outcome") or state.get("search_outcome")
+    scope = result.get("scope") or state.get("search_scope")
+    if not outcome and not references and not scope:
+        return None
+    return {
+        "outcome": outcome or "none",
+        "reference_count": len(references),
+        "scope": scope or "none",
+    }
+
+
+def _router_ticket_operator_summary(state: AgentState) -> dict | None:
+    result = state.get("ticket_operator_result")
+    if not result:
+        return None
+    ticket_result = result.get("ticket_result") or {}
+    pending = state.get("pending_customer_response")
+    return {
+        "action": result.get("action") or "none",
+        "ticket_created": bool(ticket_result.get("submission_succeeded")),
+        "pending_kind": pending.kind if pending is not None else "none",
+    }
+
+
+def _router_ticket_enquiry_summary(state: AgentState) -> dict | None:
+    result = state.get("ticket_enquiry_result")
+    if not result:
+        return None
+    tickets = result.get("tickets") or []
+    return {
+        "action": result.get("action") or "none",
+        "lookup_succeeded": result.get("lookup_succeeded"),
+        "ticket_count": len(tickets),
+        "error": bool(result.get("error")),
+    }
+
+
 def router_context(state: AgentState) -> dict:
-    """Inputs Router needs to classify the latest customer message."""
+    """Inputs Router needs to classify and dispatch the current turn."""
 
     return {
         "conversation": list(state.get("messages", [])),
@@ -42,6 +82,10 @@ def router_context(state: AgentState) -> dict:
         "previous_assistant_message": previous_assistant_message(state.get("messages", [])),
         "active_issue": state.get("active_issue"),
         "pending_customer_response": state.get("pending_customer_response"),
+        "last_worker": state.get("last_worker"),
+        "search_summary": _router_search_summary(state),
+        "ticket_operator_summary": _router_ticket_operator_summary(state),
+        "ticket_enquiry_summary": _router_ticket_enquiry_summary(state),
         "identity": state.get("identity"),
     }
 

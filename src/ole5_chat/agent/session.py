@@ -83,6 +83,7 @@ _progress_subscribers: dict[str, set[queue.Queue[dict]]] = {}
 _PROGRESS_TEXT = {
     "understanding": ("Understanding your request…", "أفهم طلبك…"),
     "searching": ("Searching the knowledge base…", "أبحث في قاعدة المعرفة…"),
+    "ticket_enquiry": ("Reviewing ticket information and policy…", "أراجع سياسة ومعلومات التذاكر…"),
     "ticket": ("Preparing support details…", "أجهز تفاصيل طلب الدعم…"),
     "answering": ("Preparing the answer…", "أجهز الإجابة…"),
     "checking": ("Checking the answer…", "أتحقق من الإجابة…"),
@@ -153,7 +154,7 @@ def _run(session_id: str, payload: dict, language: str) -> AgentState:
                 task = event["payload"]
                 node = task["name"]
                 key = {"router": "understanding", "search": "searching", "ticket_operator": "ticket",
-                       "ticket_enquiry": "searching", "respond": "answering", "validate": "checking",
+                       "ticket_enquiry": "ticket_enquiry", "respond": "answering", "validate": "checking",
                        "finalize": "checking"}.get(node)
                 if key:
                     current = task.get("input") or {}

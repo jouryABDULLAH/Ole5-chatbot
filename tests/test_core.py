@@ -75,8 +75,12 @@ def test_ticket_row_is_appended():
     assert sheets.tickets()[-1]["ticket_number"] == "T-1"
 
 
-def test_session_api_flow(monkeypatch):
+def test_session_api_flow(monkeypatch, model):
     from ole5_chat import llm
+    from ole5_chat.agent.contracts import RouterDecisionWithoutPending
+
+    model.add(RouterDecisionWithoutPending(intent="other", next_target="respond",
+                                           explicit_ticket_request=False, reason="Greeting."))
 
     def no_model(temperature):
         raise llm.ModelFailed("no model in tests")

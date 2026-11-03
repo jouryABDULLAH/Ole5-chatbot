@@ -21,14 +21,14 @@ def after_router(state: AgentState) -> str:
     
     if target:
         return target
-    decision = state.get("intent")
-    if decision == "question":
+    intent = state.get("intent")
+    if intent == "question":
         return "search"
-    if decision == "pending_response" or decision == "escalation":
+    if intent == "pending_response" or intent == "escalation":
         return "ticket_operator"
-    if decision == "ticket_enquiry":
+    if intent == "ticket_enquiry":
         return "ticket_enquiry"
-    if decision == "other":
+    if intent == "other":
         return "respond"
     raise ValueError("Router must set intent before graph routing")
 

@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, create_model
 Route = Literal["question", "pending_response", "ticket_enquiry", "escalation", "other"]
 RouteWithoutPending = Literal["question", "ticket_enquiry", "escalation", "other"]
 NextTarget = Literal["search", "ticket_operator", "ticket_enquiry", "respond"]
+WorkerName = Literal["search", "ticket_operator", "ticket_enquiry"]
 PendingKind = Literal["offer", "detail", "summary"]
 ManagerContext = Literal["none", "offer", "detail", "summary"]
 SearchOutcome = Literal["answered", "partial", "no_answer", "failed"]

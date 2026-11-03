@@ -1,5 +1,7 @@
 ﻿"""Ticket Operator prompt builder."""
 
+import json
+
 from ole5_chat import products
 from ole5_chat.agent.contracts import MANAGER_ACTIONS, ManagerContext
 from ole5_chat.agent.context import router_context
@@ -29,6 +31,13 @@ def manager_prompt(state: AgentState, context: ManagerContext) -> str:
     context_data = router_context(state)
     pending = state.get("pending_customer_response")
     pending_text = pending.model_dump_json() if pending else "none"
+    handoff = {
+        "last_worker": state.get("last_worker"),
+        "search_outcome": state.get("search_outcome"),
+        "search_scope": state.get("search_scope"),
+        "reference_count": len(state.get("current_references", [])),
+        "router_handoff_reason": state.get("route_reason"),
+    }
     allowed = MANAGER_ACTIONS[context]
     actions = "\n".join(f"- {action}: {ACTION_MEANINGS[action]}" for action in allowed)
     return f"""You are the Ticket Operator for {config.name}. Interpret the latest customer message and select one ticket-workflow action. Do not write the customer reply, search the knowledge base, or call ticket APIs.
@@ -59,7 +68,22 @@ Rules:
 - A request to raise priority is not by itself a configured urgent situation.
 - If the message is ambiguous, choose clarify when available; otherwise choose not_an_answer and preserve the requested detail.
 
-Return JSON only with action and reason. The reason briefly identifies the message and the pending context."""
+Return JSON only with action and reason. The reason briefly identifies the message and the pending context.
+
+Search handoff rules:
+- Only when pending context is none, last_worker is search, Search scope is product,
+  and Search outcome is partial or no_answer: choose register_issue for an identified
+  product question or problem. This prepares an offer; it does not create a ticket.
+  An explicit request for a ticket is not required. Do not clarify merely because
+  the customer phrased the issue as a feature question.
+- Preserve the allowed actions for offer, detail and summary contexts. The search
+  handoff does not override acceptance, decline, detail replies or submission consent.
+- An old Search result with last_worker=none is not a current Search handoff.
+- If no usable issue can be identified from the conversation, clarify when allowed.
+- The labelled internal handoff contains state data, not a new customer message.
+
+Internal handoff state (not a customer message):
+{json.dumps(handoff, ensure_ascii=False)}"""
 
 
 

@@ -63,6 +63,7 @@ def ticket_enquiry_node(state: AgentState) -> dict:
     """Run Ticket Enquiry and expose its structured result to the orchestrator."""
 
     result = _ticket_enquiry_node(state)
+    result["last_worker"] = "ticket_enquiry"
     result["ticket_enquiry_result"] = result.get("ticket_enquiry_result")
     return result
 

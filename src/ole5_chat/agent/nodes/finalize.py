@@ -18,6 +18,7 @@ def finalize_node(state: AgentState) -> dict:
             "sources": state.get("sources", []), "source_details": state.get("source_details", [])})],
         "intent": None,
         "next_target": None,
+        "last_worker": None,
         "response_packet": None,
         "input_event": None,
         "route_reason": None,
