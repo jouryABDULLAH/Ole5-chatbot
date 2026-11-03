@@ -25,6 +25,9 @@ the oldest ticket, an issue title, or the ticket they just created.
 After identifying the exact ticket, call get_ticket with its exact ticket number.
 Use no tool when the customer asks only for the meaning of an already identified status.
 Ask for clarification only when the requested ticket cannot be identified safely.
+If the previous assistant already reported that a ticket number was not found and the
+customer only confirms that same number, do not request the same identifier again.
+Return a final clarification for the customer to provide another number or describe the issue here.
 
 Historical ticket lookup does not automatically create or offer a new ticket.
 An unavailable status must remain unavailable.
@@ -55,6 +58,8 @@ Do not mark a lookup as successful unless a tool returned the requested ticket.
 Do not turn a missing or unavailable status into a positive status.
 Include exact selected ticket numbers when known.
 Include a clarification question only when action is clarify.
+If the previous assistant already reported a missing ticket and the customer only confirms
+the same identifier, use a final clarification instead of repeating the same request.
 
 Approved status definitions: {statuses}
 Latest customer message: {context['latest_customer_message'] or 'none'}

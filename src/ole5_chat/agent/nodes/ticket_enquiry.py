@@ -122,16 +122,39 @@ def run_ticket_tool_agent(state: AgentState) -> dict:
 def _tool_report(messages: list) -> str:
     report = []
     for message in messages:
-        if message.content:
+        tool_calls = getattr(message, "tool_calls", None)
+        if message.content or tool_calls:
             report.append(
                 {
                     "type": message.type,
                     "name": getattr(message, "name", None),
                     "content": message.content,
-                    "tool_calls": getattr(message, "tool_calls", None),
+                    "tool_calls": tool_calls,
                 }
             )
     return json.dumps(report, ensure_ascii=False, default=str)
+
+
+def _log_tool_activity(report: str) -> None:
+    for entry in json.loads(report):
+        for call in entry.get("tool_calls") or []:
+            log.info(
+                "ticket_enquiry tool_call name=%s args=%s",
+                call.get("name"),
+                call.get("args") or {},
+            )
+        if entry.get("name") in {"list_tickets", "get_ticket"}:
+            try:
+                result = json.loads(entry.get("content") or "{}")
+            except (TypeError, json.JSONDecodeError):
+                log.error("ERROR ticket_enquiry invalid tool result name=%s", entry.get("name"))
+                continue
+            log.info(
+                "ticket_enquiry tool_result name=%s outcome=%s ticket=%s",
+                entry.get("name"),
+                result.get("outcome"),
+                (result.get("ticket") or {}).get("ticket_number"),
+            )
 
 
 def _compatible_result(
@@ -149,8 +172,19 @@ def _compatible_result(
         "definitions": _definitions(state),
         "tool_report": report,
     }
+    entries = json.loads(report)
+    listed = [entry for entry in entries if entry.get("name") == "list_tickets"]
+    list_results = []
+    for entry in listed:
+        try:
+            list_results.append(json.loads(entry.get("content") or "{}"))
+        except (TypeError, json.JSONDecodeError):
+            log.error("ERROR ticket_enquiry invalid list_tickets result")
+    result["list_succeeded"] = any(
+        item.get("outcome") in {"success", "empty"} for item in list_results
+    )
+
     if completion.action == "lookup_status":
-        entries = json.loads(report)
         lookups = [entry for entry in entries if entry.get("name") == "get_ticket"]
         parsed = []
         for entry in lookups:
@@ -164,6 +198,14 @@ def _compatible_result(
         result["tickets"] = [
             item["ticket"] for item in parsed if item.get("ticket") is not None
         ]
+        result["lookup_outcomes"] = [item.get("outcome") for item in parsed]
+        log.info(
+            "ticket_enquiry completion action=%s list_succeeded=%s lookup_succeeded=%s tickets=%d",
+            completion.action,
+            result["list_succeeded"],
+            result["lookup_succeeded"],
+            len(result["tickets"]),
+        )
     return result
 
 
@@ -172,6 +214,7 @@ def _ticket_enquiry_node(state: AgentState) -> dict:
     try:
         tool_state = run_ticket_tool_agent(state)
         report = _tool_report(tool_state.get("messages", []))
+        _log_tool_activity(report)
     except Exception as exc:
         log.error("ERROR ticket_enquiry tool agent failed: %s", exc)
         report = json.dumps({"tool_agent_error": str(exc)}, ensure_ascii=False)
