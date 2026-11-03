@@ -1,4 +1,4 @@
-﻿from langchain_core.messages import AIMessage, HumanMessage
+﻿from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from unittest.mock import patch
 
 from ole5_chat.agent.contracts import manager_schema, router_schema
@@ -7,12 +7,13 @@ from ole5_chat.agent.graph import after_router, build
 from ole5_chat.agent.nodes.router import router_node
 from ole5_chat.agent.nodes.finalize import finalize_node
 from ole5_chat.agent.nodes.ticket_operator import ticket_operator_node
+from ole5_chat.agent.nodes import ticket_enquiry
 from ole5_chat.agent.nodes.ticket_enquiry import ticket_enquiry_node
 from ole5_chat.agent.nodes.validate import validate_node
 from ole5_chat.agent.prompts.router import router_prompt
 from ole5_chat.agent.prompts.respond import respond_prompt
 from ole5_chat.agent.state import AgentState
-from ole5_chat.agent.contracts import PendingCustomerResponse
+from ole5_chat.agent.contracts import PendingCustomerResponse, TicketEnquiryCompletion
 from ole5_chat.identity import Identity
 
 
@@ -242,13 +243,35 @@ def test_manager_submit_success_records_ticket_and_clears_active_issue():
 
 def test_ticket_status_lookup_returns_authorized_data():
     state = _state([HumanMessage(content="What is the status of my ticket?")])
-    decision = type("Decision", (), {"action": "lookup_status", "reason": "Customer asks for current status."})()
-    tickets = [{"ticket_number": "T1", "title": "Archive button fails", "created_at": "2026-11-01", "state": "open"}]
-    with patch("ole5_chat.agent.nodes.ticket_enquiry.llm.structured", return_value=decision), \
-         patch("ole5_chat.agent.nodes.ticket_enquiry.ticket_api_status.my_tickets", return_value=tickets):
+    rows = [
+        {"ticket_id": "id-1", "ticket_number": "T1", "title": "Archive button fails", "product": "OLE5",
+         "created_at": "2026-11-01", "customer_email": "test@example.com"},
+        {"ticket_id": "id-2", "ticket_number": "T2", "title": "Someone else's ticket", "product": "OLE5",
+         "created_at": "2026-11-01", "customer_email": "other@example.com"},
+    ]
+
+    def tool_agent(current):
+        # The real tools, called the way the tool agent would: one call for the customer's ticket, one for another's.
+        get_ticket = {t.name: t for t in ticket_enquiry.build_ticket_tools(current)}["get_ticket"]
+        messages = []
+        for n, number in enumerate(("T1", "T2")):
+            messages.append(AIMessage(content="", tool_calls=[
+                {"name": "get_ticket", "args": {"ticket_number": number}, "id": f"call-{n}"}]))
+            messages.append(ToolMessage(content=get_ticket.invoke({"ticket_number": number}),
+                                        name="get_ticket", tool_call_id=f"call-{n}"))
+        return {"messages": messages}
+
+    completion = TicketEnquiryCompletion(action="lookup_status", reason="Customer asks for current status.",
+                                         selected_ticket_numbers=["T1"])
+    with patch.object(ticket_enquiry.sheets, "tickets", return_value=rows),          patch.object(ticket_enquiry, "ticket_client") as client,          patch.object(ticket_enquiry, "run_ticket_tool_agent", side_effect=tool_agent),          patch.object(ticket_enquiry.llm, "structured", return_value=completion):
+        client.return_value.get.return_value = {"state": "open"}
         result = ticket_enquiry_node(state)
-    assert result["ticket_enquiry_result"]["lookup_succeeded"] is True
-    assert result["ticket_enquiry_result"]["tickets"] == tickets
+    enquiry = result["ticket_enquiry_result"]
+    assert enquiry["lookup_succeeded"] is True
+    assert enquiry["tickets"] == [{"ticket_number": "T1", "title": "Archive button fails", "product": "OLE5",
+                                   "created_at": "2026-11-01", "state": "open"}]
+    assert enquiry["lookup_outcomes"] == ["found", "not_found"]
+    client.return_value.get.assert_called_once_with("id-1")
 
 
 
