@@ -6,14 +6,20 @@ ported into the graph.
 """
 
 import logging
+import json
 
+from langchain.agents import create_agent
 from ole5_chat import llm, values
 from ole5_chat.support_core import classify as classifier
 from ole5_chat.support_core.contracts import PendingIssue
 from ole5_chat.support_core.state import ChatState, TicketDraft
-from ole5_chat.agent.contracts import MANAGER_ACTIONS, ManagerContext, manager_schema
-from ole5_chat.agent.prompts.ticket_operator import manager_prompt
+from ole5_chat.agent.contracts import MANAGER_ACTIONS, ManagerContext, OperatorCompletion, manager_schema
+from ole5_chat.agent.prompts.ticket_operator import (
+    ticket_operator_result_prompt,
+    ticket_operator_tool_prompt,
+)
 from ole5_chat.agent.state import AgentState
+from ole5_chat.agent.tools.ticket_operator import build_ticket_operator_tools
 from ole5_chat.identity import Identity
 from ole5_chat.tickets import client as ticket_api
 from ole5_chat.tickets import submit as tickets
@@ -322,49 +328,167 @@ def _submit(state: AgentState, issue: dict) -> dict:
     }
 
 
+def _tool_report(messages: list) -> str:
+    report = []
+    for message in messages:
+        calls = getattr(message, "tool_calls", None)
+        if message.content or calls:
+            report.append({
+                "type": message.type,
+                "name": getattr(message, "name", None),
+                "content": message.content,
+                "tool_calls": calls,
+            })
+    return json.dumps(report, ensure_ascii=False, default=str)
+
+
+def _working_summary(state: AgentState) -> dict:
+    return {
+        key: state.get(key)
+        for key in (
+            "active_issue", "pending_issues", "ticket_draft", "pending_customer_response",
+            "summary_shown", "submission_requested", "draft_version", "created_tickets",
+            "summary_delivered_version", "summary_confirmed_version",
+        )
+    }
+
+
+def _tool_results(report: str) -> list[dict]:
+    results = []
+    entries = json.loads(report or "[]")
+    for entry in entries if isinstance(entries, list) else []:
+        if entry.get("name") not in {"get_ticket_requirements", "save_ticket_draft", "manage_issues", "submit_ticket"}:
+            continue
+        try:
+            results.append({
+                "name": entry["name"],
+                "result": json.loads(entry.get("content") or "{}"),
+            })
+        except (KeyError, TypeError, json.JSONDecodeError):
+            log.error("ERROR ticket_operator invalid tool result name=%s", entry.get("name"))
+    return results
+
+
+def _apply_completion(state: AgentState, completion: OperatorCompletion, report: str) -> dict:
+    update = {
+        key: state.get(key)
+        for key in (
+            "active_issue", "pending_issues", "ticket_draft", "created_tickets", "attachments",
+            "summary_shown", "submission_requested", "pending_customer_response",
+            "draft_version", "summary_delivered_version", "summary_confirmed_version",
+        )
+        if key in state
+    }
+    tool_results = _tool_results(report)
+    draft_result = next(
+        (item["result"] for item in reversed(tool_results) if item["name"] == "save_ticket_draft"),
+        None,
+    )
+    if completion.action == "show_summary" and not (draft_result or {}).get("summary_ready"):
+        missing = (draft_result or {}).get("missing_customer_details") or []
+        requested = missing[0] if missing else None
+        log.error(
+            "ERROR ticket_operator rejected show_summary: classification_succeeded=%s "
+            "summary_ready=%s missing_customer_details=%s mandatory_fields_missing=%s",
+            (draft_result or {}).get("classification_succeeded"),
+            (draft_result or {}).get("summary_ready"),
+            missing,
+            (draft_result or {}).get("mandatory_fields_missing") or [],
+        )
+        completion = completion.model_copy(update={
+            "action": "request_detail" if requested else "clarify",
+            "requested_detail": requested,
+            "reason": "The draft is not ready for summary because classification or required fields are incomplete.",
+            "response_instruction": (
+                f"Ask the customer for the missing detail: {requested}."
+                if requested else "Explain that the ticket summary could not be prepared yet."
+            ),
+        })
+    issue = state.get("active_issue")
+    issue_id = completion.issue_id or (issue or {}).get("id")
+    if completion.action == "offer" and issue_id:
+        update["pending_customer_response"] = _pending("offer", issue or {"id": issue_id})
+    elif completion.action == "request_detail" and issue_id and completion.requested_detail:
+        update["pending_customer_response"] = _pending("detail", issue or {"id": issue_id}, completion.requested_detail)
+    elif completion.action == "show_summary" and issue_id:
+        update["pending_customer_response"] = _pending("summary", issue or {"id": issue_id})
+        update["summary_shown"] = True
+        update["submission_requested"] = True
+    elif completion.action in {"declined", "cancelled"}:
+        update["pending_customer_response"] = None
+
+    submission = next((item["result"] for item in reversed(tool_results) if item["name"] == "submit_ticket"), None)
+    ticket_result = {"response_instruction": completion.response_instruction}
+    if submission is not None:
+        ticket_result.update({
+            "submission_requested": True,
+            "submission_succeeded": bool(submission.get("success")),
+            "ticket": submission.get("ticket"),
+            "corrections": submission.get("corrections", []),
+            "error": submission.get("error"),
+        })
+    compatibility = {
+        "offer": "register_issue", "request_detail": "provide", "show_summary": "clarify",
+        "declined": "decline", "cancelled": "cancel", "queued": "separate_issue",
+        "submitted": "submit", "submission_failed": "submit", "clarify": "clarify",
+    }
+    update.update({
+        "manager_action": compatibility[completion.action],
+        "manager_reason": completion.reason,
+        "ticket_result": ticket_result,
+        "ticket_operator_result": {
+            "action": completion.action,
+            "reason": completion.reason,
+            "ticket_result": ticket_result,
+            "tool_report": report,
+        },
+    })
+    return update
+
+
 def _ticket_operator_node(state: AgentState) -> dict:
-    context = _context(state)
-    log.info("ticket_operator  context=%s event=%s active=%s pending=%d", context,
-             state.get("input_event"), bool(state.get("active_issue")), len(state.get("pending_issues", [])))
-    if state.get("input_event") == "submit":
-        action, reason = "submit", "The customer pressed the Submit button."
-        if context != "summary" or not state.get("summary_shown") or not state.get("submission_requested"):
-            log.warning("ticket_operator  submit rejected: no valid displayed summary")
-            return {
-                "manager_action": action,
-                "manager_reason": "Submit was pressed without a valid displayed summary.",
-                "ticket_result": {
-                    "submission_requested": True,
-                    "submission_succeeded": False,
-                    "response_instruction": "Tell the customer there is no valid ticket summary to submit.",
-                },
-            }
-    else:
-        scope_routed = "outside the chat scope" in (state.get("route_reason") or "")
-        if scope_routed:
-            action = "register_issue" if context == "none" else "separate_issue"
-            reason = "Customer-specific account or user data must go to ticket handling."
-        else:
-            schema = manager_schema(context)
-            try:
-                decision = llm.structured(manager_prompt(state, context), list(state.get("messages", [])), schema, node="ticket_operator")
-                action, reason = decision.action, decision.reason
-            except llm.ModelFailed as exc:
-                log.error("ERROR ticket_operator model call failed: %s", exc)
-                action = "not_an_answer" if context == "detail" else "clarify"
-                reason = "Ticket Operator could not safely interpret the message."
-    if context == "none":
-        update = _apply_none(state, action)
-    elif context == "offer":
-        update = _apply_offer(state, action)
-    elif context == "detail":
-        update = _apply_detail(state, action)
-    else:
-        update = _apply_summary(state, action)
-    log.info("ticket_operator  action=%s reason=%r", action, reason)
-    return {"manager_action": action, "manager_reason": reason, **update,
-            # Capture the field answered before _prepare advances or clears it.
-            "answered_detail": state.get("pending_customer_response") if context == "detail" and action == "provide" else None}
+    working = dict(state)
+    working["pending_issues"] = list(state.get("pending_issues", []))
+    working["created_tickets"] = list(state.get("created_tickets", []))
+    report = ""
+    try:
+        agent = create_agent(
+            model=llm.tool_client(0),
+            tools=build_ticket_operator_tools(working),
+            system_prompt=ticket_operator_tool_prompt(state),
+            name="ticket_operator_tools",
+        )
+        tool_state = agent.invoke({"messages": list(state.get("messages", []))})
+        handoff = next((message.content for message in reversed(tool_state.get("messages", []))
+                        if message.type == "ai" and not getattr(message, "tool_calls", None)), None)
+        log.info("ticket_operator handoff=%r", handoff)
+        report = _tool_report(tool_state.get("messages", []))
+    except Exception as exc:
+        log.error("ERROR ticket_operator tool agent failed: %s", exc)
+        report = json.dumps({"tool_agent_error": str(exc)}, ensure_ascii=False)
+
+    try:
+        completion = llm.structured(
+            ticket_operator_result_prompt(state, report, _working_summary(working)),
+            [], OperatorCompletion, node="ticket_operator",
+        )
+    except llm.ModelFailed as exc:
+        log.error("ERROR ticket_operator result interpretation failed: %s", exc)
+        completion = OperatorCompletion(
+            action="clarify", reason="Operator result could not be interpreted safely.",
+            response_instruction="Ask the customer one focused clarification question.",
+        )
+
+    update = _apply_completion(working, completion, report)
+    log.info("ticket_operator completion action=%s issue_id=%s requested_detail=%s reason=%r",
+             completion.action, completion.issue_id, completion.requested_detail, completion.reason)
+    log.info("ticket_operator response_instruction=%r", completion.response_instruction)
+    pending = update.get("pending_customer_response")
+    log.info("ticket_operator state pending_kind=%s pending_issue=%s active_issue=%s queued=%d manager_action=%s",
+             getattr(pending, "kind", None), getattr(pending, "issue_id", None),
+             (update.get("active_issue") or {}).get("id"), len(update.get("pending_issues") or []),
+             update.get("manager_action"))
+    return update
 
 
 def ticket_operator_node(state: AgentState) -> dict:
@@ -372,11 +496,11 @@ def ticket_operator_node(state: AgentState) -> dict:
 
     result = _ticket_operator_node(state)
     result["last_worker"] = "ticket_operator"
-    result["ticket_operator_result"] = {
+    result.setdefault("ticket_operator_result", {
         "action": result.get("manager_action"),
         "reason": result.get("manager_reason"),
         "ticket_result": result.get("ticket_result"),
-    }
+    })
     return result
 
 

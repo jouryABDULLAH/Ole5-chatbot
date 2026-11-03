@@ -205,12 +205,17 @@ def detach(session_id: str, att_id: str) -> bool:
 
 
 def submit(session_id: str) -> AgentState:
-    """Run the explicit Submit event; the graph performs its own summary guard."""
+    """Run the explicit Submit event; the Operator tool verifies the delivered draft version."""
 
     with _lock(session_id), using_session(session_id):
         _state(session_id)
-        log.info("v2 submit  session=%s", session_id[:8])
         state = _state(session_id)
+        log.info(
+            "v2 submit  session=%s draft_version=%s summary_delivered_version=%s",
+            session_id[:8],
+            state.get("draft_version"),
+            state.get("summary_delivered_version"),
+        )
         return _run(session_id, {"input_event": "submit"}, state.get("language") or state["identity"].language)
 
 

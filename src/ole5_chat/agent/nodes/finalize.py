@@ -44,6 +44,8 @@ def finalize_node(state: AgentState) -> dict:
         "sources": [],
         "source_details": [],
     }
+    if state.get("summary_shown") and state.get("draft_version") is not None:
+        result["summary_delivered_version"] = state["draft_version"]
     if state.get("current_references") and not state.get("grounding_failed") and state.get("validation_outcome") != "fallback":
         result["last_answer_evidence"] = {"evidence": state["current_references"]}
     return result

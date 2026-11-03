@@ -19,6 +19,11 @@ SearchOutcome = Literal["answered", "partial", "no_answer", "failed"]
 TicketStatusAction = Literal["lookup_status", "explain_status", "clarify"]
 TicketListOutcome = Literal["success", "empty", "error"]
 TicketLookupOutcome = Literal["found", "not_found", "status_unavailable", "error"]
+IssueOperation = Literal["register", "enqueue", "cancel_preparation", "activate_next"]
+OperatorAction = Literal[
+    "offer", "request_detail", "show_summary", "declined", "cancelled",
+    "queued", "submitted", "submission_failed", "clarify",
+]
 ValidationOutcome = Literal["pass", "repair", "fallback"]
 
 MANAGER_ACTIONS: dict[ManagerContext, tuple[str, ...]] = {
@@ -130,6 +135,32 @@ class TicketEnquiryCompletion(BaseModel):
     reason: str
     selected_ticket_numbers: list[str] = []
     clarification_question: str | None = None
+
+
+class OperatorCompletion(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    action: OperatorAction
+    reason: str
+    issue_id: str | None = None
+    requested_detail: str | None = None
+    response_instruction: str
+
+
+class OperatorToolResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    success: bool
+    operation: str
+    issue_id: str | None = None
+    draft_version: int | None = None
+    missing_fields: list[str] = []
+    unknown_fields: list[str] = []
+    active_issue: dict | None = None
+    pending_issues: list[dict] = []
+    draft: dict | None = None
+    ticket: dict | None = None
+    error: str | None = None
 
 
 class Grounding(BaseModel):

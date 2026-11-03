@@ -29,6 +29,9 @@ class AgentState(MessagesState, total=False):
     
     summary_shown: bool
     submission_requested: bool
+    draft_version: int | None
+    summary_delivered_version: int | None
+    summary_confirmed_version: int | None
     attachments: list[dict]
     created_tickets: list[dict]
     
@@ -83,6 +86,9 @@ def initial_state(identity: Identity) -> AgentState:
         pending_customer_response=None,
         summary_shown=False,
         submission_requested=False,
+        draft_version=None,
+        summary_delivered_version=None,
+        summary_confirmed_version=None,
         attachments=[],
         created_tickets=[],
         last_answer_evidence=None,

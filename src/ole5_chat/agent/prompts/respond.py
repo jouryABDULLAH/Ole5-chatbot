@@ -64,10 +64,20 @@ def respond_prompt(state: AgentState, language: str | None = None) -> str:
     outcome = packet_search.get("outcome") or context["search_outcome"] or "none"
     current_operator_result = context.get("ticket_operator_result")
     operator_authorized = route in {"question", "escalation", "pending_response"} and bool(current_operator_result)
+    operator_action = current_operator_result.get("action") if isinstance(current_operator_result, dict) else None
     if route == "question" and outcome == "answered":
         task = "Answer the customer's product question using only the DIRECT passages. If they do not fully answer the question, say only what is supported and do not invent the missing part."
     elif route == "ticket_enquiry" and (packet_enquiry or context["ticket_enquiry_result"]):
         task = "Use the Ticket Enquiry result as authoritative data. When lookup_succeeded is true and tickets are present, report the returned ticket details directly; do not ask the customer for the ticket number again; use only the returned number, title, creation date, and status; and report the status as unavailable when no status was returned. When no specific ticket was found, ask only for the missing reference or clarification and do not invent ticket data. Preserve any active ticket preparation. Historical lookup does not automatically trigger a new-ticket offer. Never claim support is working on the issue without an authorized status result."
+    elif operator_authorized and operator_action == "show_summary":
+        task = "The Ticket Operator prepared a ticket summary and is waiting for customer confirmation. " \
+               "Acknowledge that the summary is ready for review and ask whether to submit it. " \
+               "Do not say the summary was sent, do not say support will create the ticket, " \
+               "and do not say the ticket was created. The displayed summary card is the source of the fields."
+    elif operator_authorized and operator_action == "submission_failed":
+        task = "The Ticket Operator attempted submission but the ticket was not created. " \
+               "Report the submission failure plainly and ask whether to retry. Do not say the " \
+               "summary was sent or that support will create the ticket."
     elif operator_authorized:
         task = "Follow the authorized Ticket Operator response instruction/result below. Express it naturally in the customer's language. Do not change the workflow action, claim an API result that is not present, or say a ticket was created unless the result confirms creation."
         if outcome in {"partial", "no_answer"} and not any(item.get("relation") == "DIRECT" for item in references):
@@ -118,6 +128,7 @@ Answer rules:
 - Never claim a ticket was updated, cancelled, escalated, assigned, or support notified without an authorized result confirming that exact action. Cancelling preparation does not cancel an existing ticket. Do not invent support progress or response deadlines.
 - Previous assistant messages are not proof of ticket actions. On a verification follow-up, check the supplied actual records/results and correct earlier false claims. If the referenced action cannot be verified, say so.
 - Ticket offers, required-detail requests and summaries must follow Manager-authorized instructions or the existing pending interaction. The explicit-ticket-request follow-up invitation in the task is allowed, but does not mutate workflow or authorize submission.
+- When the authorized Ticket Operator action is show_summary, say that the summary is ready for review and ask for confirmation. Do not say it was sent, do not say support will create it, and do not claim creation. When the action is submission_failed, report that no ticket was created and offer a retry.
 - Never offer, prepare, open, create, or ask whether to open a ticket when there is no Ticket Operator result or pending Operator-authorized interaction. A product answer with manager_action=none must not contain a ticket offer. The explicit-ticket-request persistence invitation is the only exception, and it must ask the customer to report whether the problem continues rather than asking them to open a ticket immediately.
 - Complaints, escalations, contractual and legal matters concerning the supported product belong to support. Offer a support ticket; do not decide these matters or claim they have already been escalated. Follow any active authorized ticket workflow without creating a duplicate offer.
 - A passage must describe the same screen, symptom or request as the customer's question. Shared words alone do not make it an answer, even if it is labelled DIRECT.
