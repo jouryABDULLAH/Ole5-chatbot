@@ -17,6 +17,8 @@ PendingKind = Literal["offer", "detail", "summary"]
 ManagerContext = Literal["none", "offer", "detail", "summary"]
 SearchOutcome = Literal["answered", "partial", "no_answer", "failed"]
 TicketStatusAction = Literal["lookup_status", "explain_status", "clarify"]
+TicketListOutcome = Literal["success", "empty", "error"]
+TicketLookupOutcome = Literal["found", "not_found", "status_unavailable", "error"]
 ValidationOutcome = Literal["pass", "repair", "fallback"]
 
 MANAGER_ACTIONS: dict[ManagerContext, tuple[str, ...]] = {
@@ -93,6 +95,41 @@ class TicketStatusDecision(BaseModel):
 
     action: TicketStatusAction
     reason: str
+
+
+class TicketListItem(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    ticket_number: str
+    title: str
+    product: str
+    created_at: str
+
+
+class TicketListResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    outcome: TicketListOutcome
+    tickets: list[TicketListItem] = []
+    error: str | None = None
+
+
+class TicketLookupResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    outcome: TicketLookupOutcome
+    ticket: dict | None = None
+    status_available: bool = False
+    error: str | None = None
+
+
+class TicketEnquiryCompletion(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    action: TicketStatusAction
+    reason: str
+    selected_ticket_numbers: list[str] = []
+    clarification_question: str | None = None
 
 
 class Grounding(BaseModel):
