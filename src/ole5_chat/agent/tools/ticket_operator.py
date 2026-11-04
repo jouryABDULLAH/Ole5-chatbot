@@ -245,6 +245,12 @@ def build_ticket_operator_tools(state: AgentState):
         if item not in draft.required:
             return _json({"success": False, "operation": "skip_detail",
                           "error": f"{item!r} is not a required detail; required: {sorted(draft.required)}"})
+        if draft.required.get(item) in SKIPPED:
+            # Already settled: a repeat changes nothing, so a summary already shown stays valid.
+            return _json({"success": True, "operation": "skip_detail", "unchanged": True, "issue_id": active.get("id"),
+                          "item": item, "value": draft.required[item], "draft_version": state.get("draft_version"),
+                          "missing_customer_details": draft.missing, "missing_fields": draft.missing,
+                          "summary_ready": bool(draft.classified and not draft.missing)})
         required = {**draft.required, item: value}
         missing = [key for key, given in required.items() if given is None]
         mandatory_missing = [key for key in ticket_submit.REQUIRED if not getattr(draft, key, None)]

@@ -76,7 +76,7 @@ Queued issues: {state.get('pending_issues') or 'none'}
 Current ticket draft: {state.get('ticket_draft') or 'none'}
 Current draft version: {state.get('draft_version')}
 Delivered summary version: {state.get('summary_delivered_version')}
-Input event: {state.get('input_event') or 'message'}
+Input event: {state.get('input_event') or 'message'} (submit means the customer pressed Submit on the displayed summary: that is their confirmation, so call submit_ticket and nothing else)
 Use these exact version values; never guess a version. For a version mismatch,
 use the tool's returned current version only if it matches the delivered summary.
 Do not save or reclassify a draft merely to recover from a wrong version argument.

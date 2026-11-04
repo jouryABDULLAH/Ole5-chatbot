@@ -9,6 +9,7 @@ import logging
 import json
 
 from langchain.agents import create_agent
+from langchain_core.messages import HumanMessage
 from ole5_chat import llm, values
 from ole5_chat.support_core import classify as classifier
 from ole5_chat.support_core.contracts import PendingIssue
@@ -501,7 +502,14 @@ def _ticket_operator_node(state: AgentState) -> dict:
             system_prompt=ticket_operator_tool_prompt(state),
             name="ticket_operator_tools",
         )
-        tool_state = agent.invoke({"messages": list(state.get("messages", []))})
+        messages = list(state.get("messages", []))
+        if state.get("input_event") == "submit":
+            # A button turn has no customer message; without this the agent replays the last one.
+            messages.append(HumanMessage(content=(
+                "Note from the system, not the customer: the customer pressed Submit on the displayed summary "
+                f"(draft version {state.get('summary_delivered_version')}). This is their confirmation: call "
+                "submit_ticket for the active issue with that version. Do not repeat any earlier step.")))
+        tool_state = agent.invoke({"messages": messages})
         handoff = next((message.content for message in reversed(tool_state.get("messages", []))
                         if message.type == "ai" and not getattr(message, "tool_calls", None)), None)
         log.info("ticket_operator handoff=%r", handoff)
