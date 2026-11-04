@@ -305,8 +305,18 @@ def build_ticket_operator_tools(state: AgentState):
             else:
                 queue.append(issue)
             state["pending_issues"] = queue
+            return _json({
+                "success": True,
+                "operation": operation,
+                "issue": issue,
+                "queued": state.get("active_issue") is not issue,  # waits behind the active issue
+                "active_issue": state.get("active_issue"),
+                "pending_issues": queue,
+            })
         elif operation == "cancel_preparation":
             # A cancelled or declined issue is finished: it stops being active and the next queued issue takes its place.
+            if active is None:
+                return _json({"success": False, "operation": operation, "error": "nothing to cancel: no active issue"})
             cancelled = active
             state["active_issue"] = queue.pop(0) if queue else None
             state["pending_issues"] = queue

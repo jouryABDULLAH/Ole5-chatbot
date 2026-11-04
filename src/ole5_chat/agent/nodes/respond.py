@@ -9,7 +9,8 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from ole5_chat import llm
 from ole5_chat.agent.contracts import Grounding
 from ole5_chat.agent.prompts.guards import grounding_prompt
-from ole5_chat.agent.prompts.respond import respond_prompt
+from ole5_chat.agent.prompts.respond import system_prompt, turn_note
+from ole5_chat.agent.turn_sheet import TurnSheet, build_turn_sheet
 
 from ole5_chat.agent.state import AgentState
 from ole5_chat.agent.guards import NAMES, language_of, language_problem, plain
@@ -75,21 +76,15 @@ def _language_mismatch(text: str, expected: str) -> bool:
     return (expected == "ar" and has_latin and not has_arabic) or (expected == "en" and has_arabic and not has_latin)
 
 
-def _messages(state: AgentState) -> list:
-    """The chat, plus a closing note when a ticket step is waiting and this turn is not a reply to it."""
-    messages = list(state.get("messages", []))
-    pending = state.get("pending_customer_response")
-    if pending and state.get("intent") != "pending_response" and not state.get("ticket_operator_result"):
-        issue = (state.get("active_issue") or {}).get("description") or "the active issue"
-        messages.append(HumanMessage(content=(
-            f"Note from the system, not the customer: a ticket {pending.kind} for \"{issue}\" is still waiting "
-            "for the customer. After answering, remind the customer in one sentence what it still needs from them.")))
-    return messages
+def _messages(state: AgentState, sheet: TurnSheet) -> list:
+    """The chat, then this turn's facts as the last message (the turn sheet)."""
+    return [*state.get("messages", []), HumanMessage(content=turn_note(sheet))]
 
 
-def _correct_language(state: AgentState, reply: str, language: str) -> str:
+def _correct_language(state: AgentState, sheet: TurnSheet, reply: str) -> str:
     """Keep the cheap script check and add semantic detection for mixed scripts."""
-    conversation = [SystemMessage(content=respond_prompt(state, language)), *_messages(state)]
+    language = sheet["language"]
+    conversation = [SystemMessage(content=system_prompt(state, sheet)), *_messages(state, sheet)]
     for attempt in range(LANGUAGE_RETRIES + 1):
         mismatch = _language_mismatch(reply, language) or language_problem(reply, language)
         if not mismatch:
@@ -125,7 +120,7 @@ def _grounding_input(state: AgentState, reply: str) -> str:
     return f"Assistant's previous message:\n{previous}\n\nCustomer's message:\n{customer}\n\nReply:\n{reply}\n\nPassages:\n{passages}"
 
 
-def _grounded_reply(state: AgentState, reply: str, language: str | None = None) -> str | None:
+def _grounded_reply(state: AgentState, sheet: TurnSheet, reply: str) -> str | None:
     """Keep an answered product reply tied to this turn's retrieved passages."""
     if state.get("intent") != "question" or state.get("search_outcome") != "answered":
         return reply
@@ -151,14 +146,14 @@ def _grounded_reply(state: AgentState, reply: str, language: str | None = None) 
             return None
         try:
             reply = llm.invoke([
-                SystemMessage(content=respond_prompt(state, language)), *_messages(state),
+                SystemMessage(content=system_prompt(state, sheet)), *_messages(state, sheet),
                 AIMessage(content=reply),
                 HumanMessage(content=(
                     "Rewrite the reply using only the current retrieved passages. Remove every unsupported "
                     f"claim: {'; '.join(check.unsupported)}. Do not use prior conversation answers as evidence."
                 )),
             ]).text.strip()
-            reply = _correct_language(state, reply, language or _expected_language(state))
+            reply = _correct_language(state, sheet, reply)
         except llm.ModelFailed as exc:
             log.error("ERROR respond grounding correction failed: %s", exc)
             return None
@@ -166,19 +161,19 @@ def _grounded_reply(state: AgentState, reply: str, language: str | None = None) 
 
 
 def respond_node(state: AgentState) -> dict:
-    log.info("respond  intent=%s search=%s manager=%s status=%s", state.get("intent"),
-             state.get("search_outcome"), state.get("manager_action"),
-             bool(state.get("ticket_enquiry_result")))
     language = _expected_language(state)
+    sheet = build_turn_sheet(state, language)
+    log.info("respond  intent=%s search=%s stage=%s button=%s", state.get("intent"),
+             state.get("search_outcome"), sheet["stage"], sheet["button"])
     try:
         reply = llm.invoke(
-            [SystemMessage(content=respond_prompt(state, language)), *_messages(state)]
+            [SystemMessage(content=system_prompt(state, sheet)), *_messages(state, sheet)]
         ).text.strip()
     except llm.ModelFailed as exc:
         log.error("ERROR respond model call failed; sending safe fallback: %s", exc)
         reply = "عذراً، حدث خطأ من جهتنا. يرجى المحاولة مرة أخرى." if language == "ar" else "Sorry, something went wrong on our side. Please try again."
-    reply = _correct_language(state, reply, language)
-    reply = _grounded_reply(state, reply, language)
+    reply = _correct_language(state, sheet, reply)
+    reply = _grounded_reply(state, sheet, reply)
     if reply is None:
         # Fixed wording avoids another model call reintroducing unsupported facts.
         return {"reply": SAFE_FALLBACK[language], "language": language, "grounding_failed": True}

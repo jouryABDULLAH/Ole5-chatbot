@@ -43,7 +43,7 @@ def test_ticket_lie_gets_only_one_response_retry(model, rejected_twice, route):
     assert writer.call_count == 2
     assert search.call_count == (1 if route == "question" else 0)
     submit.assert_not_called()
-    assert "No actual ticket was created" in writer.call_args.args[0][0].content
+    assert "No actual ticket was created" in writer.call_args.args[0][-1].content  # the turn note
     assert result["created_tickets"] == []
     assert result["validation_retries"] == 0
     assert result["validation_note"] is None

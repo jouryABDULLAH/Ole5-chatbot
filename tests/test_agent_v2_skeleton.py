@@ -11,7 +11,8 @@ from ole5_chat.agent.nodes import ticket_enquiry
 from ole5_chat.agent.nodes.ticket_enquiry import ticket_enquiry_node
 from ole5_chat.agent.nodes.validate import validate_node
 from ole5_chat.agent.prompts.router import router_prompt
-from ole5_chat.agent.prompts.respond import respond_prompt
+from ole5_chat.agent.prompts.respond import turn_note
+from ole5_chat.agent.turn_sheet import build_turn_sheet
 from ole5_chat.agent.state import AgentState
 from ole5_chat.agent.contracts import PendingCustomerResponse, TicketEnquiryCompletion
 from ole5_chat.identity import Identity
@@ -121,8 +122,11 @@ def test_other_route_does_not_rehydrate_stale_ticket_result():
         result = router_node(state)
     assert result["next_target"] == "respond"
     assert result["response_packet"]["ticket_operator"] is None
-    prompt = respond_prompt({**state, **result})
-    assert "Respond to the customer's actual conversational message" in prompt
+    # The stale ticket_result of an earlier turn must not reach Respond as this turn's workflow fact.
+    note = turn_note(build_turn_sheet({**state, **result}, "en"))
+    assert "Stage: other" in note
+    assert "Ticket workflow this turn: not run" in note
+    assert "Ticket created" not in note
 
 
 def test_router_updates_current_intent_when_selecting_next_target():

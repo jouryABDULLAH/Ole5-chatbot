@@ -28,5 +28,5 @@ def language_problem(text: str, language: str) -> str | None:
 
 def plain(text: str) -> str:
     text = re.sub(r"\*\*|__|`", "", text)
-    return re.sub(r"(?m)^[ \t]*(#+|-)[ \t]+", "", text)
+    return re.sub(r"(?m)^[ \t]*#+[ \t]+", "", text)  # "- " bullets stay: replies keep the passage's lists
 

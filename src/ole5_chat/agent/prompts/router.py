@@ -1,4 +1,4 @@
-﻿"""Router prompt builder and its reusable prompt sections."""
+"""Router prompt builder and its reusable prompt sections."""
 
 from ole5_chat import products
 from ole5_chat.agent.context import router_context
@@ -51,6 +51,7 @@ ROUTER_EXAMPLES = {
         '"اشرحها ببساطة" after a product answer; '
         '"لوين ترسل التذكرة؟" or "لماذا تحتاج اسم المتصفح؟" while a step is pending (a question about the step); '
         '"الأرشفة" with nothing pending; "عندي مشكلة" with no subject; '
+        '"الغها" with nothing pending and no active issue (there is nothing to cancel); '
         'an unrelated/off-topic question; '
         'an ambiguous reference such as "الثانية" when no clear referent exists'
     ),

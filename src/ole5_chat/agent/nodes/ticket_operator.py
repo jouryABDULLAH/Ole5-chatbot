@@ -437,6 +437,10 @@ def _apply_completion(state: AgentState, completion: OperatorCompletion, report:
         })
     # After a submitted ticket the next queued issue is active: offer it in the same turn, as the old flow did.
     next_issue = (submission or {}).get("active_issue") if (submission or {}).get("success") else None
+    # An issue registered or enqueued this turn behind the active one: Respond tells the customer it is noted.
+    queued = next((item["result"].get("issue") for item in reversed(tool_results)
+                   if item["name"] == "manage_issues" and item["result"].get("success")
+                   and item["result"].get("queued")), None)
     if completion.action == "submitted" and next_issue:
         update["pending_customer_response"] = _pending("offer", next_issue)
     compatibility = {
@@ -461,6 +465,7 @@ def _apply_completion(state: AgentState, completion: OperatorCompletion, report:
                         for item in tool_results if item["name"] == "skip_detail" and item["result"].get("success")],
             "cancelled_issue": (cancelled or {}).get("description"),
             "next_issue": (next_issue or {}).get("description"),
+            "queued_issue": (queued or {}).get("description"),
             "ticket_result": ticket_result,
         },
     })

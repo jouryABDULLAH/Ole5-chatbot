@@ -146,6 +146,14 @@ def test_submit_activates_and_offers_the_next_queued_issue(monkeypatch):
     assert result['ticket_operator_result']['next_issue'] == 'Printing shows a blank page'
 
 
+def test_cancel_with_nothing_active_is_not_a_success():
+    state = detail_state()
+    state['active_issue'] = None
+    bound = {tool.name: tool for tool in tools.build_ticket_operator_tools(state)}
+    result = json.loads(bound['manage_issues'].invoke({'operation': 'cancel_preparation'}))
+    assert not result['success'] and 'nothing to cancel' in result['error']
+
+
 def test_undelivered_revision_cannot_submit(monkeypatch):
     state = ready_state()
     state['draft_version'] = 2

@@ -31,7 +31,7 @@ def test_english_sentence_with_arabic_name_corrects_mixed_reply():
     assert result == {"reply": corrected, "language": "en"}
     correction_messages = generate.call_args_list[1].args[0]
     assert correction_messages[-2].content == wrong
-    assert "The customer wrote in en" in correction_messages[0].content
+    assert "in English" in correction_messages[-3].content  # the turn note
     assert "Judge by the language of the sentences" in detector.call_args_list[0].args[0]
     assert validate._expected_language({**values, **result}) == "en"
 
