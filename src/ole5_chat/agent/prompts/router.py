@@ -7,7 +7,7 @@ from ole5_chat.agent.state import AgentState
 
 ROUTER_ROUTES = {
     "question": "A product question or problem report needing the knowledge base. A named ordinary issue remains question even when the customer asks for a ticket: Search runs first.",
-    "pending_response": "A reply to, or question about, the active pending offer, required detail, or submission summary. Use only when pending customer response is present.",
+    "pending_response": "An answer to the active pending offer, required detail, or submission summary: accepting, declining, giving or refusing the detail, confirming, editing, or cancelling. A question about the pending step (where it goes, why a detail is needed, what happens next) is other, not an answer. Use only when pending customer response is present.",
     "ticket_enquiry": "A lookup of the customer's ticket data, or an explanation of an identified ticket status. Support-process questions such as hours or reply channel are other.",
     "escalation": "A configured always-ticket topic, configured urgent situation, a report that suggested steps did not help, or a bare ticket request with no recoverable subject.",
     "other": "A greeting, thanks, capability/About/company question, configured support-process question, off-topic message, evidence-grounded rephrasing, or unclear intent. General questions about support hours, response times, reply channels, and how support tickets work are other and go directly to respond, using configured support information.",
@@ -29,7 +29,7 @@ ROUTER_EXAMPLES = {
         '"ارسلها" after a submission summary; '
         '"ما أعرف" after a required-detail question; '
         '"ما أبي أعطيك" after a required-detail question; '
-        '"لماذا تحتاج اسم المتصفح؟"'
+        '"نعم، بس لوين ترسل؟" after a summary (an answer with a question: still pending_response)'
     ),
     "ticket_enquiry": (
         '"وش صار على تذكرتي؟"; '
@@ -49,6 +49,7 @@ ROUTER_EXAMPLES = {
         '"مرحبا"; "شكراً"; "What can you do?"; "ايش تقدم"; "Who developed {product}?"; '
         '"وين توصلني الرسالة؟"; "كم ساعات الدعم؟"; '
         '"اشرحها ببساطة" after a product answer; '
+        '"لوين ترسل التذكرة؟" or "لماذا تحتاج اسم المتصفح؟" while a step is pending (a question about the step); '
         '"الأرشفة" with nothing pending; "عندي مشكلة" with no subject; '
         'an unrelated/off-topic question; '
         'an ambiguous reference such as "الثانية" when no clear referent exists'
@@ -106,7 +107,7 @@ Intent describes what the customer requested; worker completion alone does not c
 ### INTENT CLASSIFICATION RULES
 
 - Actual personal account information outside ticket data is escalation. General documented product procedures, such as how to reset a password, are question.
-- Use pending_response only when the message responds to or asks about the active pending interaction. An unrelated account question is escalation even if a ticket interaction is pending.
+- Use pending_response only when the message answers the active pending interaction. A question about it, with no answer, is other: Respond answers it and keeps the step. An unrelated account question is escalation even if a ticket interaction is pending.
 - Greetings, thanks, capabilities and support-process FAQs are other.
 - Explicit existing-ticket lookups and explanations of identified ticket statuses are ticket_enquiry. Asking whether the assistant CAN access tickets is other. "هل أقدر أستعلم عن تذاكري؟" and "هل اقدر استعلم عن تذاكري التي انشأتها" ask about capability, so choose other; "اعرض تذاكري" requests an actual lookup, so choose ticket_enquiry.
 
@@ -170,7 +171,7 @@ Never rewrite worker outputs or invent results. Return only the Router decision 
 - A new product question during ticket preparation is `question`, not `pending_response`.
 - If an assistant-displayed reference is ambiguous, choose `other` and let Respond ask one focused clarification.
 - A question asking whether the assistant can access or explain ticket information is `other`; only explicit requests to show, list, check, or retrieve ticket data are `ticket_enquiry`.
-- Set `explicit_ticket_request=true` only when the customer explicitly asks to prepare/open a ticket for the current named issue.
+- Set `explicit_ticket_request=true` only when the customer explicitly asks to prepare/open a ticket for the current named issue. Keep it false for policy-based escalation, urgency, status, acceptance, detail answers, rephrasing, and mere mentions of tickets.
 - If the latest message has no safe interpretation, choose `other` and do not invent a ticket subject or operation.
 
 ### FEW-SHOT EXAMPLES

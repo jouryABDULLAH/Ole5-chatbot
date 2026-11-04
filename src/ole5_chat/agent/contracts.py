@@ -19,7 +19,7 @@ SearchOutcome = Literal["answered", "partial", "no_answer", "failed"]
 TicketStatusAction = Literal["lookup_status", "explain_status", "clarify"]
 TicketListOutcome = Literal["success", "empty", "error"]
 TicketLookupOutcome = Literal["found", "not_found", "status_unavailable", "error"]
-IssueOperation = Literal["register", "enqueue", "cancel_preparation", "activate_next"]
+IssueOperation = Literal["register", "enqueue", "cancel_preparation"]
 OperatorAction = Literal[
     "offer", "request_detail", "show_summary", "declined", "cancelled",
     "queued", "submitted", "submission_failed", "clarify",
@@ -144,7 +144,6 @@ class OperatorCompletion(BaseModel):
     reason: str
     issue_id: str | None = None
     requested_detail: str | None = None
-    response_instruction: str
 
 
 class OperatorToolResult(BaseModel):

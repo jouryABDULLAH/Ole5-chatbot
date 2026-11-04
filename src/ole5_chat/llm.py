@@ -17,6 +17,7 @@ from ole5_chat.config import get_settings
 T = TypeVar("T", bound=BaseModel)
 log = logging.getLogger(__name__)
 RETRIES = 2
+NOTE = "Note from the system, not the customer: "  # prefix of every correction sent back to the model
 
 
 class ModelFailed(RuntimeError):
@@ -49,9 +50,10 @@ def _correction(exc: BadRequestError) -> list[BaseMessage]:
     body = exc.body.get("error") if isinstance(exc.body, dict) else None
     if not isinstance(body, dict) or body.get("code") not in GENERATION_REJECTED:
         return []
+    # Labelled as a system note so the model does not take Groq's error text for the customer's latest message.
     return [AIMessage(content=body.get("failed_generation") or ""),
-            HumanMessage(content=f"That was not valid: {body.get('message')}. Return only what the schema or the tool "
-                                 "call requires.")]
+            HumanMessage(content=f"{NOTE}that was not valid: {body.get('message')}. Return only what the schema or the "
+                                 "tool call requires.")]
 
 
 def invoke(convo: list[BaseMessage], tool=None, tool_choice: str | None = None) -> AIMessage:
@@ -113,7 +115,7 @@ def structured(system: str, messages: list[BaseMessage], schema: type[T], node: 
                 error = str(exc)[:400]
                 log.warning("%s  llm schema=%s attempt=%d ms=%d invalid: %s", node, schema.__name__, attempt, ms, error)
                 convo += [AIMessage(content=reply.text),
-                          HumanMessage(content=f"That was not valid: {error}. Reply with JSON only, matching the schema.")]
+                          HumanMessage(content=f"{NOTE}that was not valid: {error}. Reply with JSON only, matching the schema.")]
                 continue
             problem = check(result) if check else None
             if problem is None:
@@ -121,7 +123,7 @@ def structured(system: str, messages: list[BaseMessage], schema: type[T], node: 
                 return result
             error, last = problem, result
             log.warning("%s  llm schema=%s attempt=%d ms=%d guardrail: %s", node, schema.__name__, attempt, ms, problem)
-            convo += [AIMessage(content=reply.text), HumanMessage(content=f"Note from the system, not the customer: {problem}")]
+            convo += [AIMessage(content=reply.text), HumanMessage(content=f"{NOTE}{problem}")]
         if last is not None:
             raise GuardrailFailed(error, last)
         raise ModelFailed(error)

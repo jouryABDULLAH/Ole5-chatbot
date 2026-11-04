@@ -357,7 +357,7 @@ def _tool_results(report: str) -> list[dict]:
     results = []
     entries = json.loads(report or "[]")
     for entry in entries if isinstance(entries, list) else []:
-        if entry.get("name") not in {"get_ticket_requirements", "save_ticket_draft", "manage_issues", "submit_ticket"}:
+        if entry.get("name") not in {"get_ticket_requirements", "save_ticket_draft", "skip_detail", "manage_issues", "submit_ticket"}:
             continue
         try:
             results.append({
@@ -381,9 +381,16 @@ def _apply_completion(state: AgentState, completion: OperatorCompletion, report:
     }
     tool_results = _tool_results(report)
     draft_result = next(
-        (item["result"] for item in reversed(tool_results) if item["name"] == "save_ticket_draft"),
+        (item["result"] for item in reversed(tool_results) if item["name"] in {"save_ticket_draft", "skip_detail"}),
         None,
     )
+    cancelled = next((item["result"].get("cancelled_issue") for item in reversed(tool_results)
+                      if item["name"] == "manage_issues" and item["result"].get("operation") == "cancel_preparation"
+                      and item["result"].get("success")), None)
+    if cancelled and completion.action == "offer" and completion.issue_id in (None, cancelled.get("id")):
+        # A cancelled or declined issue is finished; offering it again would undo the customer's answer.
+        log.warning("ticket_operator  offer for cancelled issue=%s replaced with cancelled", cancelled.get("id"))
+        completion = completion.model_copy(update={"action": "cancelled", "issue_id": cancelled.get("id")})
     if completion.action == "show_summary" and not (draft_result or {}).get("summary_ready"):
         missing = (draft_result or {}).get("missing_customer_details") or []
         requested = missing[0] if missing else None
@@ -399,11 +406,11 @@ def _apply_completion(state: AgentState, completion: OperatorCompletion, report:
             "action": "request_detail" if requested else "clarify",
             "requested_detail": requested,
             "reason": "The draft is not ready for summary because classification or required fields are incomplete.",
-            "response_instruction": (
-                f"Ask the customer for the missing detail: {requested}."
-                if requested else "Explain that the ticket summary could not be prepared yet."
-            ),
         })
+    elif completion.action == "request_detail" and (draft_result or {}).get("summary_ready"):
+        # The tool reported every required detail answered; asking again would loop over settled details.
+        log.warning("ticket_operator  request_detail with a summary-ready draft replaced with show_summary")
+        completion = completion.model_copy(update={"action": "show_summary", "requested_detail": None})
     issue = state.get("active_issue")
     issue_id = completion.issue_id or (issue or {}).get("id")
     if completion.action == "offer" and issue_id:
@@ -418,7 +425,7 @@ def _apply_completion(state: AgentState, completion: OperatorCompletion, report:
         update["pending_customer_response"] = None
 
     submission = next((item["result"] for item in reversed(tool_results) if item["name"] == "submit_ticket"), None)
-    ticket_result = {"response_instruction": completion.response_instruction}
+    ticket_result = {}
     if submission is not None:
         ticket_result.update({
             "submission_requested": True,
@@ -427,6 +434,10 @@ def _apply_completion(state: AgentState, completion: OperatorCompletion, report:
             "corrections": submission.get("corrections", []),
             "error": submission.get("error"),
         })
+    # After a submitted ticket the next queued issue is active: offer it in the same turn, as the old flow did.
+    next_issue = (submission or {}).get("active_issue") if (submission or {}).get("success") else None
+    if completion.action == "submitted" and next_issue:
+        update["pending_customer_response"] = _pending("offer", next_issue)
     compatibility = {
         "offer": "register_issue", "request_detail": "provide", "show_summary": "clarify",
         "declined": "decline", "cancelled": "cancel", "queued": "separate_issue",
@@ -436,14 +447,46 @@ def _apply_completion(state: AgentState, completion: OperatorCompletion, report:
         "manager_action": compatibility[completion.action],
         "manager_reason": completion.reason,
         "ticket_result": ticket_result,
+        # Facts for Respond, like Search and Ticket Enquiry give: what was done, not what to say.
         "ticket_operator_result": {
             "action": completion.action,
             "reason": completion.reason,
+            "issue_id": issue_id,
+            "issue": ((cancelled if completion.action in {"declined", "cancelled"} and cancelled else issue)
+                      or {}).get("description"),
+            "requested_detail": completion.requested_detail,
+            # What the customer settled this turn without giving it, and an issue they stopped, whatever comes next.
+            "skipped": [{"item": item["result"].get("item"), "value": item["result"].get("value")}
+                        for item in tool_results if item["name"] == "skip_detail" and item["result"].get("success")],
+            "cancelled_issue": (cancelled or {}).get("description"),
+            "next_issue": (next_issue or {}).get("description"),
             "ticket_result": ticket_result,
-            "tool_report": report,
         },
     })
     return update
+
+
+def _completion_check(working: AgentState, report: str):
+    """What is wrong with a completion, told back to the model so it chooses again; None when it fits the tools."""
+    required = (working.get("ticket_draft") or {}).get("required") or {}
+    missing = [key for key, value in required.items() if value is None]
+    activated = next((item["result"].get("active_issue") for item in reversed(_tool_results(report))
+                      if item["name"] == "manage_issues" and item["result"].get("operation") == "cancel_preparation"
+                      and item["result"].get("success")), None)
+
+    def check(completion: OperatorCompletion) -> str | None:
+        if completion.action == "request_detail" and completion.requested_detail not in missing:
+            if not working.get("ticket_draft"):
+                return ("request_detail is not possible: no draft exists yet. Return offer before the customer "
+                        "accepts, or clarify if the draft could not be built.")
+            return (f"requested_detail {completion.requested_detail!r} is not a missing item. "
+                    f"Choose one of {missing}, or show_summary when none are missing.")
+        if activated and completion.action != "offer":
+            return (f"cancel_preparation made {activated.get('id')} the active issue; return offer for it. "
+                    "The cancellation is already recorded.")
+        return None
+
+    return check
 
 
 def _ticket_operator_node(state: AgentState) -> dict:
@@ -470,19 +513,20 @@ def _ticket_operator_node(state: AgentState) -> dict:
     try:
         completion = llm.structured(
             ticket_operator_result_prompt(state, report, _working_summary(working)),
-            [], OperatorCompletion, node="ticket_operator",
+            [], OperatorCompletion, node="ticket_operator", check=_completion_check(working, report),
         )
+    except llm.GuardrailFailed as exc:
+        # The model kept its choice after being told what was wrong; keep it and let _apply_completion's guards act.
+        log.error("ERROR ticket_operator completion still failed its check: %s", exc)
+        completion = exc.result
     except llm.ModelFailed as exc:
         log.error("ERROR ticket_operator result interpretation failed: %s", exc)
-        completion = OperatorCompletion(
-            action="clarify", reason="Operator result could not be interpreted safely.",
-            response_instruction="Ask the customer one focused clarification question.",
-        )
+        completion = OperatorCompletion(action="clarify", reason="Operator result could not be interpreted safely.")
 
     update = _apply_completion(working, completion, report)
     log.info("ticket_operator completion action=%s issue_id=%s requested_detail=%s reason=%r",
              completion.action, completion.issue_id, completion.requested_detail, completion.reason)
-    log.info("ticket_operator response_instruction=%r", completion.response_instruction)
+    log.info("ticket_operator tool_report=%s", report)
     pending = update.get("pending_customer_response")
     log.info("ticket_operator state pending_kind=%s pending_issue=%s active_issue=%s queued=%d manager_action=%s",
              getattr(pending, "kind", None), getattr(pending, "issue_id", None),

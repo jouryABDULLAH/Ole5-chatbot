@@ -4,7 +4,7 @@ import json
 import logging
 from functools import wraps
 from inspect import signature
-from typing import Any
+from typing import Any, Literal
 
 from langchain_core.tools import tool
 
@@ -18,6 +18,8 @@ from ole5_chat.tickets import client as ticket_api
 from ole5_chat.tickets import submit as ticket_submit
 
 log = logging.getLogger(__name__)
+
+SKIPPED = ("unknown", "declined")  # values of a required detail the customer answered without giving it
 
 
 def _logged_tool(function):
@@ -189,11 +191,16 @@ def build_ticket_operator_tools(state: AgentState):
                 "error": error,
             })
 
+        # A detail the customer already said they don't have or won't give stays settled when classify runs again.
+        required = {**classified.required, **{key: value for key, value in current.required.items()
+                                              if value in SKIPPED and classified.required.get(key) is None
+                                              and key in classified.required}}
+        classified = classified.model_copy(update={"required": required})
         mandatory_missing = [
             key for key in ticket_submit.REQUIRED
             if not getattr(classified, key, None)
         ]
-        missing_customer_details = list(classified.missing)
+        missing_customer_details = [key for key, value in required.items() if value is None]
         summary_ready = bool(
             classified.classified
             and not mandatory_missing
@@ -220,15 +227,61 @@ def build_ticket_operator_tools(state: AgentState):
             "draft": classified.model_dump(),
         })
 
+    @tool("skip_detail")
+    @_logged_tool
+    def skip_detail(item: str, value: Literal["unknown", "declined"], issue_id: str | None = None) -> str:
+        """Record that the customer does not know (unknown) or will not give (declined) one required detail, then
+        report the next missing detail or that the summary is ready. Use it instead of asking for that detail again."""
+
+        active = state.get("active_issue")
+        if active is None:
+            return _json({"success": False, "operation": "skip_detail", "error": "no active issue"})
+        if issue_id and issue_id != active.get("id"):
+            return _json({"success": False, "operation": "skip_detail", "error": "issue is not active"})
+        draft = _draft(state)
+        if not state.get("ticket_draft"):
+            return _json({"success": False, "operation": "skip_detail",
+                          "error": "no draft yet; call save_ticket_draft first, then skip_detail"})
+        if item not in draft.required:
+            return _json({"success": False, "operation": "skip_detail",
+                          "error": f"{item!r} is not a required detail; required: {sorted(draft.required)}"})
+        required = {**draft.required, item: value}
+        missing = [key for key, given in required.items() if given is None]
+        mandatory_missing = [key for key in ticket_submit.REQUIRED if not getattr(draft, key, None)]
+        draft = draft.model_copy(update={"required": required, "missing": missing,
+                                         "unknown": list(dict.fromkeys([*draft.unknown, item]))})
+        summary_ready = bool(draft.classified and not mandatory_missing and not missing)
+        state["ticket_draft"] = draft.model_dump()
+        state["draft_version"] = int(state.get("draft_version") or 0) + 1
+        state["summary_shown"] = False
+        state["submission_requested"] = False
+        state["summary_delivered_version"] = None
+        state["summary_confirmed_version"] = None
+        return _json({
+            "success": True,
+            "operation": "skip_detail",
+            "issue_id": active.get("id"),
+            "item": item,
+            "value": value,
+            "draft_version": state["draft_version"],
+            "classification_succeeded": bool(draft.classified),
+            "missing_customer_details": missing,
+            "missing_fields": missing,
+            "mandatory_fields_missing": mandatory_missing,
+            "summary_ready": summary_ready,
+            "draft": draft.model_dump(),
+        })
+
     @tool("manage_issues")
     @_logged_tool
     def manage_issues(
-        operation: str,
+        operation: Literal["register", "enqueue", "cancel_preparation"],
         description: str | None = None,
         issue_id: str | None = None,
         urgent: bool = False,
     ) -> str:
-        """Register, enqueue, cancel preparation, or activate the next local issue."""
+        """Register, enqueue, or cancel preparation of a local issue. The next queued issue becomes active on its
+        own when the current one is submitted or cancelled."""
 
         queue = list(state.get("pending_issues", []))
         active = state.get("active_issue")
@@ -247,23 +300,23 @@ def build_ticket_operator_tools(state: AgentState):
                 queue.append(issue)
             state["pending_issues"] = queue
         elif operation == "cancel_preparation":
+            # A cancelled or declined issue is finished: it stops being active and the next queued issue takes its place.
+            cancelled = active
+            state["active_issue"] = queue.pop(0) if queue else None
+            state["pending_issues"] = queue
             state["ticket_draft"] = None
             state["pending_customer_response"] = None
             state["summary_shown"] = False
             state["submission_requested"] = False
             state["summary_delivered_version"] = None
             state["summary_confirmed_version"] = None
-        elif operation == "activate_next":
-            if not queue:
-                state["active_issue"] = None
-            else:
-                state["active_issue"] = queue.pop(0)
-                state["pending_issues"] = queue
-            state["ticket_draft"] = None
-            state["pending_customer_response"] = None
-            state["summary_shown"] = False
-            state["submission_requested"] = False
-            state["summary_delivered_version"] = None
+            return _json({
+                "success": True,
+                "operation": operation,
+                "cancelled_issue": cancelled,
+                "active_issue": state.get("active_issue"),
+                "pending_issues": queue,
+            })
         else:
             return _json({"success": False, "operation": operation, "error": "unsupported operation"})
         return _json({
@@ -319,12 +372,19 @@ def build_ticket_operator_tools(state: AgentState):
         state["pending_customer_response"] = None
         state["summary_shown"] = False
         state["submission_requested"] = False
+        # The submitted issue is finished: the next queued issue takes its place, as after a cancel.
+        queue = list(state.get("pending_issues", []))
+        state["active_issue"] = queue.pop(0) if queue else None
+        state["pending_issues"] = queue
+        state["ticket_draft"] = None
         return _json({
             "success": True,
             "operation": "submit_ticket",
             "ticket": created,
             "corrections": corrections,
             "draft_version": draft_version,
+            "active_issue": state.get("active_issue"),
+            "pending_issues": queue,
         })
 
-    return [get_ticket_requirements, save_ticket_draft, manage_issues, submit_ticket]
+    return [get_ticket_requirements, save_ticket_draft, skip_detail, manage_issues, submit_ticket]

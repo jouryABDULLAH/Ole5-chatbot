@@ -55,7 +55,6 @@ def respond_prompt(state: AgentState, language: str | None = None) -> str:
     context = respond_context(state)
     packet = context["response_packet"] or {}
     packet_search = packet.get("search") or {}
-    packet_operator = packet.get("ticket_operator") or {}
     packet_enquiry = packet.get("ticket_enquiry")
     references = packet_search.get("references") or context["current_references"]
     latest = context["latest_customer_message"] or ""
@@ -79,9 +78,22 @@ def respond_prompt(state: AgentState, language: str | None = None) -> str:
                "Report the submission failure plainly and ask whether to retry. Do not say the " \
                "summary was sent or that support will create the ticket."
     elif operator_authorized:
-        task = "Follow the authorized Ticket Operator response instruction/result below. Express it naturally in the customer's language. Do not change the workflow action, claim an API result that is not present, or say a ticket was created unless the result confirms creation."
+        task = ("Tell the customer what the Ticket Operator action means for them, in your own words:\n"
+                "- offer: ask whether they want a support ticket prepared for the active issue.\n"
+                "- request_detail: if a detail was just skipped, acknowledge it in a few words, then ask for the "
+                "requested detail, one plain question. A skipped detail does not stop the ticket.\n"
+                "If Cancelled issue is not none, say its preparation was stopped, then do what the action says.\n"
+                "- show_summary: the card shows the summary; ask only whether to submit it.\n"
+                "- queued: the new issue will be handled after the current one; keep the current step.\n"
+                "- declined or cancelled: say the ticket preparation for the issue was stopped and nothing was "
+                "submitted; no ticket existed, so do not say a ticket was cancelled.\n"
+                "- submitted: give the ticket number from Submission; the reply comes by the Reply channel. If Next "
+                "issue is not none, then ask whether to prepare a support ticket for that issue.\n"
+                "- submission_failed: say the ticket was not created; ask whether to try again.\n"
+                "- clarify: ask one focused question.\n"
+                "Do not say a ticket was created unless Submission confirms it.")
         if outcome in {"partial", "no_answer"} and not any(item.get("relation") == "DIRECT" for item in references):
-            task = "State clearly that the available knowledge base did not provide a supported answer, then follow the authorized Ticket Operator response instruction/result below. " + task.split(". ", 1)[1]
+            task = "Search found no answer to the customer's question this turn; say so first, in one line.\n" + task
     elif route == "other":
         task = "Respond to the customer's actual conversational message. Handle greetings, thanks, capabilities/About, configured support-process facts, rephrasing from retained evidence, off-topic messages, and unclear input according to the persona. Ask only one focused clarification when needed."
     elif outcome in {"failed", "no_answer", "partial"}:
@@ -144,10 +156,16 @@ Answer rules:
 Latest customer message: {context['latest_customer_message'] or 'none'}
 Pending customer response: {pending_text}
 Active issue: {context['active_issue'] or 'none'}
+Ticket being prepared: {({key: (state.get('ticket_draft') or {}).get(key) for key in ('title_customer', 'queue', 'type', 'subtype', 'priority', 'missing')} if state.get('ticket_draft') and pending else 'none')}
 Search outcome: {outcome}
 Response packet: {packet or 'none'}
-Manager action: {packet_operator.get('action') or context['manager_action'] or 'none'}
-    Manager instruction/result: {(current_operator_result or {}).get('ticket_result') if isinstance(current_operator_result, dict) else 'none'}
+Ticket Operator action: {operator_action or 'none'}
+Ticket Operator issue: {(current_operator_result or {}).get('issue') or 'none'}
+Skipped this turn: {(current_operator_result or {}).get('skipped') or 'none'}
+Cancelled issue: {(current_operator_result or {}).get('cancelled_issue') or 'none'}
+Next issue: {(current_operator_result or {}).get('next_issue') or 'none'}
+Requested detail: {(current_operator_result or {}).get('requested_detail') or 'none'}
+Submission: {(current_operator_result or {}).get('ticket_result') or 'none'}
 Actual previously created ticket records: {context['created_tickets']}
 Ticket enquiry result: {packet_enquiry or context['ticket_enquiry_result'] or 'none'}
 Current evidence:
@@ -161,6 +179,7 @@ Examples of tone and shape (illustrations only: never copy their facts, names or
 - A side question while a ticket offer is pending: the answer, then "وما زال عرض فتح تذكرة لمشكلة زر الأرشفة بانتظار ردك: هل أفتحها؟"
 - A side question while the ticket summary is shown: the answer, then "ملخص تذكرة مشكلة زر الأرشفة بانتظار تأكيدك لإرسالها."
 - A side question while a detail is requested: the answer, then "وما زلت أحتاج اسم الصفحة التي يظهر فيها زر الأرشفة لإكمال التذكرة."
+- A question about the pending summary, such as where it goes: "تُرسل التذكرة إلى فريق الدعم الفني (Ole5 Support)، ويصلك ردهم على بريدك الإلكتروني المسجل. ملخص تذكرة مشكلة زر الأرشفة بانتظار تأكيدك لإرسالها."
 - Only when the result confirms submission_succeeded=true and a ticket number: "تم فتح التذكرة رقم T-1234، وسيصلك رد الفريق عبر البريد الإلكتروني."
 
 Task:

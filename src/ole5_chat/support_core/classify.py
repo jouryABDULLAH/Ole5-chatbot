@@ -28,15 +28,16 @@ def classify(state: ChatState) -> dict:
             result = llm.structured(prompt.classify(state), messages, Classification, node="classify")
         except llm.ModelFailed as exc:
             log.error("ERROR classify  model call failed, summary not built: %s", _short(str(exc)))
-            return {"note": "The ticket summary could not be built this time. Say so in one line, keep what the "
-                            "customer gave, and ask them to send their last message again.",
+            return {"note": f"classification model call failed: {_short(str(exc), 200)}",
                     "corrections": state["corrections"] + [f"classify failed: {exc}"]}
         fields, problems = check_ticket(result, catalog)
         if not kinds:  # A product with no kinds asks nothing: keys the model made up are dropped, not refused.
             result = result.model_copy(update={"required": {}})
         # required is one kind's list, every item as a key, or empty when no kind fits the problem (nothing to ask).
         if result.required and not any(set(result.required) == set(items) for items in kinds.values()):
-            problems.append(f"required: keys {sorted(result.required)} are not one kind's full list")
+            # Name the allowed key lists so the retry can copy them instead of guessing again.
+            problems.append(f"required: keys {sorted(result.required)} are not one kind's full list; use exactly "
+                            f"the keys of one kind, written as listed: {kinds}, or leave required empty")
         log.info("classify  attempt=%d queue=%s type=%s subtype=%s priority=%s urgent=%s confidence=%s required=%s "
                  "problems=%s", attempt, result.queue, result.type, result.subtype, result.priority, result.urgent,
                  result.confidence, result.required, problems)
@@ -47,8 +48,8 @@ def classify(state: ChatState) -> dict:
                                  + ". Choose each from its list exactly as written.")]
     if problems:
         log.error("ERROR classify  values still refused, summary not built: %s", "; ".join(problems))
-        return {"note": "The ticket summary could not be built this time. Say so in one line, keep what the "
-                        "customer gave, and ask them to send their last message again.",
+        # A fact for the caller: what failed and why, so it can retry the save or report that no summary was built.
+        return {"note": f"classification failed after 2 attempts: {'; '.join(problems)}",
                 "corrections": state["corrections"] + [f"classify refused: {'; '.join(problems)}"]}
     missing = [k for k, v in result.required.items() if v is None]
     draft = state["ticket_draft"].model_copy(update={**fields, "collected": result.collected, "missing": missing,
