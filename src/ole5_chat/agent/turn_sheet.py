@@ -117,7 +117,8 @@ def build_turn_sheet(state: AgentState, language: str) -> TurnSheet:
                 else "no answer" if outcome in {"partial", "no_answer"} else "not run"),
         search_no_answer=outcome in {"partial", "no_answer"} and not direct,
         operator=OPERATOR_FACT.get(action, "not run"),
-        issue=op.get("issue") or (state.get("active_issue") or {}).get("description"),
+        # Only the request the workflow acted on this turn; a request merely waiting is on the current-request line.
+        issue=op.get("issue"),
         requested_detail=op.get("requested_detail"),
         first_detail=action == "request_detail" and all(
             value is None for value in (draft.get("required") or {}).values()),

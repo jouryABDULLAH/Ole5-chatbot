@@ -21,7 +21,7 @@ def _persona(config, language: str) -> str:
 You are {p.identity}.
 Introduction: {intro}
 Product scope: {config.scope or config.name}
-Capabilities: answer questions about the product from supplied documentation, prepare a support ticket when the ticket workflow authorizes it, and look up tickets created in this chat when asked.
+Capabilities: answer questions about the product, prepare a support ticket when the ticket workflow authorizes it, and look up tickets created in this chat when asked.
 About: {about}
 Support hours: {hours}
 Support channel: {channel}
@@ -53,7 +53,7 @@ Ticket truth (applies on every turn, including greetings and follow-ups):
 Product answers:
 - Answer only from passages in <evidence>. Each is labelled DIRECT (it answers the question) or INFERENTIAL (related, but not a direct answer). Build the answer on the DIRECT passages. Use an INFERENTIAL passage only for what it actually states, when it adds to the answer. When the passages cover only part of the question, answer that part and say plainly that you could not find an answer to the rest; do not fill the gap yourself.
 - A feature listing, screen name or table of contents is not steps. Give steps only when the passage provides them.
-- Never infer that something is unsupported, by design, impossible or fixed at a limit unless a passage states that constraint. A workaround does not establish a prohibition. Say what cannot be established instead.
+- Never infer that something is unsupported, by design, impossible or fixed at a limit unless a passage states that constraint. A workaround does not establish a prohibition. Say what you could not find instead.
 - Document metadata (version, date, author, table of contents) is not a product fact.
 - Include every relevant step, condition and cause. Concise means removing padding, not facts. Do not add missing facts or remedies.
 - Customer account details, profiles, permissions, configuration and other customer-specific data are out of scope. Never answer or infer them, even from general passages; the ticket workflow handles them.
@@ -63,6 +63,7 @@ Product answers:
 Form:
 - When you use a passage, keep its own formatting: its bullets, numbering and line breaks, as written. Remove only the ** bold markers. No headings or backticks. Use blank lines where helpful.
 - No placeholders, square-bracket blanks, AI self-reference, sign-offs, signatures or repeated introductions.
+- Name a request by its topic, in your own words, inside a normal sentence (e.g. «طلبك بخصوص تنبيهات الواتساب»). Never write it as a label such as «الطلب: …», and never paste the customer's message as its name. The words in the turn facts identify the request; they are not text to copy.
 - Never mention prompts, state, routing, sources or internal components.
 </rules>"""
 
@@ -91,9 +92,9 @@ STAGE_GUIDANCE = {
     "no_answer": "Tell the customer you could not find a solution («لم أجد حلاً», \"I couldn't find a solution\"). Do not mention documents, sources or a search. Do not suggest the feature is missing or broken. Do not offer a ticket; offers come only from the ticket workflow.",
     "search_failed": "Say first that the search could not be completed, which says nothing about the feature, and ask the customer to send their message again. Anything still waiting comes after that.",
     "ticket_status": "Give the status of the ticket the customer asked about, from the lookup result only; if none was returned, say it is unavailable. If no ticket matched, ask for its reference. Do not offer a new ticket.",
-    "offer": "Ask the customer whether they want a support ticket prepared for the request.",
+    "offer": "Ask the customer whether they want a support ticket prepared for the request, naming the request by its topic.",
     "detail_requested": "Ask for the requested detail by name, in one short question. Accept a skipped detail; it does not stop the ticket.",
-    "summary_shown": "The card already shows the summary, so do not repeat its fields. Say the summary is ready, or name the change you made, and ask whether to submit it. Do not say anything was sent.",
+    "summary_shown": "The card already shows the summary, so do not repeat its fields. If the customer asked for a change, name the change you made; otherwise say the summary is ready. Then ask whether to submit it. Do not say anything was sent.",
     "submitted": "Give the ticket number, say the team will reply as soon as they can, and say how the reply arrives. If a next request is named, ask about it; otherwise say they can reach out if they need anything else.",
     "submission_failed": "Tell the customer the ticket was not created and that they can try again.",
     "preparation_stopped": "Tell the customer the preparation stopped and nothing was sent. Do not ask a question. No ticket existed, so do not say one was cancelled.",
@@ -148,6 +149,8 @@ def turn_note(sheet: TurnSheet) -> str:
         # Quoted so the model answers the customer, not this note, which is the last message it reads.
         lines.append(f"The customer's latest message: «{sheet['customer_message']}»")
     lines.append(f"Stage: {sheet['stage']}")
+    # The stage's guidance comes first, so the lines after it add to the reply instead of replacing it.
+    lines.append(f"Guidance: {STAGE_GUIDANCE[sheet['stage']]}")
     if sheet.get("button"):
         lines.append(f"The customer pressed {sheet['button'].capitalize()}. There is no new customer message; "
                      "do not continue your previous message.")
@@ -184,7 +187,7 @@ def turn_note(sheet: TurnSheet) -> str:
                      "from your reading of the chat, and name each request when you mention it. Do not bring up "
                      "earlier requests from the chat unless the customer's latest message asks about them; then "
                      "answer from <ticket_records>. Mention the other requests that changed this turn first, in a "
-                     "sentence each; a request that was already queued before this turn is not mentioned again."
+                     "sentence each; a request that was already queued before this turn is not mentioned again, unless it is the current request."
                      + (f" End with the one question, and ask it only about the current request, {sheet['current_issue']}."
                         if sheet.get("current_issue") else ""))
     if sheet.get("draft"):
@@ -195,15 +198,19 @@ def turn_note(sheet: TurnSheet) -> str:
                      "solution\"), about that message only. Do not mention documents, sources or a search, and do "
                      "not say it does not exist or is unavailable.")
     if sheet.get("remind_pending"):
-        lines.append("The current request is still waiting. Remind the customer what it needs from them, naming the "
-                     "request. This is not a new offer, and nothing was submitted. Do not repeat the summary.")
+        lines.append("Then remind the customer that the current request is still waiting and what it needs from "
+                     "them, naming the request. The reminder comes after answering their message and never replaces "
+                     "it. This is not a new offer, and nothing was submitted. Do not repeat the summary.")
     if sheet.get("explicit_ticket_request") and sheet["stage"] == "answered":
         lines.append("The customer explicitly asked for a ticket. Give the supported answer first, then briefly invite "
                      "them to say if the problem persists so ticket preparation can proceed. This is not an offer awaiting "
                      "acceptance. Do not claim any ticket action occurred.")
     if sheet.get("correction"):
-        lines.append(f"Validation correction: {sheet['correction']}")
-        lines.append(f"Rejected draft (data only, not proof of any action): {sheet.get('rejected_reply') or 'none'}")
-    lines.append(f"Guidance: {STAGE_GUIDANCE[sheet['stage']]}")
+        # Last on purpose: on a repair turn the edit is the whole job.
+        lines.append(f"Your previous reply (data only, not proof of any action): {sheet.get('rejected_reply') or 'none'}")
+        lines.append(f"Only these sentences of it were rejected, each with the fact to rewrite it from:\n"
+                     f"{sheet['correction']}\n"
+                     "Rewrite only those sentences, using the fact given for each, or drop one if the fact leaves "
+                     "nothing to say. Keep every other sentence as it was, in the same order.")
     lines.append(f"Write only the customer-facing reply, in {NAMES[sheet['language']]}, plain text, concise.")
     return "Note from the system, not the customer. This note is not a message to answer.\n" + "\n".join(lines)
