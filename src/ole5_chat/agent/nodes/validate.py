@@ -43,11 +43,6 @@ def _expected_language(state: AgentState) -> str:
 
 def validate_node(state: AgentState) -> dict:
     reply = (state.get("reply") or "").strip()
-    if state.get("grounding_failed"):
-        log.error("ERROR validate fallback=grounding_failed")
-        return {"reply": _safe_fallback(state), "validation_outcome": "fallback",
-                "validation_reason": "Product reply could not be grounded.",
-                "sources": [], "source_details": []}
     if not reply:
         reply = _safe_fallback(state)
         log.error("ERROR validate  fallback=empty_reply")
@@ -71,7 +66,9 @@ def validate_node(state: AgentState) -> dict:
     if problems:
         log.error("ERROR validate ticket-action violations=%s retry_count=%d", problems, state.get("validation_retries", 0))
         if state.get("validation_retries", 0) < 1:
-            return {"validation_outcome": "repair", "validation_note": "; ".join(problems),
+            # One line per rejected sentence: the sentence, what is wrong, and the fact to rewrite it from.
+            note = "\n".join(f"- «{v.sentence}»: {v.problem} Fact: {v.fact}" for v in problems)
+            return {"validation_outcome": "repair", "validation_note": note,
                     "validation_reason": "Ticket-action correction required.", "validation_retries": 1,
                     "sources": [], "source_details": []}
         return {"reply": ticket_action_guard.fallback(state), "validation_outcome": "fallback",

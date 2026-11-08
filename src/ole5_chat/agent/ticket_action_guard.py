@@ -6,7 +6,7 @@ import logging
 from langchain_core.messages import HumanMessage
 
 from ole5_chat import llm
-from ole5_chat.agent.contracts import TicketActionCheck
+from ole5_chat.agent.contracts import TicketActionCheck, TicketViolation
 from ole5_chat.agent.state import AgentState
 from ole5_chat import products
 
@@ -125,13 +125,23 @@ Flag:
 - «سيردون خلال ساعتين»: invented deadline.
 
 ## 8. Output
-- Report only ticket-action violations.
+- Report only ticket-action violations, one per wrong sentence, each with the payload fact that settles it.
+- Respond rewrites only the sentences you report and keeps the rest, so report every wrong sentence and nothing else.
 - If no violations exist, return violations = [].
 - Return JSON matching:
 """.format_map({name: name for name in FACTS if name in AgentState.__annotations__})
 
 
-def violations(state: dict, reply: str) -> list[str]:
+def _quoted(reply: str):
+    """A violation must quote a sentence that is really in the reply, so Respond knows exactly what to rewrite."""
+    def check(result: TicketActionCheck) -> str | None:
+        missing = [v.sentence for v in result.violations if v.sentence.strip() not in reply]
+        return (f"these sentences are not in the reply: {missing}. Copy each reported sentence exactly from the "
+                "reply." if missing else None)
+    return check
+
+
+def violations(state: dict, reply: str) -> list[TicketViolation]:
     """One semantic check, independently of product-grounding enforcement."""
     config = products.load(state["identity"].product)
     facts = {key: state.get(key) for key in FACTS}
@@ -142,9 +152,13 @@ def violations(state: dict, reply: str) -> list[str]:
         result = llm.structured(
             ACTION_RULES + llm.schema_text(TicketActionCheck),
             [HumanMessage(content=json.dumps(facts, ensure_ascii=False, default=lambda v: v.model_dump()))],
-            TicketActionCheck, node="ticket_action_check",
+            TicketActionCheck, node="ticket_action_check", check=_quoted(reply),
         )
         return result.violations
+    except llm.GuardrailFailed as exc:
+        # The quotes still did not match the reply after the retry; the violations themselves stand.
+        log.error("ERROR validate ticket-action quotes not found in the reply: %s", exc)
+        return exc.result.violations
     except llm.ModelFailed as exc:
         # A failed check says nothing about the reply, so the reply passes.
         log.error("ERROR validate ticket-action check failed: %s", exc)

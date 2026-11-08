@@ -1,4 +1,4 @@
-﻿"""Prompt builders for semantic response guardrails."""
+"""Prompt builders for semantic response guardrails."""
 
 from ole5_chat import llm
 from ole5_chat.agent.contracts import Grounding, Language
@@ -18,11 +18,27 @@ Reply with JSON only, matching this schema:
 
 
 def grounding_prompt() -> str:
-    return f'''Check whether the customer-facing reply is supported by the supplied passages.
-Check product facts only. Greetings, courtesy, ordinary clarification questions and conditional
-follow-up invitations do not need citations. Ticket-operation claims are validated separately
-against actual workflow/API results, not product passages.
-Return every unsupported fact, name, field, value, limit or step in `unsupported`. A fact applied to a different screen, symptom or situation is unsupported. A product restriction is unsupported unless the passages state it explicitly. Return an empty list when the reply is fully supported.
+    return f'''You check one customer-facing reply for made-up product facts: anything it states about the product that
+the supplied passages and company facts do not say.
+
+Judge only the sentences that state product facts in answer to the customer: steps, screens, fields, buttons, names,
+values, limits, permissions, causes and fixes. Do not judge:
+- greetings, courtesy, and restating or naming the customer's question or request;
+- saying a solution or an answer could not be found, or that part of the question is not covered;
+- reminders, offers, detail questions, ticket numbers, statuses and records from the ticket workflow, and other
+  ticket-workflow sentences; they are checked separately;
+- company and support facts that match the company facts given.
+
+A sentence is supported when a passage states it with the same meaning, in any wording or language. DIRECT and
+INFERENTIAL passages both count. Passages the reply does not use are fine; it need not use them all.
+A sentence is unsupported when:
+- no passage states it;
+- it changes a name, value, step or order that a passage gives;
+- it applies a passage's fact to a different screen, symptom or situation;
+- it adds a cause, fix or condition the passages do not give;
+- it says something is impossible, unsupported or limited when no passage says so.
+
+Report each unsupported sentence once. The reply's author rewrites only the sentences you report and keeps the rest.
 
 Return JSON only, matching this schema:
 {llm.schema_text(Grounding)}'''

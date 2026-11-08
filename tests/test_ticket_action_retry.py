@@ -7,7 +7,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from ole5_chat import llm
 from ole5_chat.agent import graph
-from ole5_chat.agent.contracts import Grounding, RouterDecisionWithoutPending, TicketActionCheck
+from ole5_chat.agent.contracts import Grounding, RouterDecisionWithoutPending, TicketActionCheck, TicketViolation
 from ole5_chat.agent.nodes import respond
 from ole5_chat.agent.state import initial_state
 from ole5_chat.agent.ticket_action_guard import fallback
@@ -28,8 +28,10 @@ def test_ticket_lie_gets_only_one_response_retry(model, rejected_twice, route):
     if route == "question":
         model.add(RouterDecisionWithoutPending(intent="question", next_target="respond",
                                               explicit_ticket_request=True, reason="Search completed."))
-    model.add(TicketActionCheck(violations=["No actual ticket was created. Answer from evidence."]),
-              TicketActionCheck(violations=["Still no actual creation result."] if rejected_twice else []))
+    created = TicketViolation(sentence="تم إنشاء التذكرة بنجاح.", problem="No actual ticket was created.",
+                              fact="ticket_result is empty and created_tickets has no ticket.")
+    model.add(TicketActionCheck(violations=[created]),
+              TicketActionCheck(violations=[created] if rejected_twice else []))
     model.add(Grounding(unsupported=[]), Grounding(unsupported=[]))
     bad = "تم إنشاء التذكرة بنجاح."
     good = "حذف المراسلات يتطلب الصلاحية الموثقة. إذا استمرت المشكلة، أخبرني وسأساعدك ضمن نطاقي."
@@ -43,7 +45,9 @@ def test_ticket_lie_gets_only_one_response_retry(model, rejected_twice, route):
     assert writer.call_count == 2
     assert search.call_count == (1 if route == "question" else 0)
     submit.assert_not_called()
-    assert "No actual ticket was created" in writer.call_args.args[0][-1].content  # the turn note
+    note = writer.call_args.args[0][-1].content  # the turn note of the repair
+    assert "- «تم إنشاء التذكرة بنجاح.»: No actual ticket was created. Fact: ticket_result is empty" in note
+    assert "Keep every other sentence as it was" in note
     assert result["created_tickets"] == []
     assert result["validation_retries"] == 0
     assert result["validation_note"] is None
@@ -95,8 +99,10 @@ def test_checker_receives_authoritative_records_and_a_failed_check_lets_the_repl
     state = initial_state(identity)
     state.update(manager_action="submit", ticket_result={"submission_succeeded": False},
                  created_tickets=[{"ticket_number": "OLD-1", "title": "Unrelated issue"}])
-    with patch.object(llm, "structured", return_value=TicketActionCheck(violations=["Submission failed"])) as checker:
-        assert ticket_action_guard.violations(state, "Ticket created") == ["Submission failed"]
+    failed = TicketViolation(sentence="Ticket created", problem="Submission failed.",
+                             fact="ticket_result.submission_succeeded is false.")
+    with patch.object(llm, "structured", return_value=TicketActionCheck(violations=[failed])) as checker:
+        assert ticket_action_guard.violations(state, "Ticket created") == [failed]
     payload = checker.call_args.args[1][0].content
     assert '"submission_succeeded": false' in payload
     assert '"OLD-1"' in payload

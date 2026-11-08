@@ -7,7 +7,7 @@ transitions are added in later implementation steps.
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, create_model
+from pydantic import BaseModel, ConfigDict, Field, create_model
 
 Route = Literal["question", "pending_response", "ticket_enquiry", "needs_ticket", "other"]
 RouteWithoutPending = Literal["question", "ticket_enquiry", "needs_ticket", "other"]
@@ -111,16 +111,36 @@ class OperatorCompletion(BaseModel):
     requested_detail: str | None = None
 
 
+class GroundingIssue(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    sentence: str = Field(description="The unsupported sentence, copied exactly as it is written in the reply.")
+    problem: str = Field(description="What in it no passage or company fact says.")
+    passage: str = Field(description="The index of the closest passage, e.g. 2, or none.")
+
+
 class Grounding(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    unsupported: list[str]
+    unsupported: list[GroundingIssue] = Field(description="One entry per unsupported product sentence; empty when "
+                                                          "every product sentence is supported.")
+
+
+class TicketViolation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    sentence: str = Field(description="The wrong sentence, copied exactly as it is written in the reply.")
+    problem: str = Field(description="What is false or unverified about that sentence.")
+    fact: str = Field(description="The payload value that settles it, named and quoted, e.g. created_tickets has "
+                                  "T-1 for that request. If no payload value contradicts the sentence, it is not a "
+                                  "violation.")
 
 
 class TicketActionCheck(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    violations: list[str]
+    violations: list[TicketViolation] = Field(description="One entry per wrong sentence; empty when the reply is "
+                                                          "consistent. Respond rewrites only these sentences.")
 
 
 class Language(BaseModel):

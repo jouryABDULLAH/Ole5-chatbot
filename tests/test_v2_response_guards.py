@@ -6,14 +6,13 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
 from ole5_chat import llm
-from ole5_chat.agent.contracts import Grounding
+from ole5_chat.agent.contracts import Grounding, GroundingIssue
 from ole5_chat.support_core.state import TicketDraft
 from ole5_chat.agent.contracts import Language
 from ole5_chat.agent import graph
 from ole5_chat.agent.contracts import (OperatorCompletion, PendingCustomerResponse, RouterDecision,
                                       RouterDecisionWithoutPending, manager_schema)
 from ole5_chat.agent.nodes import respond
-from ole5_chat.agent.nodes.validate import SAFE_FALLBACK
 from ole5_chat.agent.state import initial_state
 from ole5_chat.identity import Identity
 
@@ -83,37 +82,34 @@ def test_literal_values_preserve_language(item, text):
     detector.assert_not_called()
 
 
-@pytest.mark.parametrize("failure", ["rejected", "check_error", "rewrite_error", "repaired"])
-def test_grounding_graph_never_publishes_rejected_answer(model, failure, caplog):
+@pytest.mark.parametrize("failure", ["rewritten", "check_error", "rewrite_error"])
+def test_grounding_rewrites_only_the_unsupported_sentence_once(model, failure, caplog):
     state = conversation("How do I archive a record?", "en")
     model.add(RouterDecisionWithoutPending(intent="question", next_target="search", explicit_ticket_request=False, reason="Product question"))
     model.add(RouterDecisionWithoutPending(intent="question", next_target="respond", explicit_ticket_request=False, reason="Search returned the product result."))
-    model.add(Grounding(unsupported=["Invented limit"]))
-    if failure == "rejected":
-        model.add(Grounding(unsupported=["Invented limit"]))
-    elif failure == "repaired":
-        model.add(Grounding(unsupported=[]))
-    if failure == "check_error":
-        model.queue[Grounding] = []  # scripted model raises ModelFailed
-    outputs = [AIMessage(content="There is an invented limit.")]
-    outputs.append(llm.ModelFailed("rewrite failed") if failure == "rewrite_error"
-                   else AIMessage(content="Select Archive."))
+    first = "Select Archive. There is an invented limit of 5 files."
+    if failure != "check_error":  # with nothing scripted, the check raises ModelFailed
+        model.add(Grounding(unsupported=[GroundingIssue(sentence="There is an invented limit of 5 files.",
+                                                        problem="No passage gives a limit.", passage="none")]))
+    rewrite = llm.ModelFailed("rewrite failed") if failure == "rewrite_error" else AIMessage(content="Select Archive.")
     retrieval = {"search_outcome": "answered", "current_references": [
         {"document": "Archive guide", "text": "Select Archive.", "relation": "DIRECT"}
     ]}
     with patch.object(respond, "GROUNDING_ENFORCE", True), \
          patch.object(graph, "search_node", return_value=retrieval), \
-         patch.object(llm, "invoke", side_effect=outputs):
+         patch.object(llm, "invoke", side_effect=[AIMessage(content=first), rewrite]) as writer:
         result = graph.build().invoke(state)
     message = result["messages"][-1]
-    if failure == "repaired":
-        assert message.content == "Select Archive."
-        assert message.additional_kwargs["sources"] == ["Archive guide"]
+    # The rewrite is published without a second check; when the check or the rewrite fails, the reply passes as it is.
+    assert message.content == ("Select Archive." if failure == "rewritten" else first)
+    assert message.additional_kwargs["sources"] == ["Archive guide"]
+    assert sum(schema is Grounding for schema, _ in model.calls) == 1
+    if failure != "check_error":
+        note = writer.call_args_list[1].args[0][-1].content
+        assert "«There is an invented limit of 5 files.»: No passage gives a limit." in note
+        assert "Keep every other sentence as it was" in note
     else:
-        assert message.content == SAFE_FALLBACK["en"]
-        assert message.additional_kwargs["sources"] == []
-        assert result["last_answer_evidence"] is None
-        assert "ERROR" in caplog.text
+        assert "grounding check failed" in caplog.text
 
 
 

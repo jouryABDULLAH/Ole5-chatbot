@@ -6,15 +6,14 @@ import re
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
-from ole5_chat import llm
+from ole5_chat import llm, products
 from ole5_chat.agent.contracts import Grounding
 from ole5_chat.agent.prompts.guards import grounding_prompt
-from ole5_chat.agent.prompts.respond import system_prompt, turn_note
+from ole5_chat.agent.prompts.respond import _evidence, system_prompt, turn_note
 from ole5_chat.agent.turn_sheet import TurnSheet, build_turn_sheet
 
 from ole5_chat.agent.state import AgentState
 from ole5_chat.agent.guards import NAMES, language_of, language_problem, plain
-from ole5_chat.agent.nodes.validate import SAFE_FALLBACK
 
 log = logging.getLogger(__name__)
 
@@ -109,56 +108,69 @@ def _correct_language(state: AgentState, sheet: TurnSheet, reply: str) -> str:
     return reply
 
 
-def _grounding_input(state: AgentState, reply: str) -> str:
+def _seen_passages(state: AgentState, sheet: TurnSheet) -> list[dict]:
+    """The passages Respond saw this turn, as system_prompt shows them: the evidence, plus the retained one on other."""
+    last = state.get("last_answer_evidence")
+    retained = (last or {}).get("evidence", []) if sheet["stage"] == "other" and isinstance(last, dict) else []
+    return [*state.get("current_references", []), *retained]
+
+
+def _grounding_input(state: AgentState, reply: str, passages: list[dict], language: str) -> str:
+    """What the check reads: the reply, the exchange it answers, the passages as Respond saw them, and the company
+    facts Respond may also state."""
     customer = next((str(message.content) for message in reversed(state.get("messages", []))
                      if message.type == "human"), "")
     before = state.get("messages", [])[:-1]
     previous = next((str(message.content) for message in reversed(before) if message.type == "ai"), "none")
-    passages = "\n\n".join(
-        f"Document: {item.get('document', 'unknown')}\n{item.get('text', '').strip()}"
-        for item in state.get("current_references", [])
-    )
-    return f"Assistant's previous message:\n{previous}\n\nCustomer's message:\n{customer}\n\nReply:\n{reply}\n\nPassages:\n{passages}"
+    config = products.load(state["identity"].product)
+    company = "\n".join(f"{name}: {value}" for name, value in (
+        ("About", config.about.get(language)), ("Support hours", config.support_hours.get(language)),
+        ("Support channel", config.support_channel.get(language)), ("Reply channel", config.reply_channel.get(language)),
+    ) if value) or "none"
+    return (f"Assistant's previous message:\n{previous}\n\nCustomer's message:\n{customer}\n\nReply:\n{reply}\n\n"
+            f"Passages the reply's author saw (it need not use them all):\n{_evidence(passages)}\n\n"
+            f"Company facts the reply may also state:\n{company}")
 
 
-def _grounded_reply(state: AgentState, sheet: TurnSheet, reply: str) -> str | None:
-    """Keep an answered product reply tied to this turn's retrieved passages."""
-    if state.get("intent") != "question" or state.get("search_outcome") != "answered":
+def _grounded_reply(state: AgentState, sheet: TurnSheet, reply: str) -> str:
+    """Check the reply's product sentences against the passages Respond saw. With enforcement on, the unsupported
+    sentences are rewritten once; the rewrite is not checked again, so a second failure passes."""
+    passages = _seen_passages(state, sheet)
+    if not passages:
         return reply
-    if not any(item.get("relation") == "DIRECT" for item in state.get("current_references", [])):
-        log.warning("grounding skipped enforcement: answered without DIRECT evidence")
-        return reply if not GROUNDING_ENFORCE else None
-    for attempt in range(1 if not GROUNDING_ENFORCE else 2):
-        try:
-            check = llm.structured(
-                grounding_prompt(), [HumanMessage(content=_grounding_input(state, reply))],
-                Grounding, node="ground"
-            )
-        except llm.ModelFailed as exc:
-            log.error("ERROR respond grounding check failed: %s", exc)
-            return reply if not GROUNDING_ENFORCE else None
-        if not check.unsupported:
-            return reply
-        log.warning("grounding unsupported=%s enforcement=%s", check.unsupported, GROUNDING_ENFORCE)
-        if not GROUNDING_ENFORCE:
-            return reply
-        if attempt == 1:
-            log.error("ERROR respond grounding failed after correction; suppressing unsupported reply")
-            return None
-        try:
-            reply = llm.invoke([
-                SystemMessage(content=system_prompt(state, sheet)), *_messages(state, sheet),
-                AIMessage(content=reply),
-                HumanMessage(content=(
-                    "Rewrite the reply using only the current retrieved passages. Remove every unsupported "
-                    f"claim: {'; '.join(check.unsupported)}. Do not use prior conversation answers as evidence."
-                )),
-            ]).text.strip()
-            reply = _correct_language(state, sheet, reply)
-        except llm.ModelFailed as exc:
-            log.error("ERROR respond grounding correction failed: %s", exc)
-            return None
-    return None
+
+    def quoted(result: Grounding) -> str | None:
+        missing = [issue.sentence for issue in result.unsupported if issue.sentence.strip() not in reply]
+        return (f"these sentences are not in the reply: {missing}. Copy each reported sentence exactly from the "
+                "reply." if missing else None)
+
+    try:
+        check = llm.structured(grounding_prompt(), [HumanMessage(content=_grounding_input(
+            state, reply, passages, sheet["language"]))], Grounding, node="ground", check=quoted)
+    except llm.GuardrailFailed as exc:
+        check = exc.result  # the quotes still did not match; the findings stand
+    except llm.ModelFailed as exc:
+        log.error("ERROR respond grounding check failed: %s", exc)
+        return reply
+    if not check.unsupported:
+        return reply
+    log.warning("grounding unsupported=%s enforcement=%s", check.unsupported, GROUNDING_ENFORCE)
+    if not GROUNDING_ENFORCE:
+        return reply
+    rejected = "\n".join(f"- «{issue.sentence}»: {issue.problem} Closest passage: {issue.passage}"
+                         for issue in check.unsupported)
+    try:
+        rewritten = llm.invoke([
+            SystemMessage(content=system_prompt(state, sheet)), *_messages(state, sheet), AIMessage(content=reply),
+            HumanMessage(content=(
+                "Note from the system, not the customer. Only these sentences of your reply are not supported by "
+                f"the passages:\n{rejected}\nRewrite each from the passage named, or drop it if no passage supports "
+                "it. Keep every other sentence as it was, in the same order. Return only the reply.")),
+        ]).text.strip()
+    except llm.ModelFailed as exc:
+        log.error("ERROR respond grounding rewrite failed, the reply passes as it is: %s", exc)
+        return reply
+    return _correct_language(state, sheet, rewritten)
 
 
 def respond_node(state: AgentState) -> dict:
@@ -175,11 +187,8 @@ def respond_node(state: AgentState) -> dict:
         reply = "عذراً، حدث خطأ من جهتنا. يرجى المحاولة مرة أخرى." if language == "ar" else "Sorry, something went wrong on our side. Please try again."
     # Language Check (2 rewrites)
     reply = _correct_language(state, sheet, reply)
-    # Grounded Check 
+    # Grounded Check
     reply = _grounded_reply(state, sheet, reply)
-    if reply is None:
-        # Fixed wording avoids another model call reintroducing unsupported facts.
-        return {"reply": SAFE_FALLBACK[language], "language": language, "grounding_failed": True}
     cleaned = plain(reply)
     if cleaned != reply:
         log.info("respond markdown=stripped")
