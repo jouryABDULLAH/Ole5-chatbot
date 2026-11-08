@@ -1,4 +1,4 @@
-﻿from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from unittest.mock import patch
 
 from ole5_chat.agent.contracts import manager_schema, router_schema
@@ -172,6 +172,18 @@ def test_finalize_appends_reply_and_retains_answer_evidence():
     assert result["last_answer_evidence"]["evidence"][0]["document"] == "guide.md"
     assert result["current_references"] == []
     assert result["intent"] is None
+
+
+def test_finalize_keeps_the_last_answer_evidence_after_a_partial_search():
+    state = _state([HumanMessage(content="Can it translate automatically?")])
+    state.update(
+        reply="I couldn't find a solution.",
+        current_references=[{"document": "other.md", "text": "Related text.", "relation": "INFERENTIAL"}],
+        search_outcome="partial",
+        last_answer_evidence={"evidence": [{"document": "guide.md", "text": "Open Reports.", "relation": "DIRECT"}]},
+    )
+    result = finalize_node(state)
+    assert "last_answer_evidence" not in result  # the earlier answer's evidence stays in the state
 
 
 def test_operator_registers_issue_and_opens_offer_pending_state(model, operator_model):

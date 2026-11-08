@@ -52,6 +52,7 @@ class AgentState(MessagesState, total=False):
     search_scope: Literal["product", "outside_scope"] | None
     search_result: dict | None
     current_references: list[dict]
+    search_queries: list[str]  # every wording searched this turn: the Search agent's, then find()'s own rephrasings
     search_outcome: SearchOutcome | None
     unresolved_information: dict | None
     
@@ -63,7 +64,6 @@ class AgentState(MessagesState, total=False):
     manager_reason: str | None
     
     answered_detail: PendingCustomerResponse | None
-    grounding_failed: bool
     reply: str | None
     
     validation_outcome: ValidationOutcome | None
@@ -104,6 +104,7 @@ def initial_state(identity: Identity) -> AgentState:
         search_scope=None,
         search_result=None,
         current_references=[],
+        search_queries=[],
         search_outcome=None,
         unresolved_information=None,
         ticket_result=None,
@@ -112,7 +113,6 @@ def initial_state(identity: Identity) -> AgentState:
         manager_action=None,
         manager_reason=None,
         answered_detail=None,
-        grounding_failed=False,
         reply=None,
         validation_outcome=None,
         validation_reason=None,

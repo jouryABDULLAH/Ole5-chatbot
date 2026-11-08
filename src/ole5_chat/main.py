@@ -1,8 +1,9 @@
-"""The process to run: the chat API, plus the web/ folder served as static files for local testing. The page only talks to the API over HTTP. Logs go to the terminal through rich; traces go to Phoenix when TRACING is on; RAGent2 loads its models in the background when KB_BACKEND is ragent2."""
+"""The process to run: the chat API, plus the web/ folder served as static files for local testing. The page only talks to the API over HTTP. Logs go to the terminal through rich and to logs/chat-<start time>.log; traces go to Phoenix when TRACING is on; RAGent2 loads its models in the background when KB_BACKEND is ragent2."""
 
 import logging
 import os
 import threading
+import time
 
 from fastapi.staticfiles import StaticFiles
 from opentelemetry.sdk.trace.sampling import Decision, ParentBased, Sampler, SamplingResult
@@ -26,9 +27,13 @@ class LogHighlighter(ReprHighlighter):
 THEME = Theme({"repr.node": "bold magenta", "repr.key": "dim cyan", "repr.step": "bold green"})
 handler = RichHandler(console=Console(theme=THEME), highlighter=LogHighlighter(), show_path=False,
                       rich_tracebacks=True, markup=False, log_time_format="[%X]")
-logging.basicConfig(level=logging.INFO, format="%(message)s", handlers=[handler], force=True)
+# The same log, as plain text, in logs/ (one file per start) so a session can be read back after it ends.
+(ROOT / "logs").mkdir(exist_ok=True)
+file_handler = logging.FileHandler(ROOT / "logs" / f"chat-{time.strftime('%Y%m%d-%H%M%S')}.log", encoding="utf-8")
+file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+logging.basicConfig(level=logging.INFO, format="%(message)s", handlers=[handler, file_handler], force=True)
 for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
-    logging.getLogger(name).handlers = [handler]
+    logging.getLogger(name).handlers = [handler, file_handler]
     logging.getLogger(name).propagate = False
 logging.getLogger("httpx").setLevel(logging.WARNING)
 

@@ -68,6 +68,7 @@ def _search_node(state: AgentState) -> dict:
         return {
             "current_request": request,
             "current_references": references,
+            "search_queries": [request],
             "search_outcome": outcome,
             "search_scope": "product",
             "unresolved_information": None if outcome == "answered" else {
@@ -126,6 +127,8 @@ def _search_node(state: AgentState) -> dict:
     return {
         "current_request": request,
         "current_references": references,
+        # The Search agent's own queries first, then every rephrasing find() tried, so a miss can be replayed.
+        "search_queries": list(dict.fromkeys([*(r.query for r in sink), *retrieval.queries_tried])),
         "search_outcome": outcome,
         "search_scope": "product",
         "unresolved_information": None if outcome == "answered" else {"request": request, "retrieval": retrieval.as_json()},

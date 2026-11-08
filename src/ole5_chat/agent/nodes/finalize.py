@@ -25,6 +25,7 @@ def finalize_node(state: AgentState) -> dict:
         "explicit_ticket_request": False,
         "current_request": None,
         "current_references": [],
+        "search_queries": [],
         "search_result": None,
         "search_outcome": None,
         "search_scope": None,
@@ -35,7 +36,6 @@ def finalize_node(state: AgentState) -> dict:
         "manager_action": None,
         "manager_reason": None,
         "answered_detail": None,
-        "grounding_failed": False,
         "reply": None,
         "validation_outcome": None,
         "validation_reason": None,
@@ -46,7 +46,9 @@ def finalize_node(state: AgentState) -> dict:
     }
     if state.get("summary_shown") and state.get("draft_version") is not None:
         result["summary_delivered_version"] = state["draft_version"]
-    if state.get("current_references") and not state.get("grounding_failed") and state.get("validation_outcome") != "fallback":
+    # Kept only behind a real answer: a no-answer or partial turn's passages are not "the latest supported answer".
+    if (state.get("search_outcome") == "answered" and state.get("current_references")
+            and state.get("validation_outcome") != "fallback"):
         result["last_answer_evidence"] = {"evidence": state["current_references"]}
     return result
 
