@@ -39,7 +39,7 @@ graders = ["evals.graders:correctness", "evals.graders:completeness", "evals.gra
 
 [tool.evalkit.suites.reg_kb_answers]
 task = "evals.regression_task:agent_task"
-graders = ["evals.regression_graders:chunk_included", "evals.regression_graders:provided_answer", "evals.regression_graders:no_ticket_offer", "evals.graders:language_matches"]
+graders = ["evals.regression_graders:search_answered", "evals.regression_graders:answer_retrieved", "evals.regression_graders:chunk_included", "evals.graders:completeness", "evals.regression_graders:grounded"]
 
 [tool.evalkit.suites.reg_direct_chunks]
 task = "evals.regression_task:direct_chunks_task"

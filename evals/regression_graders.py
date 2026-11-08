@@ -26,6 +26,27 @@ def provided_answer(input: dict, output: dict, expected: dict) -> EvaluationResu
     return _result(passed, f"sources {output.get('sources')}, said no answer: {said_no.group(0) if said_no else 'no'}")
 
 
+def search_answered(input: dict, output: dict, expected: dict) -> EvaluationResult:
+    """Search found a direct answer (outcome answered), whatever Respond then wrote: the search engine's own result."""
+    if output.get("empty_slot"):
+        return _skip("empty slot")
+    return _result(output.get("search_outcome") == "answered", f"search outcome {output.get('search_outcome')}")
+
+
+def _flat(text: str) -> str:
+    """Text without markdown bold, list dashes or spacing differences, so a quote matches the chunk it came from."""
+    return " ".join(re.sub(r"\*\*|^\s*[-*]\s+", "", text or "", flags=re.MULTILINE).split())
+
+
+def answer_retrieved(input: dict, output: dict, expected: dict) -> EvaluationResult:
+    """expected["quote"], the sentence that answers the question, is in a passage Search returned, in any relation.
+    No model: it shows whether the search engine found the answer at all."""
+    if output.get("empty_slot") or not expected.get("quote"):
+        return _skip("no expected quote")
+    found = _flat(expected["quote"]) in _flat(output.get("evidence") or "")
+    return _result(found, "quote found in the passages" if found else f"quote not in the {len(output.get('chunks') or [])} passages")
+
+
 def chunk_included(input: dict, output: dict, expected: dict) -> EvaluationResult:
     """At least one of expected["chunks"] (each holds the fact) reached Respond, in any relation. Other chunks may be
     there too."""

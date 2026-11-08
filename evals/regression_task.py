@@ -2,6 +2,7 @@
 frozen state, so a change to Respond or a guard is measured without Router and Search varying around it."""
 
 import re
+from datetime import datetime
 from functools import cache
 from pathlib import Path
 
@@ -59,19 +60,37 @@ def _chunks(references: list[dict]) -> list[dict]:
              "relation": r.get("relation")} for r in references]
 
 
+def _timings(history: list) -> dict:
+    """Milliseconds for this turn and for its Search node, from checkpoint timestamps. history is newest first and
+    this turn ends where its input checkpoint is."""
+    turn = []
+    for snapshot in history:
+        turn.append(snapshot)
+        if snapshot.metadata.get("source") == "input":
+            break
+    at = [datetime.fromisoformat(snapshot.created_at) for snapshot in turn]
+    # A checkpoint whose next node is search, and the newer one Search wrote, bracket the Search run.
+    search = sum((at[i - 1] - at[i]).total_seconds() for i, snapshot in enumerate(turn)
+                 if snapshot.next == ("search",) and i > 0)
+    return {"turn_ms": int((at[0] - at[-1]).total_seconds() * 1000), "search_ms": int(search * 1000) or None}
+
+
 def _turn(sid: str, state: dict) -> dict:
     """finalize clears the turn's facts, so they are read from the checkpoint just before it."""
-    history = agent_session._graph.get_state_history(agent_session._config(sid))
+    history = list(agent_session._graph.get_state_history(agent_session._config(sid)))
     before = next(snapshot.values for snapshot in history if snapshot.next == ("finalize",))
     return {
+        **_timings(history),
         "answer": state["messages"][-1].text,
         "stage": _stage(before),
         "intent": before.get("intent"),
         "search_outcome": before.get("search_outcome"),
+        "search_queries": list(before.get("search_queries") or []),
         "operator_action": (before.get("ticket_operator_result") or {}).get("action"),
         "validation": before.get("validation_outcome"),
         "sources": list(before.get("sources") or []),
-        "evidence": "\n\n".join(r.get("text") or "" for r in _direct(before)),
+        # Every passage Respond saw, DIRECT and INFERENTIAL: the made-up judge and answer_retrieved read it.
+        "evidence": "\n\n".join(r.get("text") or "" for r in before.get("current_references") or []),
         "chunks": _chunks(before.get("current_references") or []),  # all Respond received; sources list only DIRECT
         "pending": _kind(state),
         "queued": len(state.get("pending_issues") or []),
@@ -147,10 +166,10 @@ def guard_task(input: dict) -> dict:
     if input["guard"] == "language":
         return {"answer": reply, "validation": "repair" if language_problem(reply, state["language"]) else "pass"}
     if input["guard"] == "grounding":
-        check = llm.structured(grounding_prompt(), [HumanMessage(content=_grounding_input(state, reply))],
-                               Grounding, node="ground")
+        check = llm.structured(grounding_prompt(), [HumanMessage(content=_grounding_input(
+            state, reply, state.get("current_references", []), state["language"]))], Grounding, node="ground")
         return {"answer": reply, "validation": "repair" if check.unsupported else "pass",
-                "note": "; ".join(check.unsupported)}
+                "note": "; ".join(f"{issue.sentence}: {issue.problem}" for issue in check.unsupported)}
     result = validate_node(state)
     return {"answer": result.get("reply", reply), "validation": result["validation_outcome"],
             "note": result.get("validation_note")}
