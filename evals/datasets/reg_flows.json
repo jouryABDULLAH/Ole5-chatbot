@@ -1,0 +1,383 @@
+{
+  "cases": [
+    {
+      "id": "submit-in-chat",
+      "input": {
+        "turns": [
+          "اواجه مشكلة في زر الارشفة، لا يعمل",
+          "نعم",
+          "صفحة الوارد",
+          "تظهر رسالة: تعذر أرشفة المراسلة",
+          "نعم ارسلها"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "pending": "offer",
+            "language": "ar"
+          },
+          {
+            "pending": "detail",
+            "language": "ar"
+          },
+          {
+            "pending": "detail",
+            "language": "ar"
+          },
+          {
+            "pending": "summary",
+            "language": "ar"
+          },
+          {
+            "pending": null,
+            "created": 1,
+            "language": "ar"
+          }
+        ]
+      }
+    },
+    {
+      "id": "submit-button",
+      "input": {
+        "turns": [
+          "اواجه مشكلة في زر الارشفة، لا يعمل",
+          "نعم",
+          "صفحة الوارد",
+          "تظهر رسالة: تعذر أرشفة المراسلة",
+          "[submit]"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "pending": "offer",
+            "language": "ar"
+          },
+          {
+            "pending": "detail",
+            "language": "ar"
+          },
+          {
+            "pending": "detail",
+            "language": "ar"
+          },
+          {
+            "pending": "summary",
+            "language": "ar"
+          },
+          {
+            "pending": null,
+            "created": 1,
+            "language": "ar"
+          }
+        ]
+      }
+    },
+    {
+      "id": "two-details-in-one-message",
+      "input": {
+        "turns": [
+          "زر الأرشفة ما يشتغل",
+          "نعم",
+          "صفحة الصادر، ويطلع لي خطأ: Access denied",
+          "نعم ارسلها"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "pending": "offer",
+            "language": "ar"
+          },
+          {
+            "pending": "detail",
+            "language": "ar"
+          },
+          {
+            "pending": "summary",
+            "language": "ar"
+          },
+          {
+            "pending": null,
+            "created": 1,
+            "language": "ar"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edit-then-submit",
+      "input": {
+        "turns": [
+          "اواجه مشكلة في زر الارشفة، لا يعمل",
+          "نعم",
+          "صفحة الوارد",
+          "تظهر رسالة: تعذر أرشفة المراسلة",
+          "خل الأولوية عالية",
+          "نعم ارسلها"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "pending": "offer",
+            "language": "ar"
+          },
+          {
+            "pending": "detail",
+            "language": "ar"
+          },
+          {
+            "pending": "detail",
+            "language": "ar"
+          },
+          {
+            "pending": "summary",
+            "language": "ar"
+          },
+          {
+            "pending": "summary",
+            "language": "ar"
+          },
+          {
+            "pending": null,
+            "created": 1,
+            "language": "ar"
+          }
+        ]
+      }
+    },
+    {
+      "id": "urgent",
+      "input": {
+        "turns": [
+          "ولا موظف عندنا يقدر يسجل دخول للنظام من الصباح",
+          "نعم",
+          "Invalid credentials",
+          "نعم ارسلها"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "language": "ar",
+            "pending": "offer"
+          },
+          {
+            "language": "ar",
+            "pending": "summary"
+          },
+          {
+            "pending": "summary",
+            "language": "ar"
+          },
+          {
+            "pending": null,
+            "created": 1,
+            "language": "ar"
+          }
+        ]
+      }
+    },
+    {
+      "id": "new-issue-during-details",
+      "input": {
+        "turns": [
+          "اواجه مشكلة في زر الارشفة، لا يعمل",
+          "نعم",
+          "وكمان ما أقدر أطبع المراسلات، تطلع صفحة فاضية",
+          "صفحة الوارد",
+          "تظهر رسالة: تعذر أرشفة المراسلة",
+          "نعم ارسلها"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "pending": "offer",
+            "language": "ar"
+          },
+          {
+            "pending": "detail",
+            "language": "ar"
+          },
+          {
+            "pending": "detail",
+            "queued": 1,
+            "language": "ar"
+          },
+          {
+            "pending": "detail",
+            "language": "ar"
+          },
+          {
+            "pending": "summary",
+            "language": "ar"
+          },
+          {
+            "pending": "offer",
+            "created": 1,
+            "queued": 0,
+            "language": "ar"
+          }
+        ]
+      }
+    },
+    {
+      "id": "password",
+      "input": {
+        "turns": [
+          "نسيت كلمة المرور وما أقدر أدخل على حسابي",
+          "نعم",
+          "ahmad.k",
+          "Chrome",
+          "نعم ارسلها"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "pending": "offer",
+            "language": "ar"
+          },
+          {
+            "pending": "detail",
+            "language": "ar"
+          },
+          {
+            "pending": "detail",
+            "language": "ar"
+          },
+          {
+            "pending": "summary",
+            "language": "ar"
+          },
+          {
+            "pending": null,
+            "created": 1,
+            "language": "ar"
+          }
+        ]
+      }
+    },
+    {
+      "id": "refused-details-then-cancel",
+      "input": {
+        "turns": [
+          "اواجه مشكلة في زر الارشفة، لا يعمل",
+          "نعم",
+          "لست متاكد",
+          "مدري",
+          "كنسله"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "pending": "offer",
+            "language": "ar"
+          },
+          {
+            "pending": "detail",
+            "language": "ar"
+          },
+          {
+            "pending": "detail",
+            "language": "ar"
+          },
+          {
+            "pending": "summary",
+            "language": "ar"
+          },
+          {
+            "pending": null,
+            "created": 0,
+            "language": "ar"
+          }
+        ]
+      }
+    },
+    {
+      "id": "plain-no-to-details",
+      "input": {
+        "turns": [
+          "اواجه مشكلة في زر الارشفة، لا يعمل",
+          "نعم",
+          "لا",
+          "لا"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "pending": "offer",
+            "language": "ar"
+          },
+          {
+            "pending": "detail",
+            "language": "ar"
+          },
+          {
+            "pending": "detail",
+            "language": "ar"
+          },
+          {
+            "pending": "summary",
+            "language": "ar"
+          }
+        ]
+      }
+    },
+    {
+      "id": "decline-offer",
+      "input": {
+        "turns": [
+          "اواجه مشكلة في زر الارشفة، لا يعمل",
+          "لا"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "pending": "offer",
+            "language": "ar"
+          },
+          {
+            "pending": null,
+            "created": 0,
+            "language": "ar"
+          }
+        ]
+      }
+    },
+    {
+      "id": "cancel-moves-to-next-issue",
+      "input": {
+        "turns": [
+          "هل تتم ترجمة نص المراسلة تلقائياً إلى الإنجليزية؟",
+          "اواجه مشكلة في زر الارشفة، لا يعمل",
+          "لا الغها"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "pending": "offer",
+            "language": "ar"
+          },
+          {
+            "pending": "offer",
+            "queued": 1,
+            "language": "ar"
+          },
+          {
+            "pending": "offer",
+            "queued": 0,
+            "language": "ar"
+          }
+        ]
+      }
+    }
+  ]
+}

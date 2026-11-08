@@ -1,0 +1,374 @@
+{
+  "cases": [
+    {
+      "id": "kb-01",
+      "input": {
+        "message": "أواجه مشكلة في تصدير مراسلة إلى إدارة الصادر."
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "دليل استخدام نظام OLE5 — الإجراءات والشاشات",
+            "chunk": "chunk_012"
+          },
+          {
+            "document": "نظام OLE5 — الصلاحيات وقواعد العمل",
+            "chunk": "chunk_003"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kb-02",
+      "input": {
+        "message": "ابغا اطلّع على تقارير للمراسلات التي تم عملها وتاريخها كيف؟"
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "دليل استخدام نظام OLE5 — الإجراءات والشاشات",
+            "chunk": "chunk_026"
+          },
+          {
+            "document": "نظام OLE5 — الصلاحيات وقواعد العمل",
+            "chunk": "chunk_004"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kb-03",
+      "input": {
+        "message": "كيف اضيف سياسة تصعيد جديدة؟"
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "دليل استخدام نظام OLE5 — الإجراءات والشاشات",
+            "chunk": "chunk_033"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kb-04",
+      "input": {
+        "message": "ايش الاعدادات اللي اقدر اتحكم فيها فيما يخص المراسلات"
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "دليل استخدام نظام OLE5 — الإجراءات والشاشات",
+            "chunk": "chunk_038"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kb-05",
+      "input": {
+        "message": "كيف اضيف اجراء جديد لخصائص التصعيد"
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "دليل استخدام نظام OLE5 — الإجراءات والشاشات",
+            "chunk": "chunk_035"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kb-06",
+      "input": {
+        "message": "ايش الصلاحيات اللي احتاجها عشان أنشئ مراسلة داخلية؟"
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "نظام OLE5 — الصلاحيات وقواعد العمل",
+            "chunk": "chunk_001"
+          }
+        ]
+      },
+      "note": "Only this chunk. The agent previously answered this and used another chunk incorrectly: \"الصلاحية المطلوبة لإنشاء مراسلة داخلية هي «إنشاء مراسلة داخلية». بالإضافة إلى ذلك، ضمن مجموعة صلاحيات النظام العامة، تحتاج إلى صلاحية «إنشاء مراسلة (داخلية، واردة، صادرة، مشفرة)».\" the second part of that sentence was mentioned in another chunk but not as a standalone permission like the agent states, the kb meant a creation permission regardless of the type of message sent"
+    },
+    {
+      "id": "kb-07",
+      "input": {
+        "message": "ايش شروط اشتعراض المراسلة؟ وايش ينعرض؟"
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "نظام OLE5 — الصلاحيات وقواعد العمل",
+            "chunk": "chunk_004"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kb-08",
+      "input": {
+        "message": "الى اين يضاف تحويل الاحالة؟"
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "نظام OLE5 — الصلاحيات وقواعد العمل",
+            "chunk": "chunk_005"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kb-09",
+      "input": {
+        "message": "ارسلت مراسلة بالغلط كيف استردها؟ هل هذا ممكن؟"
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "نظام OLE5 — الصلاحيات وقواعد العمل",
+            "chunk": "chunk_006"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kb-10",
+      "input": {
+        "message": "الإدارة الرئيسية  عندنا في النظام لا تملك صندوق بريد، ايش المشكلة؟"
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "نظام OLE5 — الصلاحيات وقواعد العمل",
+            "chunk": "chunk_025"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kb-11",
+      "input": {
+        "message": "كيف اضيف اداراة فرعية"
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "نظام OLE5 — الصلاحيات وقواعد العمل",
+            "chunk": "chunk_027"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kb-12",
+      "input": {
+        "message": "كيف اعيد تفعيل حساب موظف محذوف"
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "نظام OLE5 — حلول المشكلات الشائعة",
+            "chunk": "chunk_032"
+          },
+          {
+            "document": "نظام OLE5 — حلول المشكلات الشائعة",
+            "chunk": "chunk_005"
+          }
+        ]
+      },
+      "note": "Router sometimes sends this to the Operator as needs_ticket (open bug)."
+    },
+    {
+      "id": "kb-13",
+      "input": {
+        "message": "عندي مشكلة مع المعاملة لا تصل عبر الربط الالكتروني"
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "نظام OLE5 — حلول المشكلات الشائعة",
+            "chunk": "chunk_031"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kb-14",
+      "input": {
+        "message": "أضفنا جهات خارجية في النظام لكن لا تظهر كلها في الثائمة ليه؟؟؟"
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "نظام OLE5 — حلول المشكلات الشائعة",
+            "chunk": "chunk_030"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kb-15a",
+      "input": {
+        "message": "نرسل رسائل تصعيد بس ما توصل ليه"
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "نظام OLE5 — حلول المشكلات الشائعة",
+            "chunk": "chunk_026"
+          }
+        ]
+      },
+      "note": "Failed while the Router intent was named escalation, because the feature has the same name. Passed 3 of 3 after the rename to ticket_request, since renamed needs_ticket."
+    },
+    {
+      "id": "kb-15b",
+      "input": {
+        "message": "نرسل رسائل تصعيد في نظام ole5 بس ما توصل ليه"
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "نظام OLE5 — حلول المشكلات الشائعة",
+            "chunk": "chunk_026"
+          }
+        ]
+      },
+      "note": "Failed while the Router intent was named escalation, because the feature has the same name. Passed 3 of 3 after the rename to ticket_request, since renamed needs_ticket."
+    },
+    {
+      "id": "kb-16",
+      "input": {
+        "message": "لماذا لا تصلني إشعارات مراسلات الإدارة"
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "نظام OLE5 — حلول المشكلات الشائعة",
+            "chunk": "chunk_025"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kb-17",
+      "input": {
+        "message": "نواجه مشكلة في بعض أحد تقارير إدارة النظام، لا تظهر فيه جميع المراسلات التي تم تبادلها..."
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "نظام OLE5 — حلول المشكلات الشائعة",
+            "chunk": "chunk_024"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kb-18",
+      "input": {
+        "message": "ليش مااقدر احذف المرفق من المراسلة؟؟؟"
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "نظام OLE5 — حلول المشكلات الشائعة",
+            "chunk": "chunk_013"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kb-19",
+      "input": {
+        "message": "المعاملة عندي مرتبطة بشخص خارج الجهة ايش اسوي"
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "دليل استخدام نظام OLE5 — الإجراءات والشاشات",
+            "chunk": "chunk_010"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kb-20",
+      "input": {
+        "message": "كيف احذف المراسلة من داخل المراسلة"
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "دليل استخدام نظام OLE5 — الإجراءات والشاشات",
+            "chunk": "chunk_015"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kb-21",
+      "input": {
+        "message": "كيف ارسل لمجموعة اشخاص مرة واحد نفس المراسلة"
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "دليل استخدام نظام OLE5 — الإجراءات والشاشات",
+            "chunk": "chunk_023"
+          },
+          {
+            "document": "دليل استخدام نظام OLE5 — الإجراءات والشاشات",
+            "chunk": "chunk_024"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kb-22",
+      "input": {
+        "message": "كيف اتحكم بادوار وصلاحيات الموظفين"
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "دليل استخدام نظام OLE5 — الإجراءات والشاشات",
+            "chunk": "chunk_030"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kb-23",
+      "input": {
+        "message": "كيف اطلع على إجمالي عدد المراسلات المنشأة من قبل الموظف"
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "دليل استخدام نظام OLE5 — الإجراءات والشاشات",
+            "chunk": "chunk_027"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kb-24",
+      "input": {
+        "message": "ايش هو بيان التسليم وكيف اطبعه"
+      },
+      "expected": {
+        "chunks": [
+          {
+            "document": "دليل استخدام نظام OLE5 — الإجراءات والشاشات",
+            "chunk": "chunk_018"
+          }
+        ]
+      }
+    }
+  ]
+}

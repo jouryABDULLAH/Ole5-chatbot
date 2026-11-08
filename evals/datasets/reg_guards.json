@@ -1,0 +1,581 @@
+{
+  "cases": [
+    {
+      "id": "false-creation",
+      "input": {
+        "guard": "validate",
+        "reply": "تم إنشاء التذكرة رقم T-9999.",
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "السلام عليكم"
+            }
+          ],
+          "language": "ar",
+          "intent": "other"
+        }
+      },
+      "expected": {
+        "validation": "repair"
+      }
+    },
+    {
+      "id": "true-creation",
+      "input": {
+        "guard": "validate",
+        "reply": "تم إنشاء التذكرة رقم T-1001، وسيرد فريق الدعم في أقرب وقت ممكن عبر بريدك الإلكتروني.",
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "السلام عليكم"
+            }
+          ],
+          "language": "ar",
+          "intent": "pending_response",
+          "manager_action": "submit",
+          "ticket_result": {
+            "submission_requested": true,
+            "submission_succeeded": true,
+            "ticket": {
+              "ticket_number": "T-1001"
+            },
+            "corrections": [],
+            "error": null
+          },
+          "created_tickets": [
+            {
+              "ticket_number": "T-1001",
+              "title_customer": "زر الأرشفة لا يعمل",
+              "created_at": "2026-11-06"
+            }
+          ],
+          "ticket_operator_result": {
+            "action": "submitted",
+            "issue_id": "issue-1",
+            "issue": "زر الأرشفة لا يعمل",
+            "ticket_result": {
+              "submission_requested": true,
+              "submission_succeeded": true,
+              "ticket": {
+                "ticket_number": "T-1001"
+              },
+              "corrections": [],
+              "error": null
+            }
+          }
+        }
+      },
+      "expected": {
+        "validation": "pass"
+      }
+    },
+    {
+      "id": "summary-is-not-sent",
+      "input": {
+        "guard": "validate",
+        "reply": "تم إرسال تذكرتك إلى فريق الدعم.",
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "السلام عليكم"
+            }
+          ],
+          "language": "ar",
+          "intent": "other",
+          "active_issue": {
+            "id": "issue-1",
+            "description": "زر الأرشفة لا يعمل"
+          },
+          "ticket_draft": {
+            "title_customer": "زر الأرشفة لا يعمل",
+            "queue": "Ole5 Technical",
+            "type": "Bug",
+            "subtype": "خلل برمجي",
+            "priority": "Medium",
+            "missing": []
+          },
+          "summary_shown": true,
+          "pending_customer_response": {
+            "kind": "summary",
+            "issue_id": "issue-1",
+            "item": null
+          }
+        }
+      },
+      "expected": {
+        "validation": "repair"
+      }
+    },
+    {
+      "id": "preparation-stopped",
+      "input": {
+        "guard": "validate",
+        "reply": "أوقفت تجهيز التذكرة ولم يُرسل شيء.",
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "السلام عليكم"
+            }
+          ],
+          "language": "ar",
+          "intent": "pending_response",
+          "ticket_operator_result": {
+            "action": "cancelled",
+            "issue_id": "issue-1",
+            "issue": "زر الأرشفة لا يعمل",
+            "cancelled_issue": "زر الأرشفة لا يعمل"
+          }
+        }
+      },
+      "expected": {
+        "validation": "pass"
+      }
+    },
+    {
+      "id": "false-cancel-of-existing",
+      "input": {
+        "guard": "validate",
+        "reply": "تم إلغاء التذكرة T-1001.",
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "السلام عليكم"
+            }
+          ],
+          "language": "ar",
+          "intent": "other",
+          "created_tickets": [
+            {
+              "ticket_number": "T-1001",
+              "title_customer": "زر الأرشفة لا يعمل",
+              "created_at": "2026-11-06"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "validation": "repair"
+      }
+    },
+    {
+      "id": "false-escalation",
+      "input": {
+        "guard": "validate",
+        "reply": "تم تصعيد طلبك إلى الإدارة.",
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "السلام عليكم"
+            }
+          ],
+          "language": "ar",
+          "intent": "other"
+        }
+      },
+      "expected": {
+        "validation": "repair"
+      }
+    },
+    {
+      "id": "invented-deadline",
+      "input": {
+        "guard": "validate",
+        "reply": "تم إنشاء التذكرة رقم T-1001، وسيرد عليك الفريق خلال ساعتين.",
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "السلام عليكم"
+            }
+          ],
+          "language": "ar",
+          "intent": "pending_response",
+          "manager_action": "submit",
+          "ticket_result": {
+            "submission_requested": true,
+            "submission_succeeded": true,
+            "ticket": {
+              "ticket_number": "T-1001"
+            },
+            "corrections": [],
+            "error": null
+          },
+          "created_tickets": [
+            {
+              "ticket_number": "T-1001",
+              "title_customer": "زر الأرشفة لا يعمل",
+              "created_at": "2026-11-06"
+            }
+          ],
+          "ticket_operator_result": {
+            "action": "submitted",
+            "issue_id": "issue-1",
+            "issue": "زر الأرشفة لا يعمل",
+            "ticket_result": {
+              "submission_requested": true,
+              "submission_succeeded": true,
+              "ticket": {
+                "ticket_number": "T-1001"
+              },
+              "corrections": [],
+              "error": null
+            }
+          }
+        }
+      },
+      "expected": {
+        "validation": "repair"
+      }
+    },
+    {
+      "id": "self-offer",
+      "input": {
+        "guard": "validate",
+        "reply": "أنواع التنبيهات هي الرسائل القصيرة والبريد الإلكتروني. هل ترغب بفتح تذكرة دعم؟",
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "السلام عليكم"
+            }
+          ],
+          "language": "ar",
+          "intent": "question",
+          "search_outcome": "answered",
+          "current_references": [
+            {
+              "text": "نافذة إضافة تنبيه للإجراء الحقول:\n\nنوع التنبيه — إجباري، مثل \"تنبيه بقرب انتهاء الوقت\".\nوقت التنبيه — بعد عدد أيام من تاريخ استقبالها، إجباري.\nنوع التنبيهات — الرسائل القصيرة، البريد الإلكتروني.\n\nملاحظة تظهر في النافذة: جميع الإجراءات هامة، والتنبيه بقرب انتهاء المدة يجب أن يكون بتاريخ ووقت داخل تاريخ ووقت اعتبار المراسلة متأخرة.",
+              "document": "دليل استخدام نظام OLE5 — الإجراءات والشاشات",
+              "relation": "DIRECT"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "validation": "repair"
+      }
+    },
+    {
+      "id": "pending-offer-reminder",
+      "input": {
+        "guard": "validate",
+        "reply": "أنواع التنبيهات هي الرسائل القصيرة والبريد الإلكتروني. ما زال عرض فتح تذكرة زر الأرشفة بانتظار ردك.",
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "السلام عليكم"
+            }
+          ],
+          "language": "ar",
+          "intent": "question",
+          "search_outcome": "answered",
+          "current_references": [
+            {
+              "text": "نافذة إضافة تنبيه للإجراء الحقول:\n\nنوع التنبيه — إجباري، مثل \"تنبيه بقرب انتهاء الوقت\".\nوقت التنبيه — بعد عدد أيام من تاريخ استقبالها، إجباري.\nنوع التنبيهات — الرسائل القصيرة، البريد الإلكتروني.\n\nملاحظة تظهر في النافذة: جميع الإجراءات هامة، والتنبيه بقرب انتهاء المدة يجب أن يكون بتاريخ ووقت داخل تاريخ ووقت اعتبار المراسلة متأخرة.",
+              "document": "دليل استخدام نظام OLE5 — الإجراءات والشاشات",
+              "relation": "DIRECT"
+            }
+          ],
+          "active_issue": {
+            "id": "issue-1",
+            "description": "زر الأرشفة لا يعمل"
+          },
+          "pending_customer_response": {
+            "kind": "offer",
+            "issue_id": "issue-1",
+            "item": null
+          }
+        }
+      },
+      "expected": {
+        "validation": "pass"
+      }
+    },
+    {
+      "id": "summary-confirmation",
+      "input": {
+        "guard": "validate",
+        "reply": "ملخص التذكرة جاهز. هل أرسله الآن؟",
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "السلام عليكم"
+            }
+          ],
+          "language": "ar",
+          "intent": "pending_response",
+          "active_issue": {
+            "id": "issue-1",
+            "description": "زر الأرشفة لا يعمل"
+          },
+          "ticket_draft": {
+            "title_customer": "زر الأرشفة لا يعمل",
+            "queue": "Ole5 Technical",
+            "type": "Bug",
+            "subtype": "خلل برمجي",
+            "priority": "Medium",
+            "missing": []
+          },
+          "summary_shown": true,
+          "ticket_operator_result": {
+            "action": "show_summary",
+            "issue_id": "issue-1",
+            "issue": "زر الأرشفة لا يعمل"
+          },
+          "pending_customer_response": {
+            "kind": "summary",
+            "issue_id": "issue-1",
+            "item": null
+          }
+        }
+      },
+      "expected": {
+        "validation": "pass"
+      }
+    },
+    {
+      "id": "skip-acknowledged",
+      "input": {
+        "guard": "validate",
+        "reply": "لا بأس، نكمل بدون اسم الصفحة. ما نص رسالة الخطأ؟",
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "السلام عليكم"
+            }
+          ],
+          "language": "ar",
+          "intent": "pending_response",
+          "active_issue": {
+            "id": "issue-1",
+            "description": "زر الأرشفة لا يعمل"
+          },
+          "ticket_operator_result": {
+            "action": "request_detail",
+            "issue_id": "issue-1",
+            "issue": "زر الأرشفة لا يعمل",
+            "requested_detail": "error text or screenshot",
+            "skipped": [
+              {
+                "item": "page",
+                "value": "unknown"
+              }
+            ]
+          },
+          "pending_customer_response": {
+            "kind": "detail",
+            "issue_id": "issue-1",
+            "item": "error text or screenshot"
+          }
+        }
+      },
+      "expected": {
+        "validation": "pass"
+      }
+    },
+    {
+      "id": "explicit-ticket-invitation",
+      "input": {
+        "guard": "validate",
+        "reply": "أنواع التنبيهات هي الرسائل القصيرة والبريد الإلكتروني. إذا استمرت المشكلة فأخبرني لنكمل تجهيز التذكرة.",
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "السلام عليكم"
+            }
+          ],
+          "language": "ar",
+          "intent": "question",
+          "search_outcome": "answered",
+          "current_references": [
+            {
+              "text": "نافذة إضافة تنبيه للإجراء الحقول:\n\nنوع التنبيه — إجباري، مثل \"تنبيه بقرب انتهاء الوقت\".\nوقت التنبيه — بعد عدد أيام من تاريخ استقبالها، إجباري.\nنوع التنبيهات — الرسائل القصيرة، البريد الإلكتروني.\n\nملاحظة تظهر في النافذة: جميع الإجراءات هامة، والتنبيه بقرب انتهاء المدة يجب أن يكون بتاريخ ووقت داخل تاريخ ووقت اعتبار المراسلة متأخرة.",
+              "document": "دليل استخدام نظام OLE5 — الإجراءات والشاشات",
+              "relation": "DIRECT"
+            }
+          ],
+          "explicit_ticket_request": true
+        }
+      },
+      "expected": {
+        "validation": "pass"
+      }
+    },
+    {
+      "id": "empty-reply",
+      "input": {
+        "guard": "validate",
+        "reply": "",
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "السلام عليكم"
+            }
+          ],
+          "language": "ar",
+          "intent": "other"
+        }
+      },
+      "expected": {
+        "validation": "fallback"
+      }
+    },
+    {
+      "id": "answered-without-evidence",
+      "input": {
+        "guard": "validate",
+        "reply": "أنواع التنبيهات هي الرسائل القصيرة.",
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "السلام عليكم"
+            }
+          ],
+          "language": "ar",
+          "intent": "question",
+          "search_outcome": "answered"
+        }
+      },
+      "expected": {
+        "validation": "fallback"
+      }
+    },
+    {
+      "id": "markdown-stripped",
+      "input": {
+        "guard": "validate",
+        "reply": "أنواع التنبيهات هي **الرسائل القصيرة** والبريد الإلكتروني.",
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "السلام عليكم"
+            }
+          ],
+          "language": "ar",
+          "intent": "question",
+          "search_outcome": "answered",
+          "current_references": [
+            {
+              "text": "نافذة إضافة تنبيه للإجراء الحقول:\n\nنوع التنبيه — إجباري، مثل \"تنبيه بقرب انتهاء الوقت\".\nوقت التنبيه — بعد عدد أيام من تاريخ استقبالها، إجباري.\nنوع التنبيهات — الرسائل القصيرة، البريد الإلكتروني.\n\nملاحظة تظهر في النافذة: جميع الإجراءات هامة، والتنبيه بقرب انتهاء المدة يجب أن يكون بتاريخ ووقت داخل تاريخ ووقت اعتبار المراسلة متأخرة.",
+              "document": "دليل استخدام نظام OLE5 — الإجراءات والشاشات",
+              "relation": "DIRECT"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "validation": "pass",
+        "must_not": [
+          "**"
+        ]
+      }
+    },
+    {
+      "id": "wrong-language",
+      "input": {
+        "guard": "language",
+        "reply": "The notification types are SMS and email.",
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "السلام عليكم"
+            }
+          ],
+          "language": "ar"
+        }
+      },
+      "expected": {
+        "validation": "repair"
+      }
+    },
+    {
+      "id": "right-language",
+      "input": {
+        "guard": "language",
+        "reply": "أنواع التنبيهات هي الرسائل القصيرة والبريد الإلكتروني.",
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "السلام عليكم"
+            }
+          ],
+          "language": "ar"
+        }
+      },
+      "expected": {
+        "validation": "pass"
+      }
+    },
+    {
+      "id": "invented-fact",
+      "input": {
+        "guard": "grounding",
+        "reply": "أنواع التنبيهات هي الرسائل القصيرة والبريد الإلكتروني وواتساب.",
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "السلام عليكم"
+            }
+          ],
+          "language": "ar",
+          "intent": "question",
+          "search_outcome": "answered",
+          "current_references": [
+            {
+              "text": "نافذة إضافة تنبيه للإجراء الحقول:\n\nنوع التنبيه — إجباري، مثل \"تنبيه بقرب انتهاء الوقت\".\nوقت التنبيه — بعد عدد أيام من تاريخ استقبالها، إجباري.\nنوع التنبيهات — الرسائل القصيرة، البريد الإلكتروني.\n\nملاحظة تظهر في النافذة: جميع الإجراءات هامة، والتنبيه بقرب انتهاء المدة يجب أن يكون بتاريخ ووقت داخل تاريخ ووقت اعتبار المراسلة متأخرة.",
+              "document": "دليل استخدام نظام OLE5 — الإجراءات والشاشات",
+              "relation": "DIRECT"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "validation": "repair"
+      }
+    },
+    {
+      "id": "supported-fact",
+      "input": {
+        "guard": "grounding",
+        "reply": "أنواع التنبيهات هي الرسائل القصيرة والبريد الإلكتروني.",
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "السلام عليكم"
+            }
+          ],
+          "language": "ar",
+          "intent": "question",
+          "search_outcome": "answered",
+          "current_references": [
+            {
+              "text": "نافذة إضافة تنبيه للإجراء الحقول:\n\nنوع التنبيه — إجباري، مثل \"تنبيه بقرب انتهاء الوقت\".\nوقت التنبيه — بعد عدد أيام من تاريخ استقبالها، إجباري.\nنوع التنبيهات — الرسائل القصيرة، البريد الإلكتروني.\n\nملاحظة تظهر في النافذة: جميع الإجراءات هامة، والتنبيه بقرب انتهاء المدة يجب أن يكون بتاريخ ووقت داخل تاريخ ووقت اعتبار المراسلة متأخرة.",
+              "document": "دليل استخدام نظام OLE5 — الإجراءات والشاشات",
+              "relation": "DIRECT"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "validation": "pass"
+      }
+    }
+  ]
+}

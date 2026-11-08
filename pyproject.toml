@@ -36,3 +36,24 @@ graders = ["evals.graders:correctness", "evals.graders:completeness", "evals.gra
 
 [tool.evalkit.suites.happy_path]
 graders = ["evals.graders:correctness", "evals.graders:completeness", "evals.graders:phase_matches", "evals.graders:language_matches", "evals.graders:sources_match", "evals.graders:draft_matches"]
+
+[tool.evalkit.suites.reg_kb_answers]
+task = "evals.regression_task:agent_task"
+graders = ["evals.regression_graders:chunk_included", "evals.regression_graders:provided_answer", "evals.regression_graders:no_ticket_offer", "evals.graders:language_matches"]
+
+[tool.evalkit.suites.reg_direct_chunks]
+task = "evals.regression_task:direct_chunks_task"
+graders = ["evals.regression_graders:provided_answer", "evals.regression_graders:no_ticket_offer", "evals.regression_graders:required_text", "evals.regression_graders:grounded"]
+
+[tool.evalkit.suites.reg_respond]
+task = "evals.regression_task:respond_task"
+graders = ["evals.regression_graders:no_ticket_offer", "evals.regression_graders:question_count", "evals.regression_graders:required_text", "evals.graders:language_matches"]
+
+[tool.evalkit.suites.reg_flows]
+task = "evals.regression_task:flow_task"
+graders = ["evals.regression_graders:pending_matches", "evals.regression_graders:counts_match", "evals.regression_graders:no_fallback", "evals.graders:language_matches"]
+timeout = 900
+
+[tool.evalkit.suites.reg_guards]
+task = "evals.regression_task:guard_task"
+graders = ["evals.regression_graders:guard_outcome", "evals.regression_graders:required_text"]

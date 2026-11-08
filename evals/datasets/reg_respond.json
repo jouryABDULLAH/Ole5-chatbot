@@ -1,0 +1,905 @@
+{
+  "cases": [
+    {
+      "id": "greeting",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "السلام عليكم"
+            }
+          ],
+          "language": "ar",
+          "intent": "other"
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "وعليكم السلام"
+          ]
+        ],
+        "max_questions": 1
+      }
+    },
+    {
+      "id": "capabilities",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "وش تقدر تسوي؟"
+            }
+          ],
+          "language": "ar",
+          "intent": "other"
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "تذكرة",
+            "تذاكر"
+          ],
+          [
+            "حالة",
+            "الاستعلام"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "out-of-scope",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "ما أفضل مطعم في الرياض؟"
+            }
+          ],
+          "language": "ar",
+          "intent": "other"
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "max_questions": 0
+      }
+    },
+    {
+      "id": "support-hours",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "متى ساعات الدعم؟"
+            }
+          ],
+          "language": "ar",
+          "intent": "other"
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "09",
+            "٠٩",
+            "التاسعة"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "reply-time",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "متى يوصلني الرد؟"
+            }
+          ],
+          "language": "ar",
+          "intent": "other",
+          "created_tickets": [
+            {
+              "ticket_number": "T-1001",
+              "title_customer": "زر الأرشفة لا يعمل",
+              "created_at": "2026-11-06"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "أقرب",
+            "أسرع"
+          ]
+        ],
+        "must_not": [
+          "لا يوجد وقت"
+        ]
+      }
+    },
+    {
+      "id": "does-not-know",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "ما أدري"
+            }
+          ],
+          "language": "ar",
+          "intent": "other"
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "max_questions": 1
+      }
+    },
+    {
+      "id": "reminder-offer",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "ما هي حقول نافذة إضافة تنبيه للإجراء؟"
+            }
+          ],
+          "language": "ar",
+          "intent": "question",
+          "search_outcome": "answered",
+          "current_references": [
+            {
+              "text": "نافذة إضافة تنبيه للإجراء الحقول:\n\nنوع التنبيه — إجباري، مثل \"تنبيه بقرب انتهاء الوقت\".\nوقت التنبيه — بعد عدد أيام من تاريخ استقبالها، إجباري.\nنوع التنبيهات — الرسائل القصيرة، البريد الإلكتروني.\n\nملاحظة تظهر في النافذة: جميع الإجراءات هامة، والتنبيه بقرب انتهاء المدة يجب أن يكون بتاريخ ووقت داخل تاريخ ووقت اعتبار المراسلة متأخرة.",
+              "document": "دليل استخدام نظام OLE5 — الإجراءات والشاشات",
+              "relation": "DIRECT"
+            }
+          ],
+          "active_issue": {
+            "id": "issue-1",
+            "description": "زر الأرشفة لا يعمل"
+          },
+          "pending_customer_response": {
+            "kind": "offer",
+            "issue_id": "issue-1",
+            "item": null
+          }
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "الأرشفة",
+            "الارشفة"
+          ]
+        ],
+        "offer_allowed": true
+      }
+    },
+    {
+      "id": "reminder-summary",
+      "input": {
+      "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "ما هي حقول نافذة إضافة تنبيه للإجراء؟"
+            }
+          ],
+          "language": "ar",
+          "intent": "question",
+          "search_outcome": "answered",
+          "current_references": [
+            {
+              "text": "نافذة إضافة تنبيه للإجراء الحقول:\n\nنوع التنبيه — إجباري، مثل \"تنبيه بقرب انتهاء الوقت\".\nوقت التنبيه — بعد عدد أيام من تاريخ استقبالها، إجباري.\nنوع التنبيهات — الرسائل القصيرة، البريد الإلكتروني.\n\nملاحظة تظهر في النافذة: جميع الإجراءات هامة، والتنبيه بقرب انتهاء المدة يجب أن يكون بتاريخ ووقت داخل تاريخ ووقت اعتبار المراسلة متأخرة.",
+              "document": "دليل استخدام نظام OLE5 — الإجراءات والشاشات",
+              "relation": "DIRECT"
+            }
+          ],
+          "active_issue": {
+            "id": "issue-1",
+            "description": "زر الأرشفة لا يعمل"
+          },
+          "ticket_draft": {
+            "title_customer": "زر الأرشفة لا يعمل",
+            "queue": "Ole5 Technical",
+            "type": "Bug",
+            "subtype": "خلل برمجي",
+            "priority": "Medium",
+            "missing": []
+          },
+          "pending_customer_response": {
+            "kind": "summary",
+            "issue_id": "issue-1",
+            "item": null
+          }
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "الأرشفة",
+            "الارشفة"
+          ]
+        ],
+        "must_not": [
+          "Ole5 Technical"
+        ],
+        "offer_allowed": true
+      }
+    },
+    {
+      "id": "no-answer",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "هل يدعم النظام الوضع الليلي؟"
+            }
+          ],
+          "language": "ar",
+          "intent": "question",
+          "search_outcome": "no_answer"
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "لم أجد",
+            "لم أعثر",
+            "راجعت",
+            "بحثت",
+            "تحققت"
+          ]
+        ],
+        "must_not": [
+          "لا يتوفر",
+          "لا تتوفر",
+          "لا توجد",
+          "لا يوجد"
+        ]
+      }
+    },
+    {
+      "id": "search-failed",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "هل يدعم النظام الوضع الليلي؟"
+            }
+          ],
+          "language": "ar",
+          "intent": "question",
+          "search_outcome": "failed"
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "أعد",
+            "إعادة",
+            "أرسل",
+            "مرة أخرى"
+          ]
+        ],
+        "must_not": [
+          "لا يتوفر",
+          "لا تتوفر",
+          "لا توجد",
+          "لا يوجد"
+        ]
+      }
+    },
+    {
+      "id": "search-failed-pending",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "هل يدعم النظام الوضع الليلي؟"
+            }
+          ],
+          "language": "ar",
+          "intent": "question",
+          "search_outcome": "failed",
+          "active_issue": {
+            "id": "issue-1",
+            "description": "زر الأرشفة لا يعمل"
+          },
+          "pending_customer_response": {
+            "kind": "offer",
+            "issue_id": "issue-1",
+            "item": null
+          }
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "أعد",
+            "إعادة",
+            "أرسل",
+            "مرة أخرى"
+          ],
+          [
+            "الأرشفة",
+            "الارشفة"
+          ]
+        ],
+        "offer_allowed": true,
+        "must_not": [
+          "لا يتوفر",
+          "لا تتوفر",
+          "لا توجد",
+          "لا يوجد"
+        ]
+      }
+    },
+    {
+      "id": "offer",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "زر الأرشفة لا يعمل"
+            }
+          ],
+          "language": "ar",
+          "intent": "question",
+          "search_outcome": "no_answer",
+          "active_issue": {
+            "id": "issue-1",
+            "description": "زر الأرشفة لا يعمل"
+          },
+          "ticket_operator_result": {
+            "action": "offer",
+            "issue_id": "issue-1",
+            "issue": "زر الأرشفة لا يعمل"
+          },
+          "pending_customer_response": {
+            "kind": "offer",
+            "issue_id": "issue-1",
+            "item": null
+          }
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "لم أجد",
+            "لم أعثر",
+            "راجعت",
+            "بحثت",
+            "تحققت"
+          ],
+          [
+            "الأرشفة",
+            "الارشفة"
+          ]
+        ],
+        "max_questions": 1,
+        "offer_allowed": true
+      }
+    },
+    {
+      "id": "offer-after-cancel",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "اواجه مشكلة في زر الارشفة"
+            },
+            {
+              "role": "assistant",
+              "content": "هل ترغب بفتح تذكرة؟"
+            },
+            {
+              "role": "user",
+              "content": "لا الغها"
+            }
+          ],
+          "language": "ar",
+          "intent": "pending_response",
+          "active_issue": {
+            "id": "issue-2",
+            "description": "تنبيهات الواتساب لا تصل"
+          },
+          "pending_customer_response": {
+            "kind": "offer",
+            "issue_id": "issue-2",
+            "item": null
+          },
+          "ticket_operator_result": {
+            "action": "offer",
+            "issue_id": "issue-2",
+            "issue": "تنبيهات الواتساب لا تصل",
+            "cancelled_issue": "زر الأرشفة لا يعمل"
+          }
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "الأرشفة",
+            "الارشفة"
+          ],
+          [
+            "الواتساب",
+            "واتساب"
+          ]
+        ],
+        "max_questions": 1,
+        "offer_allowed": true
+      }
+    },
+    {
+      "id": "first-detail",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "زر الأرشفة لا يعمل"
+            },
+            {
+              "role": "assistant",
+              "content": "هل ترغب بفتح تذكرة؟"
+            },
+            {
+              "role": "user",
+              "content": "نعم"
+            }
+          ],
+          "language": "ar",
+          "intent": "pending_response",
+          "active_issue": {
+            "id": "issue-1",
+            "description": "زر الأرشفة لا يعمل"
+          },
+          "ticket_operator_result": {
+            "action": "request_detail",
+            "issue_id": "issue-1",
+            "issue": "زر الأرشفة لا يعمل",
+            "requested_detail": "page"
+          },
+          "pending_customer_response": {
+            "kind": "detail",
+            "issue_id": "issue-1",
+            "item": "page"
+          }
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "لفتح",
+            "تفاصيل"
+          ]
+        ],
+        "max_questions": 1,
+        "offer_allowed": true
+      }
+    },
+    {
+      "id": "summary",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "تظهر رسالة خطأ"
+            }
+          ],
+          "language": "ar",
+          "intent": "pending_response",
+          "active_issue": {
+            "id": "issue-1",
+            "description": "زر الأرشفة لا يعمل"
+          },
+          "ticket_draft": {
+            "title_customer": "زر الأرشفة لا يعمل",
+            "queue": "Ole5 Technical",
+            "type": "Bug",
+            "subtype": "خلل برمجي",
+            "priority": "Medium",
+            "missing": []
+          },
+          "ticket_operator_result": {
+            "action": "show_summary",
+            "issue_id": "issue-1",
+            "issue": "زر الأرشفة لا يعمل"
+          },
+          "pending_customer_response": {
+            "kind": "summary",
+            "issue_id": "issue-1",
+            "item": null
+          }
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_not": [
+          "Ole5 Technical"
+        ],
+        "max_questions": 1,
+        "offer_allowed": true
+      }
+    },
+    {
+      "id": "summary-after-edit",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "خل الأولوية عالية"
+            }
+          ],
+          "language": "ar",
+          "intent": "pending_response",
+          "active_issue": {
+            "id": "issue-1",
+            "description": "زر الأرشفة لا يعمل"
+          },
+          "ticket_draft": {
+            "title_customer": "زر الأرشفة لا يعمل",
+            "queue": "Ole5 Technical",
+            "type": "Bug",
+            "subtype": "خلل برمجي",
+            "priority": "High",
+            "missing": []
+          },
+          "ticket_operator_result": {
+            "action": "show_summary",
+            "issue_id": "issue-1",
+            "issue": "زر الأرشفة لا يعمل"
+          },
+          "pending_customer_response": {
+            "kind": "summary",
+            "issue_id": "issue-1",
+            "item": null
+          }
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "الأولوية"
+          ]
+        ],
+        "max_questions": 1,
+        "offer_allowed": true
+      }
+    },
+    {
+      "id": "submitted",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "نعم ارسلها"
+            }
+          ],
+          "language": "ar",
+          "intent": "pending_response",
+          "ticket_operator_result": {
+            "action": "submitted",
+            "issue_id": "issue-1",
+            "issue": "زر الأرشفة لا يعمل",
+            "ticket_result": {
+              "submission_requested": true,
+              "submission_succeeded": true,
+              "ticket": {
+                "ticket_number": "T-1001"
+              },
+              "corrections": [],
+              "error": null
+            }
+          },
+          "ticket_result": {
+            "submission_requested": true,
+            "submission_succeeded": true,
+            "ticket": {
+              "ticket_number": "T-1001"
+            },
+            "corrections": [],
+            "error": null
+          },
+          "created_tickets": [
+            {
+              "ticket_number": "T-1001",
+              "title_customer": "زر الأرشفة لا يعمل",
+              "created_at": "2026-11-06"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "T-1001"
+          ],
+          [
+            "البريد"
+          ],
+          [
+            "أقرب",
+            "أسرع"
+          ]
+        ],
+        "max_questions": 0
+      }
+    },
+    {
+      "id": "submitted-next-issue",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "نعم ارسلها"
+            }
+          ],
+          "language": "ar",
+          "intent": "pending_response",
+          "active_issue": {
+            "id": "issue-2",
+            "description": "تنبيهات الواتساب لا تصل"
+          },
+          "pending_customer_response": {
+            "kind": "offer",
+            "issue_id": "issue-2",
+            "item": null
+          },
+          "ticket_operator_result": {
+            "action": "submitted",
+            "issue_id": "issue-1",
+            "issue": "زر الأرشفة لا يعمل",
+            "ticket_result": {
+              "submission_requested": true,
+              "submission_succeeded": true,
+              "ticket": {
+                "ticket_number": "T-1001"
+              },
+              "corrections": [],
+              "error": null
+            },
+            "next_issue": "تنبيهات الواتساب لا تصل"
+          },
+          "ticket_result": {
+            "submission_requested": true,
+            "submission_succeeded": true,
+            "ticket": {
+              "ticket_number": "T-1001"
+            },
+            "corrections": [],
+            "error": null
+          },
+          "created_tickets": [
+            {
+              "ticket_number": "T-1001",
+              "title_customer": "زر الأرشفة لا يعمل",
+              "created_at": "2026-11-06"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "T-1001"
+          ],
+          [
+            "الواتساب",
+            "واتساب"
+          ]
+        ],
+        "max_questions": 1,
+        "offer_allowed": true
+      }
+    },
+    {
+      "id": "submission-failed",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "نعم ارسلها"
+            }
+          ],
+          "language": "ar",
+          "intent": "pending_response",
+          "active_issue": {
+            "id": "issue-1",
+            "description": "زر الأرشفة لا يعمل"
+          },
+          "pending_customer_response": {
+            "kind": "summary",
+            "issue_id": "issue-1",
+            "item": null
+          },
+          "ticket_operator_result": {
+            "action": "submission_failed",
+            "issue_id": "issue-1",
+            "issue": "زر الأرشفة لا يعمل",
+            "ticket_result": {
+              "submission_requested": true,
+              "submission_succeeded": false
+            }
+          },
+          "ticket_result": {
+            "submission_requested": true,
+            "submission_succeeded": false
+          }
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_not": [
+          "T-1001"
+        ],
+        "max_questions": 1,
+        "offer_allowed": true
+      }
+    },
+    {
+      "id": "preparation-stopped",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "الغها"
+            }
+          ],
+          "language": "ar",
+          "intent": "pending_response",
+          "ticket_operator_result": {
+            "action": "cancelled",
+            "issue_id": "issue-1",
+            "issue": "زر الأرشفة لا يعمل",
+            "cancelled_issue": "زر الأرشفة لا يعمل"
+          }
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "max_questions": 0
+      }
+    },
+    {
+      "id": "queued",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "وتنبيهات الواتساب لا تصل"
+            }
+          ],
+          "language": "ar",
+          "intent": "pending_response",
+          "active_issue": {
+            "id": "issue-1",
+            "description": "زر الأرشفة لا يعمل"
+          },
+          "pending_issues": [
+            {
+              "id": "issue-2",
+              "description": "تنبيهات الواتساب لا تصل"
+            }
+          ],
+          "ticket_draft": {
+            "title_customer": "زر الأرشفة لا يعمل",
+            "queue": "Ole5 Technical",
+            "type": "Bug",
+            "subtype": "خلل برمجي",
+            "priority": "Medium",
+            "missing": []
+          },
+          "ticket_operator_result": {
+            "action": "queued",
+            "issue_id": "issue-1",
+            "issue": "زر الأرشفة لا يعمل",
+            "queued_issue": "تنبيهات الواتساب لا تصل"
+          },
+          "pending_customer_response": {
+            "kind": "summary",
+            "issue_id": "issue-1",
+            "item": null
+          }
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "الأرشفة",
+            "الارشفة"
+          ],
+          [
+            "الواتساب",
+            "واتساب"
+          ]
+        ],
+        "max_questions": 1,
+        "offer_allowed": true
+      }
+    },
+    {
+      "id": "ticket-status",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "ما حالة تذكرتي؟"
+            }
+          ],
+          "language": "ar",
+          "intent": "ticket_enquiry",
+          "created_tickets": [
+            {
+              "ticket_number": "T-1001",
+              "title_customer": "زر الأرشفة لا يعمل",
+              "created_at": "2026-11-06"
+            }
+          ],
+          "ticket_enquiry_result": {
+            "outcome": "success",
+            "tickets": [
+              {
+                "ticket_number": "T-1001",
+                "title": "زر الأرشفة لا يعمل",
+                "created_at": "2026-11-06",
+                "status": "Open"
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "T-1001"
+          ]
+        ],
+        "max_questions": 0
+      }
+    }
+  ]
+}
