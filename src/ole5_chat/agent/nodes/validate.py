@@ -16,10 +16,6 @@ SAFE_FALLBACK = {
 }
 
 
-CLAIMS = ("تم إنشاء", "تم فتح", "تم إرسال", "تم رفع", "تم تصعيد", "تم تحويل", "تم تحديث", "تم إلغاء",
-          "created", "submitted", "opened", "escalated", "forwarded", "updated", "cancelled")
-
-
 def _safe_fallback(state: AgentState) -> str:
     language = state.get("language") or state["identity"].language or "ar"
     return SAFE_FALLBACK.get(language, SAFE_FALLBACK["ar"])
@@ -70,13 +66,8 @@ def validate_node(state: AgentState) -> dict:
     expected = _expected_language(state)
     if _language_mismatch(reply, expected):
         log.error("ERROR validate  language mismatch expected=%s", expected)
-        # Keep the generated response available for the customer; the mismatch is
-        # recorded for correction while the v2 response path is still plain-text.
 
-    # Only a turn with ticket activity, or a reply claiming a completed action, can make a ticket claim.
-    ticket_turn = (state.get("ticket_operator_result") or state.get("ticket_enquiry_result")
-                   or state.get("pending_customer_response") or any(c in reply.lower() for c in CLAIMS))
-    problems = ticket_action_guard.violations(state, reply) if ticket_turn else []
+    problems = ticket_action_guard.violations(state, reply)
     if problems:
         log.error("ERROR validate ticket-action violations=%s retry_count=%d", problems, state.get("validation_retries", 0))
         if state.get("validation_retries", 0) < 1:

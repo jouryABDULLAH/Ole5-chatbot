@@ -32,6 +32,20 @@ def test_submit_button_is_submitted_with_the_ticket_number_and_the_button_named(
     assert not sheet["remind_pending"]
 
 
+def test_only_the_first_detail_explains_why_details_are_needed():
+    pending = PendingCustomerResponse(kind="detail", issue_id="issue-1", item="page")
+    first = state(intent="pending_response", pending_customer_response=pending,
+                  ticket_operator_result=operator("request_detail", requested_detail="page"),
+                  ticket_draft={"required": {"page": None, "error text or screenshot": None}})
+    sheet = build_turn_sheet(first, "ar")
+    assert sheet["first_detail"] and "first detail since the customer accepted" in turn_note(sheet)
+    later = state(intent="pending_response", pending_customer_response=pending,
+                  ticket_operator_result=operator("request_detail", requested_detail="error text or screenshot"),
+                  ticket_draft={"required": {"page": "الصفحة الرئيسية", "error text or screenshot": None}})
+    sheet = build_turn_sheet(later, "ar")
+    assert not sheet["first_detail"] and "already knows why details are needed" in turn_note(sheet)
+
+
 def test_failed_submit_is_not_reported_as_created():
     current = state(intent="pending_response", ticket_operator_result=operator(
         "submitted", ticket_result={"submission_succeeded": False, "error": "API down"}))
@@ -46,7 +60,9 @@ def test_cancel_then_next_issue_is_one_transition_sentence():
     assert sheet["stage"] == "offer"
     assert sheet["transition"] == ("Preparation for «ترجمة نص المراسلة» was stopped; the next issue «مشكلة زر "
                                    "الأرشفة» is now offered.")
-    assert "Cancelled issue:" not in turn_note(sheet)
+    note = turn_note(sheet)
+    assert "Cancelled request:" not in note
+    assert "Stopped this turn: «ترجمة نص المراسلة»." in note and "Offered now: «مشكلة زر الأرشفة»." in note
 
 
 def test_side_question_reminds_of_the_pending_summary_and_shows_the_draft():
@@ -60,6 +76,11 @@ def test_side_question_reminds_of_the_pending_summary_and_shows_the_draft():
     assert sheet["stage"] == "answered" and sheet["remind_pending"]
     assert sheet["draft"]["queue"] == "Ole5 Support"
     assert "is still waiting" in turn_note(sheet)
+
+
+def test_pending_step_without_an_active_issue_reaches_the_note():
+    current = state(pending_customer_response=PendingCustomerResponse(kind="detail", issue_id="issue-1", item="browser"))
+    assert "Pending step now: detail (browser)" in turn_note(build_turn_sheet(current, "ar"))
 
 
 def test_queued_and_skipped_facts_reach_the_note():

@@ -38,7 +38,7 @@ def test_ticket_lie_gets_only_one_response_retry(model, rejected_twice, route):
     with patch.object(respond, "GROUNDING_ENFORCE", False), \
          patch.object(graph, "search_node", return_value=evidence) as search, \
          patch.object(llm, "invoke", side_effect=[AIMessage(content=bad), AIMessage(content=bad if rejected_twice else good)]) as writer, \
-         patch("ole5_chat.agent.nodes.ticket_operator.tickets.submit") as submit:
+         patch("ole5_chat.tickets.submit.submit") as submit:
         result = graph.build().invoke(state)
     assert writer.call_count == 2
     assert search.call_count == (1 if route == "question" else 0)
@@ -55,19 +55,41 @@ def test_ticket_lie_gets_only_one_response_retry(model, rejected_twice, route):
         assert result["last_answer_evidence"] is None
 
 
+IDENTITY = Identity(customer_id="test", email="ole5@example.com", name="Test", organization="Test",
+                    product="OLE5", language="ar")
+
+
 def test_fallback_preserves_actual_creation():
-    state = {"language": "en", "ticket_result": {
+    state = {"identity": IDENTITY, "language": "en", "ticket_result": {
         "submission_succeeded": True, "ticket": {"ticket_number": "T-123"}}}
-    assert fallback(state) == "Ticket T-123 was created."
+    assert fallback(state).startswith("Ticket T-123 was created. The support team's reply arrives")
 
 
 def test_submit_intent_is_not_creation():
-    state = {"language": "en", "manager_action": "submit", "ticket_result": {
+    state = {"identity": IDENTITY, "language": "en", "manager_action": "submit", "ticket_result": {
         "submission_succeeded": False}}
-    assert "unsuccessful" in fallback(state)
+    assert "was not created" in fallback(state) and "T-" not in fallback(state)
 
 
-def test_checker_receives_authoritative_records_and_failure_is_not_a_pass(model):
+def test_fallback_says_what_happened_then_asks_what_the_current_request_waits_on():
+    from ole5_chat.agent.contracts import PendingCustomerResponse
+    state = {"identity": IDENTITY, "language": "ar",
+             "ticket_operator_result": {"cancelled_issue": "الترجمة", "queued_issue": None},
+             "active_issue": {"id": "issue-2", "description": "زر الأرشفة لا يعمل"},
+             "pending_customer_response": PendingCustomerResponse(kind="offer", issue_id="issue-2")}
+    assert fallback(state) == ("أوقفت تحضير الطلب «الترجمة» ولم يُرسل شيء. "
+                               "هل ترغب في فتح تذكرة دعم للطلب «زر الأرشفة لا يعمل»؟")
+    state.update(ticket_operator_result={"queued_issue": "الطباعة"},
+                 pending_customer_response=PendingCustomerResponse(kind="detail", issue_id="issue-2", item="page"))
+    assert fallback(state) == ("سجلت الطلب «الطباعة» وسأتابعه بعد الطلب الحالي. "
+                               "لإكمال الطلب «زر الأرشفة لا يعمل» أحتاج: اسم الصفحة.")
+
+
+def test_fallback_with_nothing_to_say_asks_to_send_again():
+    assert "إعادة إرسال" in fallback({"identity": IDENTITY, "language": "ar"})
+
+
+def test_checker_receives_authoritative_records_and_a_failed_check_lets_the_reply_pass(model):
     identity = Identity(customer_id="test", email="ole5@example.com", name="Test",
                         organization="Test", product="OLE5", language="en")
     state = initial_state(identity)
@@ -79,4 +101,4 @@ def test_checker_receives_authoritative_records_and_failure_is_not_a_pass(model)
     assert '"submission_succeeded": false' in payload
     assert '"OLD-1"' in payload
     with patch.object(llm, "structured", side_effect=llm.ModelFailed("offline")):
-        assert ticket_action_guard.violations(state, "Ticket created")
+        assert ticket_action_guard.violations(state, "Ticket created") == []

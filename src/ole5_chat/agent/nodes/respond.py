@@ -63,6 +63,7 @@ def _expected_language(state: AgentState) -> str:
     detected = language_of(latest)
     if detected:
         return detected
+    # regex fallback 
     if re.search(r"[\u0600-\u06ff]", latest):
         return "ar"
     if re.search(r"[A-Za-z]", latest):
@@ -115,7 +116,7 @@ def _grounding_input(state: AgentState, reply: str) -> str:
     previous = next((str(message.content) for message in reversed(before) if message.type == "ai"), "none")
     passages = "\n\n".join(
         f"Document: {item.get('document', 'unknown')}\n{item.get('text', '').strip()}"
-        for item in state.get("current_references", []) if item.get("relation") == "DIRECT"
+        for item in state.get("current_references", [])
     )
     return f"Assistant's previous message:\n{previous}\n\nCustomer's message:\n{customer}\n\nReply:\n{reply}\n\nPassages:\n{passages}"
 
@@ -162,7 +163,7 @@ def _grounded_reply(state: AgentState, sheet: TurnSheet, reply: str) -> str | No
 
 def respond_node(state: AgentState) -> dict:
     language = _expected_language(state)
-    sheet = build_turn_sheet(state, language)
+    sheet = build_turn_sheet(state, language) # turns state into facts and one stage
     log.info("respond  intent=%s search=%s stage=%s button=%s", state.get("intent"),
              state.get("search_outcome"), sheet["stage"], sheet["button"])
     try:
@@ -172,7 +173,9 @@ def respond_node(state: AgentState) -> dict:
     except llm.ModelFailed as exc:
         log.error("ERROR respond model call failed; sending safe fallback: %s", exc)
         reply = "عذراً، حدث خطأ من جهتنا. يرجى المحاولة مرة أخرى." if language == "ar" else "Sorry, something went wrong on our side. Please try again."
+    # Language Check (2 rewrites)
     reply = _correct_language(state, sheet, reply)
+    # Grounded Check 
     reply = _grounded_reply(state, sheet, reply)
     if reply is None:
         # Fixed wording avoids another model call reintroducing unsupported facts.

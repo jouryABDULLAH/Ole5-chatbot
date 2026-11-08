@@ -7,7 +7,7 @@ from typing import Literal, TypedDict
 from ole5_chat.agent.state import AgentState
 
 Stage = Literal[
-    "answered", "no_answer", "ticket_status",
+    "answered", "no_answer", "search_failed", "ticket_status",
     "offer", "detail_requested", "summary_shown",
     "submitted", "submission_failed", "preparation_stopped",
     "queued", "clarify", "other",
@@ -19,17 +19,20 @@ class TurnSheet(TypedDict):
     language: str
     customer_message: str | None    # this turn's message; None on a button turn
     button: str | None             # "submit" on a Submit-button turn (input_event), else None
-    search: str                     # "answered with N passages" | "no answer" | "not run"
+    search: str                     # "answered with N passages" | "no answer" | "failed" | "not run"
     search_no_answer: bool          # outcome partial or no_answer and no DIRECT passage
     operator: str                   # what the ticket workflow did, in plain words, or "not run"
     issue: str | None
     requested_detail: str | None
+    first_detail: bool              # the first detail asked since the offer was accepted: nothing answered or skipped yet
     skipped: str | None             # e.g. "page (unknown)"
     cancelled_issue: str | None
     queued_issue: str | None
     next_issue: str | None          # the queued issue offered after a submit
     transition: str | None          # one sentence when one issue stopped and the next one is offered
     ticket_number: str | None       # only when the submission succeeded
+    current_issue: str | None       # the active issue and what it is waiting for, stated so the model need not work it out
+    next_in_queue: str | None       # the queued issues, in order
     pending_kind: str | None        # offer | detail | summary pending now, after the workflow ran
     pending_item: str | None
     remind_pending: bool            # a step is pending and this turn did not answer it
@@ -40,16 +43,27 @@ class TurnSheet(TypedDict):
 
 
 OPERATOR_FACT = {
-    "offer": "offered to prepare a support ticket for the issue",
+    "offer": "offered to prepare a support ticket for the request",
     "request_detail": "needs one more detail before the ticket is complete",
     "show_summary": "prepared the ticket summary; it is shown on a card and waits for the customer's confirmation",
     "submitted": "submitted the ticket",
     "submission_failed": "tried to submit the ticket; the ticket was not created",
     "declined": "stopped preparing the ticket because the customer declined",
     "cancelled": "stopped preparing the ticket because the customer cancelled",
-    "queued": "will handle the new issue after the current one",
+    "queued": "will handle the new request after the current one",
     "clarify": "needs a clarification before it can act",
 }
+
+
+def _current_issue(state: AgentState) -> str | None:
+    active = state.get("active_issue")
+    if not active:
+        return None
+    pending = state.get("pending_customer_response")
+    waiting = {"offer": "ticket offer waiting for a yes or no",
+               "detail": f"waiting for the detail: {getattr(pending, 'item', None)}",
+               "summary": "summary waiting for confirmation"}.get(getattr(pending, "kind", None))
+    return f"«{active.get('description')}»" + (f" ({waiting})" if waiting else "")
 
 
 def build_turn_sheet(state: AgentState, language: str) -> TurnSheet:
@@ -84,7 +98,9 @@ def build_turn_sheet(state: AgentState, language: str) -> TurnSheet:
         stage = action
     elif intent == "other":
         stage = "other"
-    elif outcome in {"failed", "no_answer", "partial"}:
+    elif outcome == "failed":
+        stage = "search_failed"
+    elif outcome in {"no_answer", "partial"}:
         stage = "no_answer"
     else:
         stage = "other"
@@ -96,11 +112,15 @@ def build_turn_sheet(state: AgentState, language: str) -> TurnSheet:
         customer_message=last.text if last is not None and last.type == "human" else None,
         button="submit" if state.get("input_event") == "submit" else None,
         search=(f"answered with {len(direct)} passages" if direct
-                else "no answer" if outcome in {"partial", "no_answer", "failed"} else "not run"),
+                else ('failed: an error stopped the search, so you do not know whether the documentation covers this. '
+                      'This is not "no answer".') if outcome == "failed"
+                else "no answer" if outcome in {"partial", "no_answer"} else "not run"),
         search_no_answer=outcome in {"partial", "no_answer"} and not direct,
         operator=OPERATOR_FACT.get(action, "not run"),
         issue=op.get("issue") or (state.get("active_issue") or {}).get("description"),
         requested_detail=op.get("requested_detail"),
+        first_detail=action == "request_detail" and all(
+            value is None for value in (draft.get("required") or {}).values()),
         skipped=", ".join(f"{s.get('item')} ({s.get('value')})" for s in op.get("skipped") or []) or None,
         cancelled_issue=op.get("cancelled_issue"),
         queued_issue=op.get("queued_issue"),
@@ -108,6 +128,8 @@ def build_turn_sheet(state: AgentState, language: str) -> TurnSheet:
         transition=(f"Preparation for «{op['cancelled_issue']}» was stopped; the next issue «{op.get('issue')}» "
                     "is now offered." if op.get("cancelled_issue") and action == "offer" else None),
         ticket_number=(result.get("ticket") or {}).get("ticket_number") if succeeded else None,
+        current_issue=_current_issue(state),
+        next_in_queue=", ".join(f"«{i.get('description')}»" for i in state.get("pending_issues") or []) or None,
         pending_kind=getattr(pending, "kind", None),
         pending_item=getattr(pending, "item", None),
         remind_pending=bool(pending) and intent != "pending_response" and not op
