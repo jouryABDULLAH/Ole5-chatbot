@@ -1,11 +1,11 @@
-"""The model, behind one small wrapper. Groq today; the model name is a setting. Every call returns a validated pydantic object; an invalid reply, or one a caller's check refuses, is sent back to the model with the reason, up to RETRIES times."""
+"""The model, behind one small wrapper. Groq today; the model name is a setting. Every call returns a validated pydantic object; an invalid reply, or one a caller's check refuses, is sent back to the model with the reason, up to RETRIES times. Any other Groq error (connection, rate limit, server) is retried by the Groq client itself (twice, with backoff), then raised as ModelFailed."""
 
 import json
 import logging
 import time
 from typing import Callable, TypeVar
 
-from groq import BadRequestError
+from groq import APIError, BadRequestError
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 from openinference.instrumentation.langchain import get_current_span
@@ -58,7 +58,7 @@ def _correction(exc: BadRequestError) -> list[BaseMessage]:
 
 def invoke(convo: list[BaseMessage], tool=None, tool_choice: str | None = None) -> AIMessage:
     """One plain model call. If Groq rejects the generation, it is retried warmer with the rejection sent back to the
-    model. Only the search node binds a tool."""
+    model; any other Groq error, already retried by the client, ends the call. Only the search node binds a tool."""
     error, correction = "no attempt made", []
     for temperature in (0, 0.3):
         try:
@@ -67,6 +67,9 @@ def invoke(convo: list[BaseMessage], tool=None, tool_choice: str | None = None) 
         except BadRequestError as exc:
             error, correction = str(exc)[:400], _correction(exc)
             log.warning("llm  rejected by Groq at temperature %s: %s", temperature, error)
+        except APIError as exc:
+            log.error("ERROR llm  Groq error after the client's retries: %s", str(exc)[:400])
+            raise ModelFailed(str(exc)[:400]) from exc
     raise ModelFailed(error)
 
 
@@ -106,6 +109,11 @@ def structured(system: str, messages: list[BaseMessage], schema: type[T], node: 
                     log.warning("%s  llm schema=%s attempt=%d rejected by Groq: %s", node, schema.__name__, attempt, error)
                     convo += _correction(exc)
                     continue
+                except APIError as exc:
+                    # Not the model's output, and the client already retried it: nothing to send back.
+                    log.error("ERROR %s  llm schema=%s Groq error after the client's retries: %s",
+                              node, schema.__name__, str(exc)[:400])
+                    raise ModelFailed(str(exc)[:400]) from exc
                 if reasoning := reply.additional_kwargs.get("reasoning_content"):
                     span.set_attribute("output.value", reasoning)
             ms = int((time.perf_counter() - started) * 1000)
