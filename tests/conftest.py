@@ -4,6 +4,7 @@ import re
 import shutil
 
 import pytest
+from langchain_core.messages import AIMessage
 from openpyxl import Workbook
 
 from ole5_chat import llm, products, sheets
@@ -84,3 +85,36 @@ def model(monkeypatch):
 
 
 
+class ScriptedToolModel:
+    """Stands in for llm.tool_client in the Ticket Operator's tool agent: returns the queued tool calls in order, then a final message without calls."""
+
+    def __init__(self):
+        self.replies: list[AIMessage] = []
+        self.bound: list[str] = []  # names of every tool the agent was given
+
+    def call(self, name, **args):
+        self.replies.append(AIMessage(content="", tool_calls=[{"name": name, "args": args, "id": f"call-{len(self.replies)}"}]))
+
+    def __call__(self, temperature):
+        return self
+
+    def bind_tools(self, tools, **kwargs):
+        self.bound += [tool.name for tool in tools]
+        return self
+
+    def fail(self, error: Exception):
+        """The next model call raises error, as when Groq fails partway through the tool agent."""
+        self.replies.append(error)
+
+    def invoke(self, messages, *args, **kwargs):
+        reply = self.replies.pop(0) if self.replies else AIMessage(content="Done.")
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+
+@pytest.fixture
+def operator_model(monkeypatch):
+    scripted = ScriptedToolModel()
+    monkeypatch.setattr(llm, "tool_client", scripted)
+    return scripted

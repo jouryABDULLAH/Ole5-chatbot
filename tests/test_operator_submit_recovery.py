@@ -2,6 +2,8 @@
 import json
 from unittest.mock import Mock
 
+import pytest
+
 from ole5_chat.agent.contracts import OperatorCompletion, PendingCustomerResponse
 from ole5_chat.agent.nodes.ticket_operator import _apply_completion
 from ole5_chat.agent.prompts.ticket_operator import ticket_operator_tool_prompt
@@ -87,6 +89,40 @@ def test_skip_detail_settles_the_item_and_readies_the_summary():
     assert not json.loads(bound['skip_detail'].invoke({'item': 'colour', 'value': 'unknown'}))['success']
 
 
+@pytest.mark.parametrize('urgent', [True, False])
+def test_urgent_issue_summary_is_ready_without_customer_details(monkeypatch, urgent):
+    state = detail_state()
+    state['active_issue'] = {**state['active_issue'], 'urgent': urgent}
+    reclassified = TicketDraft(**{**state['ticket_draft'], 'required': {'page': None, 'browser': None},
+                                  'missing': ['page', 'browser'], 'classified': True})
+    monkeypatch.setattr(tools.ticket_classifier, 'classify', lambda _: {'ticket_draft': reclassified})
+    bound = {tool.name: tool for tool in tools.build_ticket_operator_tools(state)}
+    result = json.loads(bound['save_ticket_draft'].invoke({'fields': {'summary': 'Nobody can sign in'},
+                                                           'issue_id': 'issue-1'}))
+    assert result['summary_ready'] is urgent
+    assert result['missing_customer_details'] == ['page', 'browser']  # still reported, only not asked
+
+
+@pytest.mark.parametrize('ticket_type,subtype,asked', [
+    ('Bug', 'Software malfunction', {'page': None, 'error text or screenshot': 'Access denied'}),
+    ('Inquiry', 'General questions', {}),
+])
+def test_required_details_come_from_the_ticket_type(model, ticket_type, subtype, asked):
+    from ole5_chat.support_core.classify import classify
+    from ole5_chat.support_core.contracts import Classification
+    state = detail_state()
+    # The model leaves out the bug's required list and keeps one value it heard; the code restores the list.
+    model.add(Classification(
+        queue='Ole5 Technical', type=ticket_type, subtype=subtype, reason='Issue - archive button',
+        priority='Medium', title='Archive button fails', summary='The archive button fails.',
+        title_customer='Archive button fails', summary_customer='The archive button fails.',
+        confidence='high', queue_reason='Product behaviour', collected={},
+        required={'error text or screenshot': 'Access denied'} if ticket_type == 'Bug' else {'colour': None}))
+    result = classify(tools._classification_state(state, TicketDraft(product='Ole5')))
+    assert result['ticket_draft'].required == asked
+    assert result['ticket_draft'].missing == [key for key, value in asked.items() if value is None]
+
+
 def test_reclassifying_keeps_a_skipped_detail(monkeypatch):
     state = detail_state()
     state['ticket_draft']['required']['page'] = 'declined'
@@ -144,6 +180,34 @@ def test_submit_activates_and_offers_the_next_queued_issue(monkeypatch):
     assert result['pending_customer_response'].kind == 'offer'
     assert result['pending_customer_response'].issue_id == 'issue-2'
     assert result['ticket_operator_result']['next_issue'] == 'Printing shows a blank page'
+
+
+def test_new_issue_during_an_offer_is_queued_and_the_offer_stays():
+    state = ready_state()
+    offer = PendingCustomerResponse(kind='offer', issue_id='issue-1')
+    state.update(pending_customer_response=offer, summary_shown=False, submission_requested=False)
+    bound = {tool.name: tool for tool in tools.build_ticket_operator_tools(state)}
+    queued = bound['manage_issues'].invoke({'operation': 'register', 'description': 'Archive button fails'})
+    result = _apply_completion(state, OperatorCompletion(action='offer', reason='Offer again', issue_id='issue-1'),
+                               json.dumps([{'name': 'manage_issues', 'content': queued}]))
+    assert result['ticket_operator_result']['action'] == 'queued'
+    assert result['ticket_operator_result']['queued_issue'] == 'Archive button fails'
+    assert result['pending_customer_response'] == offer
+    assert [issue['description'] for issue in result['pending_issues']] == ['Archive button fails']
+
+
+def test_two_new_issues_offer_the_first_and_queue_the_second():
+    state = ready_state()
+    state.update(active_issue=None, pending_customer_response=None, ticket_draft=None,
+                 summary_shown=False, submission_requested=False)
+    bound = {tool.name: tool for tool in tools.build_ticket_operator_tools(state)}
+    first = bound['manage_issues'].invoke({'operation': 'register', 'description': 'Login fails'})
+    second = bound['manage_issues'].invoke({'operation': 'register', 'description': 'Archive button fails'})
+    result = _apply_completion(state, OperatorCompletion(action='offer', reason='Offer the first', issue_id='issue-1'),
+                               json.dumps([{'name': 'manage_issues', 'content': first},
+                                           {'name': 'manage_issues', 'content': second}]))
+    assert result['ticket_operator_result']['action'] == 'offer'
+    assert result['pending_customer_response'].kind == 'offer'
 
 
 def test_cancel_with_nothing_active_is_not_a_success():

@@ -31,6 +31,10 @@ class ProductConfig(BaseModel):
     urgent_when: list[str] = []
     # Per kind of problem, the information only the customer can give and the team cannot act without.
     required: dict[str, list[str]] = {}
+    # Each required detail's name for the customer, by language, for fixed replies that ask for it.
+    required_labels: dict[str, dict[str, str]] = {}
+    # The ticket type whose tickets ask each kind's details; the classifier's type decides, not the model's list.
+    required_for_type: dict[str, str] = {}
     # When and how support works, by language like the introduction; stated from here, never by the model.
     support_hours: dict[str, str] = {}
     about: dict[str, str] = {}

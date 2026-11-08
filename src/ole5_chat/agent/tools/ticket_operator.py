@@ -22,8 +22,13 @@ log = logging.getLogger(__name__)
 SKIPPED = ("unknown", "declined")  # values of a required detail the customer answered without giving it
 
 
-def _logged_tool(function):
-    """Log execution at the tool boundary while preserving its argument schema."""
+def _logged_tool(sink: list):
+    """Log execution at the tool boundary while preserving its argument schema. Each result also goes to sink, so
+    the Operator still knows what the tools did if the tool agent fails after they ran."""
+    return lambda function: _logged(function, sink)
+
+
+def _logged(function, sink: list):
     @wraps(function)
     def wrapped(*args, **kwargs):
         arguments = signature(function).bind(*args, **kwargs)
@@ -57,6 +62,7 @@ def _logged_tool(function):
                 result.get("classification_succeeded"), result.get("summary_ready"),
                 result.get("missing_customer_details"), result.get("mandatory_fields_missing"),
             )
+        sink.append({"type": "tool", "name": function.__name__, "content": payload})
         return payload
     return wrapped
 
@@ -127,11 +133,13 @@ def _classification_state(state: AgentState, draft: TicketDraft) -> ChatState:
     )
 
 
-def build_ticket_operator_tools(state: AgentState):
-    """Build tools bound to one graph invocation's mutable working state."""
+def build_ticket_operator_tools(state: AgentState, sink: list | None = None):
+    """Build tools bound to one graph invocation's mutable working state; sink collects their results."""
+
+    sink = [] if sink is None else sink
 
     @tool("get_ticket_requirements")
-    @_logged_tool
+    @_logged_tool(sink)
     def get_ticket_requirements() -> str:
         """Return the configured ticket categories and required customer details."""
 
@@ -149,7 +157,7 @@ def build_ticket_operator_tools(state: AgentState):
         })
 
     @tool("save_ticket_draft")
-    @_logged_tool
+    @_logged_tool(sink)
     def save_ticket_draft(fields: dict, issue_id: str | None = None) -> str:
         """Merge draft updates, classify them, and report whether a summary is safe."""
 
@@ -201,10 +209,11 @@ def build_ticket_operator_tools(state: AgentState):
             if not getattr(classified, key, None)
         ]
         missing_customer_details = [key for key, value in required.items() if value is None]
+        # An urgent issue goes to the summary without the customer details; the classification is still required.
         summary_ready = bool(
             classified.classified
             and not mandatory_missing
-            and not missing_customer_details
+            and (not missing_customer_details or active.get("urgent"))
         )
         classified = classified.model_copy(update={"missing": missing_customer_details})
         state["ticket_draft"] = classified.model_dump()
@@ -228,7 +237,7 @@ def build_ticket_operator_tools(state: AgentState):
         })
 
     @tool("skip_detail")
-    @_logged_tool
+    @_logged_tool(sink)
     def skip_detail(item: str, value: Literal["unknown", "declined"], issue_id: str | None = None) -> str:
         """Record that the customer does not know (unknown) or will not give (declined) one required detail, then
         report the next missing detail or that the summary is ready. Use it instead of asking for that detail again."""
@@ -279,7 +288,7 @@ def build_ticket_operator_tools(state: AgentState):
         })
 
     @tool("manage_issues")
-    @_logged_tool
+    @_logged_tool(sink)
     def manage_issues(
         operation: Literal["register", "enqueue", "cancel_preparation"],
         description: str | None = None,
@@ -343,7 +352,7 @@ def build_ticket_operator_tools(state: AgentState):
         })
 
     @tool("submit_ticket")
-    @_logged_tool
+    @_logged_tool(sink)
     def submit_ticket(issue_id: str, draft_version: int) -> str:
         """Submit the displayed, confirmed draft and return the actual ticket result."""
 

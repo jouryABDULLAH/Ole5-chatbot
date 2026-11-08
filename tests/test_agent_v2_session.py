@@ -6,7 +6,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from ole5_chat import api
 from ole5_chat.agent import session
-from ole5_chat.agent.contracts import PendingCustomerResponse, RouterDecision, RouterDecisionWithoutPending, manager_schema
+from ole5_chat.agent.contracts import OperatorCompletion, PendingCustomerResponse, RouterDecision, RouterDecisionWithoutPending
 from ole5_chat.agent.nodes.router import router_node
 from ole5_chat.support_core.contracts import Classification
 from ole5_chat.identity import Identity
@@ -77,25 +77,17 @@ def test_api_switch_and_v2_state_view(monkeypatch):
     get_settings.cache_clear()
 
 
-def test_v2_ticket_submission_returns_valid_customer_ticket_card(model, monkeypatch):
+def _writer(messages):
+    """Respond: names the ticket number when the turn note gives one."""
+    match = re.search(r"Ticket created, number: (\S+)", messages[-1].content)
+    return AIMessage(content=f"Your ticket number is {match.group(1)}." if match else "Here is your ticket summary.")
+
+
+def test_v2_ticket_submission_returns_valid_customer_ticket_card(model, operator_model):
     from ole5_chat import llm
     from ole5_chat.config import get_settings
 
-    class Writer:
-        def __call__(self, temperature):
-            return self
-
-        def bind_tools(self, tools, tool_choice=None):
-            return self
-
-        def invoke(self, messages):
-            prompt = messages[0].content
-            match = re.search(r"Confirm that ticket ([^ ]+) was created", prompt)
-            number = match.group(1) if match else "the ticket"
-            return AIMessage(content=f"Your ticket number is {number}.")
-
     get_settings.cache_clear()
-    monkeypatch.setattr(llm, "tool_client", Writer())
     client = TestClient(api.app)
 
     start = client.post("/chat/sessions", json={"email": "ole5@example.com"})
@@ -103,9 +95,8 @@ def test_v2_ticket_submission_returns_valid_customer_ticket_card(model, monkeypa
     session_id = start.json()["session_id"]
 
     model.add(
-        RouterDecisionWithoutPending(intent="escalation", next_target="ticket_operator", explicit_ticket_request=True,
+        RouterDecisionWithoutPending(intent="needs_ticket", next_target="ticket_operator", explicit_ticket_request=True,
                                      reason="Customer requested a ticket."),
-        manager_schema("none")(action="register_issue", reason="Register the requested issue."),
         Classification(
             queue="Ole5 Technical", type="Bug", subtype="Software malfunction",
             reason="Issue - calendar synchronization", priority="Medium", title="Calendar synchronization issue",
@@ -116,18 +107,27 @@ def test_v2_ticket_submission_returns_valid_customer_ticket_card(model, monkeypa
             collected={"page": "Calendar"},
             required={"page": "Calendar", "error text or screenshot": "provided"},
         ),
+        OperatorCompletion(action="show_summary", reason="Summary ready."),
+        RouterDecision(intent="needs_ticket", next_target="respond", explicit_ticket_request=True,
+                       reason="Ticket summary prepared."),
     )
-    model.add(RouterDecision(intent="escalation", next_target="respond", explicit_ticket_request=True,
-                             reason="Ticket summary prepared."),
-              RouterDecisionWithoutPending(intent="escalation", next_target="respond",
-                                           explicit_ticket_request=True, reason="Ticket submitted."))
-    ready = client.post(f"/chat/sessions/{session_id}/messages", json={
-        "text": "Please create a ticket for a calendar synchronization issue."
-    })
+    operator_model.call("manage_issues", operation="register", description="Calendar synchronization issue")
+    operator_model.call("save_ticket_draft", fields={"summary": "Calendar synchronization issue"})
+    with patch.object(llm, "invoke", side_effect=_writer):
+        ready = client.post(f"/chat/sessions/{session_id}/messages", json={
+            "text": "Please create a ticket for a calendar synchronization issue."
+        })
     assert ready.status_code == 200
     assert ready.json()["phase"] == "confirm"
 
-    submitted = client.post(f"/chat/sessions/{session_id}/submit")
+    prepared = session.get(session_id)
+    operator_model.call("submit_ticket", issue_id=prepared["active_issue"]["id"],
+                        draft_version=prepared["summary_delivered_version"])
+    model.add(OperatorCompletion(action="submitted", reason="Created."),
+              RouterDecisionWithoutPending(intent="needs_ticket", next_target="respond",
+                                           explicit_ticket_request=True, reason="Ticket submitted."))
+    with patch.object(llm, "invoke", side_effect=_writer):
+        submitted = client.post(f"/chat/sessions/{session_id}/submit")
     assert submitted.status_code == 200, submitted.text
     view = submitted.json()
     assert view["phase"] == "none"
@@ -150,55 +150,47 @@ def test_v2_user_specific_data_bypasses_knowledge_router(model):
         "pending_customer_response": None,
     }
     model.add(RouterDecisionWithoutPending(
-        intent="escalation", next_target="ticket_operator", explicit_ticket_request=False,
+        intent="needs_ticket", next_target="ticket_operator", explicit_ticket_request=False,
         reason="Customer-specific account or user data is outside the chat scope.",
     ))
     result = router_node(state)
-    assert result["intent"] == "escalation"
+    assert result["intent"] == "needs_ticket"
     assert "outside the chat scope" in result["route_reason"]
     assert model.calls
 
 
-def test_v2_user_specific_question_goes_to_ticket_offer_without_search(model, monkeypatch):
+def test_v2_user_specific_question_goes_to_ticket_offer_without_search(model, operator_model):
     from ole5_chat import llm
     from ole5_chat.config import get_settings
 
-    class Writer:
-        def __call__(self, temperature):
-            return self
-
-        def bind_tools(self, tools, tool_choice=None):
-            self.bound_tools = tools
-            return self
-
-        def invoke(self, messages):
-            return AIMessage(content="I cannot access account details here. Would you like a support ticket?")
-
     get_settings.cache_clear()
-    writer = Writer()
-    monkeypatch.setattr(llm, "tool_client", writer)
     client = TestClient(api.app)
     session_id = client.post("/chat/sessions", json={"email": "ole5@example.com"}).json()["session_id"]
     model.add(RouterDecisionWithoutPending(
-        intent="escalation", next_target="ticket_operator", explicit_ticket_request=False,
+        intent="needs_ticket", next_target="ticket_operator", explicit_ticket_request=False,
         reason="Customer-specific account or user data is outside the chat scope.",
-    ), RouterDecision(
-        intent="escalation", next_target="respond", explicit_ticket_request=False,
+    ), OperatorCompletion(action="offer", reason="Account data needs support."), RouterDecision(
+        intent="needs_ticket", next_target="respond", explicit_ticket_request=False,
         reason="Ticket Operator prepared the authorized response.",
     ))
+    operator_model.call("manage_issues", operation="register", description="Account permissions question")
 
-    response = client.post(f"/chat/sessions/{session_id}/messages", json={
-        "text": "What permissions does my account have?"
-    })
+    with patch.object(llm, "invoke", return_value=AIMessage(
+            content="I cannot access account details here. Would you like a support ticket?")):
+        response = client.post(f"/chat/sessions/{session_id}/messages", json={
+            "text": "What permissions does my account have?"
+        })
     assert response.status_code == 200
     view = response.json()
     assert view["phase"] == "offer_ticket"
     assert "ticket" in view["messages"][-1]["text"].lower()
-    # Router classifies both the incoming turn and the completed Ticket Operator result.
+    # Router classifies both the incoming turn and the completed Ticket Operator result; Search never runs.
     from ole5_chat.agent.contracts import Language, TicketActionCheck
-    assert all(schema in (RouterDecision, RouterDecisionWithoutPending, Language, TicketActionCheck)
+    assert all(schema in (RouterDecision, RouterDecisionWithoutPending, OperatorCompletion, Language, TicketActionCheck)
                for schema, _ in model.calls)
-    assert not getattr(writer, "bound_tools", None)
+    from ole5_chat.agent.tools.ticket_operator import build_ticket_operator_tools
+    operator_tools = {tool.name for tool in build_ticket_operator_tools({})}
+    assert operator_model.bound and set(operator_model.bound) <= operator_tools
     assert api._session_backend() is session
 
     state = {

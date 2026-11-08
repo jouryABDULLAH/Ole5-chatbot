@@ -14,7 +14,8 @@ from ole5_chat.agent.prompts.router import router_prompt
 from ole5_chat.agent.prompts.respond import turn_note
 from ole5_chat.agent.turn_sheet import build_turn_sheet
 from ole5_chat.agent.state import AgentState
-from ole5_chat.agent.contracts import PendingCustomerResponse, TicketEnquiryCompletion
+from ole5_chat.agent.contracts import OperatorCompletion, PendingCustomerResponse, TicketEnquiryCompletion
+from ole5_chat.tickets.submit import SubmitRefused
 from ole5_chat.identity import Identity
 
 
@@ -25,7 +26,7 @@ def test_new_graph_compiles():
 def test_router_routes_have_single_owner_boundary():
     assert after_router({"intent": "question"}) == "search"
     assert after_router({"intent": "pending_response"}) == "ticket_operator"
-    assert after_router({"intent": "escalation"}) == "ticket_operator"
+    assert after_router({"intent": "needs_ticket"}) == "ticket_operator"
     assert after_router({"intent": "ticket_enquiry"}) == "ticket_enquiry"
     assert after_router({"intent": "other"}) == "respond"
 
@@ -100,13 +101,13 @@ def test_router_builds_response_packet_after_worker_result():
     state = _state([HumanMessage(content="Can it translate text?")])
     state.update(intent="question", ticket_operator_result={"action": "register_issue"}, manager_action="register_issue")
     decision = type("Decision", (), {
-        "intent": "escalation", "next_target": "respond", "explicit_ticket_request": False,
+        "intent": "needs_ticket", "next_target": "respond", "explicit_ticket_request": False,
         "reason": "Ticket Operator completed the authorized action.",
     })()
     with patch("ole5_chat.agent.nodes.router.llm.structured", return_value=decision):
         result = router_node(state)
     assert result["next_target"] == "respond"
-    assert result["response_packet"]["intent"] == "escalation"
+    assert result["response_packet"]["intent"] == "needs_ticket"
     assert result["response_packet"]["ticket_operator"]["action"] == "register_issue"
 
 
@@ -173,76 +174,119 @@ def test_finalize_appends_reply_and_retains_answer_evidence():
     assert result["intent"] is None
 
 
-def test_manager_registers_issue_and_opens_offer_pending_state():
+def test_operator_registers_issue_and_opens_offer_pending_state(model, operator_model):
     state = _state([HumanMessage(content="The archive button does not work")])
-    state.update(intent="escalation", current_request="The archive button does not work")
-    decision = type("Decision", (), {"action": "register_issue", "reason": "New issue."})()
-    with patch("ole5_chat.agent.nodes.ticket_operator.llm.structured", return_value=decision):
-        result = ticket_operator_node(state)
+    state.update(intent="needs_ticket")
+    operator_model.call("manage_issues", operation="register", description="The archive button does not work")
+    model.add(OperatorCompletion(action="offer", reason="New issue."))
+    result = ticket_operator_node(state)
     assert result["active_issue"]["description"] == "The archive button does not work"
     assert result["pending_customer_response"].kind == "offer"
-    assert result["manager_action"] == "register_issue"
+    assert result["ticket_operator_result"]["action"] == "offer"
 
 
-def test_manager_unanswered_search_explains_missing_kb_answer_before_offer():
+def test_operator_offer_after_unanswered_search_tells_respond_nothing_was_found(model, operator_model):
     state = _state([HumanMessage(content="Can the system translate correspondence automatically?")])
-    state.update(intent="question", current_request="Can the system translate correspondence automatically?",
-                 search_outcome="partial", current_references=[{"relation": "INFERENTIAL"}])
-    decision = type("Decision", (), {"action": "register_issue", "reason": "No supported answer."})()
-    with patch("ole5_chat.agent.nodes.ticket_operator.llm.structured", return_value=decision):
-        result = ticket_operator_node(state)
-    instruction = result["ticket_result"]["response_instruction"]
-    assert "did not provide a supported answer" in instruction
+    state.update(intent="question", search_outcome="partial", current_references=[{"relation": "INFERENTIAL"}])
+    operator_model.call("manage_issues", operation="register", description="Automatic translation of correspondence")
+    model.add(OperatorCompletion(action="offer", reason="No supported answer."))
+    result = ticket_operator_node(state)
     assert result["pending_customer_response"].kind == "offer"
+    sheet = build_turn_sheet({**state, **result}, "en")
+    assert sheet["stage"] == "offer"
+    assert "Search found no answer" in turn_note(sheet)
 
 
-def test_manager_decline_clears_active_offer():
+def test_operator_decline_clears_active_offer(model, operator_model):
     state = _state([AIMessage(content="Would you like a ticket?"), HumanMessage(content="No")])
     issue = {"id": "issue-1", "description": "Archive button fails", "source": "no_answer", "urgent": False}
     state.update(active_issue=issue, pending_customer_response=PendingCustomerResponse(kind="offer", issue_id="issue-1"))
-    decision = type("Decision", (), {"action": "decline", "reason": "Customer declined."})()
-    with patch("ole5_chat.agent.nodes.ticket_operator.llm.structured", return_value=decision):
-        result = ticket_operator_node(state)
+    operator_model.call("manage_issues", operation="cancel_preparation", issue_id="issue-1")
+    model.add(OperatorCompletion(action="declined", reason="Customer declined."))
+    result = ticket_operator_node(state)
     assert result["active_issue"] is None
     assert result["pending_customer_response"] is None
+    assert result["ticket_operator_result"]["action"] == "declined"
 
 
-def test_manager_submit_failure_preserves_summary():
+def _summary_state(draft):
     state = _state([AIMessage(content="Submit the summary?"), HumanMessage(content="Yes")])
-    issue = {"id": "issue-1", "description": "Archive button fails", "source": "no_answer", "urgent": False}
     state.update(
-        active_issue=issue,
-        ticket_draft={"product": "Ole5", "required": {}, "missing": []},
+        active_issue={"id": "issue-1", "description": "Archive button fails", "source": "no_answer", "urgent": False},
+        ticket_draft=draft, summary_shown=True, submission_requested=True, draft_version=1,
+        summary_delivered_version=1, created_tickets=[],
         pending_customer_response=PendingCustomerResponse(kind="summary", issue_id="issue-1"),
     )
-    decision = type("Decision", (), {"action": "submit", "reason": "Customer approved the summary."})()
-    with patch("ole5_chat.agent.nodes.ticket_operator.llm.structured", return_value=decision):
+    return state
+
+
+def test_operator_submit_failure_preserves_summary(model, operator_model):
+    state = _summary_state({"product": "Ole5", "required": {}, "missing": []})
+    operator_model.call("submit_ticket", issue_id="issue-1", draft_version=1)
+    model.add(OperatorCompletion(action="submission_failed", reason="The ticket service refused it."))
+    with patch("ole5_chat.tickets.submit.submit", side_effect=SubmitRefused("service refused")),          patch("ole5_chat.tickets.client.ticket_client", return_value=object()):
         result = ticket_operator_node(state)
     assert result["ticket_result"]["submission_requested"] is True
-    assert result.get("created_tickets") is None
     assert result["ticket_result"]["submission_succeeded"] is False
+    assert not result.get("created_tickets")
     assert result["pending_customer_response"].kind == "summary"
 
 
-def test_manager_submit_success_records_ticket_and_clears_active_issue():
-    state = _state([AIMessage(content="Submit the summary?"), HumanMessage(content="Yes")])
-    issue = {"id": "issue-1", "description": "Archive button fails", "source": "no_answer", "urgent": False}
-    state.update(
-        active_issue=issue,
-        ticket_draft={
-            "product": "Ole5", "queue": "General Support", "type": "Bug", "subtype": "Other",
-            "reason": "Archive button fails", "priority": "P3", "title": "Archive button fails",
-            "summary": "The archive button fails.", "classified": True, "required": {}, "missing": [],
-        },
-        pending_customer_response=PendingCustomerResponse(kind="summary", issue_id="issue-1"),
-    )
-    decision = type("Decision", (), {"action": "submit", "reason": "Customer approved the summary."})()
-    with patch("ole5_chat.agent.nodes.ticket_operator.llm.structured", return_value=decision), \
-         patch("ole5_chat.agent.nodes.ticket_operator.tickets.submit", return_value=({"ticket_number": "T1", "ticket_id": "1", "created_at": "now"}, [])):
+def test_operator_submit_success_records_ticket_and_clears_active_issue(model, operator_model):
+    state = _summary_state({
+        "product": "Ole5", "queue": "General Support", "type": "Bug", "subtype": "Other",
+        "reason": "Archive button fails", "priority": "P3", "title": "Archive button fails",
+        "summary": "The archive button fails.", "classified": True, "required": {}, "missing": [],
+    })
+    operator_model.call("submit_ticket", issue_id="issue-1", draft_version=1)
+    model.add(OperatorCompletion(action="submitted", reason="Created."))
+    with patch("ole5_chat.tickets.submit.submit", return_value=({"ticket_number": "T1", "ticket_id": "1", "created_at": "now"}, [])),          patch("ole5_chat.tickets.client.ticket_client", return_value=object()):
         result = ticket_operator_node(state)
     assert result["ticket_result"]["submission_succeeded"] is True
     assert result["created_tickets"][0]["ticket_number"] == "T1"
     assert result["active_issue"] is None
+    assert result["pending_customer_response"] is None
+
+
+def test_interpreter_failure_after_submit_still_reports_the_created_ticket(model, operator_model):
+    state = _summary_state({
+        "product": "Ole5", "queue": "General Support", "type": "Bug", "subtype": "Other",
+        "reason": "Archive button fails", "priority": "P3", "title": "Archive button fails",
+        "summary": "The archive button fails.", "classified": True, "required": {}, "missing": [],
+    })
+    operator_model.call("submit_ticket", issue_id="issue-1", draft_version=1)
+    # No OperatorCompletion is scripted, so the interpreter fails.
+    with patch("ole5_chat.tickets.submit.submit", return_value=({"ticket_number": "T1", "ticket_id": "1", "created_at": "now"}, [])), \
+         patch("ole5_chat.tickets.client.ticket_client", return_value=object()):
+        result = ticket_operator_node(state)
+    assert result["ticket_operator_result"]["action"] == "submitted"
+    assert result["ticket_result"]["submission_succeeded"] is True
+    assert result["created_tickets"][0]["ticket_number"] == "T1"
+    assert build_turn_sheet({**state, **result}, "en")["ticket_number"] == "T1"
+
+
+def test_tool_agent_crash_after_cancel_keeps_the_cancel_and_offers_the_next_issue(model, operator_model):
+    state = _state([AIMessage(content="Would you like a ticket?"), HumanMessage(content="No, but the export fails")])
+    state.update(active_issue={"id": "issue-1", "description": "Archive button fails"},
+                 pending_issues=[{"id": "issue-2", "description": "Export fails"}],
+                 pending_customer_response=PendingCustomerResponse(kind="offer", issue_id="issue-1"))
+    operator_model.call("manage_issues", operation="cancel_preparation", issue_id="issue-1")
+    operator_model.fail(RuntimeError("connection lost"))
+    result = ticket_operator_node(state)
+    assert result["active_issue"]["id"] == "issue-2"
+    assert result["pending_customer_response"].kind == "offer"
+    assert result["pending_customer_response"].issue_id == "issue-2"
+    assert result["ticket_operator_result"]["cancelled_issue"] == "Archive button fails"
+
+
+def test_interpreter_failure_with_no_tool_step_clarifies_and_keeps_the_pending_step(model, operator_model):
+    state = _state([AIMessage(content="Would you like a ticket?"), HumanMessage(content="Hmm")])
+    state.update(active_issue={"id": "issue-1", "description": "Archive button fails"},
+                 pending_customer_response=PendingCustomerResponse(kind="offer", issue_id="issue-1"))
+    result = ticket_operator_node(state)
+    assert result["ticket_operator_result"]["action"] == "clarify"
+    assert result["active_issue"]["id"] == "issue-1"
+    assert result["pending_customer_response"].kind == "offer"
 
 
 def test_ticket_status_lookup_returns_authorized_data():

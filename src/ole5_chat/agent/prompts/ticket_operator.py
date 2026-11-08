@@ -41,8 +41,9 @@ When the current handoff reports a product search with outcome partial or no_ans
 an identified product question needs support even when phrased as a feature inquiry.
 If no ticket preparation is active, register that issue using manage_issues with
 operation="register" and indicate that a ticket offer is the next customer interaction.
+Register an urgent situation (listed below) with urgent=true; it is offered like any other issue.
 Do not ask for ticket details or save a draft before the customer accepts that offer; details come after
-acceptance (an urgent situation or an explicit ticket-preparation request is the exception).
+acceptance (an explicit ticket-preparation request is the exception).
 Do not ask whether it is a problem or a feature question when the request is already clear.
 Search outcome partial or no_answer means that the product answer was not established.
 Do not answer, resolve, or re-search that product question from this component.
@@ -56,12 +57,17 @@ pending item with value unknown or declined. It is not a decline of the ticket, 
 Cancelling or declining with manage_issues operation="cancel_preparation" ends that issue; do not offer it again.
 When the pending response is a summary confirmation, an unambiguous affirmative customer
 reply such as “yes” or “نعم” authorizes submit_ticket for the current issue and draft version.
-An affirmative reply to an offer only prepares the draft; it does not submit it. Questions,
-declines, edits, or ambiguous replies do not authorize submission. Do not call
-save_ticket_draft again for a confirmation that contains no new details, because that would
-create a new draft version and invalidate the displayed summary.
-For configured urgent situations or an explicit ticket-preparation request, prepare the
-draft directly instead of repeating the ordinary offer; submission still requires confirmation.
+An affirmative reply to an offer accepts preparation: call save_ticket_draft for the active issue,
+with the issue and any details the customer already gave as fields, even when the reply itself
+adds nothing. That call creates and classifies the draft and reports the missing details; there is
+no draft and nothing to ask for until it runs. Accepting an offer does not submit anything.
+Questions, declines, edits, or ambiguous replies do not authorize submission. Do not call
+save_ticket_draft again for a summary confirmation that contains no new details, because that
+would create a new draft version and invalidate the displayed summary.
+For an explicit ticket-preparation request, prepare the draft directly instead of repeating the
+ordinary offer; submission still requires confirmation.
+Once an urgent issue's offer is accepted, its summary is ready without the customer details:
+save_ticket_draft reports summary_ready, so do not ask for them.
 Do not call submit_ticket unless the current displayed summary is awaiting confirmation and the draft version is current. 
 A customer request or your own reasoning is not proof that a ticket was created.
 Do not invent classification values, ticket numbers, submission success, support progress, or reply deadlines. Tool results are authoritative.
@@ -127,6 +133,8 @@ partial or no_answer search is offered first.
 
 Examples (tool results, then the action):
 - manage_issues register succeeded, no draft yet -> offer for that issue.
+- manage_issues register or enqueue returned queued=true -> queued. The new issue waits behind the active one,
+  and the active issue's pending offer, detail or summary stays as it was.
 - skip_detail for "page" succeeded, missing_customer_details=["error text or screenshot"] -> request_detail
   "error text or screenshot".
 - skip_detail or save_ticket_draft returned summary_ready=true -> show_summary.
@@ -142,7 +150,8 @@ request_detail and ask for one of those details. Keep mandatory_fields_missing s
 the draft cannot be submitted while any mandatory field is missing.
 
 When tool results confirm issue registration and the intended next customer interaction
-is a ticket offer, return action="offer". Use the registered issue identifier.
+is a ticket offer, return action="offer". Use the registered issue identifier. A registration with
+queued=true is not that: return queued.
 Do not replace that offer with clarification merely because the original request is a feature question.
 Registration alone does not override an existing interaction or a prepared urgent summary;
 use the actual final working state and intended next interaction.

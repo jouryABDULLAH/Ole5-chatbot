@@ -20,7 +20,7 @@ def _short(text: str, limit: int = 90) -> str:
 
 def classify(state: ChatState) -> dict:
     catalog = values.catalog(state["identity"].product)
-    kinds = products.load(state["identity"].product).required
+    config = products.load(state["identity"].product)
     messages = list(state["messages"])
     fields, problems = {}, ["classification not run"]
     for attempt in (1, 2):
@@ -31,13 +31,9 @@ def classify(state: ChatState) -> dict:
             return {"note": f"classification model call failed: {_short(str(exc), 200)}",
                     "corrections": state["corrections"] + [f"classify failed: {exc}"]}
         fields, problems = check_ticket(result, catalog)
-        if not kinds:  # A product with no kinds asks nothing: keys the model made up are dropped, not refused.
-            result = result.model_copy(update={"required": {}})
-        # required is one kind's list, every item as a key, or empty when no kind fits the problem (nothing to ask).
-        if result.required and not any(set(result.required) == set(items) for items in kinds.values()):
-            # Name the allowed key lists so the retry can copy them instead of guessing again.
-            problems.append(f"required: keys {sorted(result.required)} are not one kind's full list; use exactly "
-                            f"the keys of one kind, written as listed: {kinds}, or leave required empty")
+        # The details to ask come from the ticket type, not from the model's list; the model's values are kept.
+        keys = config.required.get(config.required_for_type.get(result.type), [])
+        result = result.model_copy(update={"required": {key: result.required.get(key) for key in keys}})
         log.info("classify  attempt=%d queue=%s type=%s subtype=%s priority=%s urgent=%s confidence=%s required=%s "
                  "problems=%s", attempt, result.queue, result.type, result.subtype, result.priority, result.urgent,
                  result.confidence, result.required, problems)
