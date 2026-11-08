@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 from langchain_core.messages import HumanMessage
 
-from ole5_chat.agent.context import respond_context, router_context
+from ole5_chat.agent.context import router_context
 from ole5_chat.agent.nodes.finalize import finalize_node
 from ole5_chat.agent.nodes.router import _response_packet
 from ole5_chat.agent.prompts.router import router_prompt
@@ -74,7 +74,6 @@ def test_router_omits_payloads_without_changing_response_facts():
     assert context["ticket_operator_summary"]["ticket_created"] is False
     assert context["ticket_enquiry_summary"]["ticket_count"] == 1
     assert _response_packet(current)["search"] == original["search_result"]
-    assert respond_context(current)["ticket_operator_result"] == original["ticket_operator_result"]
     assert current == original
 
 

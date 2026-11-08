@@ -26,8 +26,9 @@ def _handoff_note(context: dict) -> HumanMessage | None:
         "ticket_enquiry": context.get("ticket_enquiry_summary"),
     }[worker]
     return HumanMessage(content=(
-        f"{NOTE}last_worker={worker} has completed for the customer message above: {summary}. "
-        "That message was already handled by this worker; choose next_target by the worker result rules."))
+        f"{NOTE} last_worker={worker} has completed for the customer message above: {summary}. "
+        "That message was already handled by this worker, including any pending step it just created; "
+        "choose next_target by the worker result rules."))
 
 def _response_packet(state: AgentState) -> dict:
     """Collect the structured facts Router has gathered without rewriting them."""

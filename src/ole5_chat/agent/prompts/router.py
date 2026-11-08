@@ -9,7 +9,7 @@ ROUTER_ROUTES = {
     "question": "A product question or problem report needing the knowledge base. A named ordinary issue remains question even when the customer asks for a ticket: Search runs first.",
     "pending_response": "An answer to the active pending offer, required detail, or submission summary: accepting, declining, giving or refusing the detail, confirming, editing, or cancelling. A question about the pending step (where it goes, why a detail is needed, what happens next) is other, not an answer. Use only when pending customer response is present.",
     "ticket_enquiry": "A lookup of the customer's ticket data, or an explanation of an identified ticket status. Support-process questions such as hours or reply channel are other.",
-    "escalation": "A configured always-ticket topic, configured urgent situation, a report that suggested steps did not help, or a bare ticket request with no recoverable subject.",
+    "needs_ticket": "A configured always-ticket topic, configured urgent situation, a report that suggested steps did not help, or a bare ticket request with no recoverable subject.",
     "other": "A greeting, thanks, capability/About/company question, configured support-process question, off-topic message, evidence-grounded rephrasing, or unclear intent. General questions about support hours, response times, reply channels, and how support tickets work are other and go directly to respond, using configured support information.",
 }
 
@@ -37,12 +37,12 @@ ROUTER_EXAMPLES = {
         '"ما معنى غير متوفرة؟" after a ticket-status reply; '
         '"What happened to the ticket I opened earlier?"'
     ),
-    "escalation": (
+    "needs_ticket": (
         '"نبي ننقل بياناتنا من النظام القديم"; '
         '"ولا موظف عندنا يقدر يسجل دخول"; '
         '"لا زال لا يعمل" after suggested steps; '
         '"افتح لي تذكرة" with no issue subject; '
-        '"افتحوا تذكرة لنقل البيانات" → escalation, '
+        '"افتحوا تذكرة لنقل البيانات" → needs_ticket, '
         'explicit_ticket_request=true'
     ),
     "other": (
@@ -107,8 +107,8 @@ Intent describes what the customer requested; worker completion alone does not c
 
 ### INTENT CLASSIFICATION RULES
 
-- Actual personal account information outside ticket data is escalation. General documented product procedures, such as how to reset a password, are question.
-- Use pending_response only when the message answers the active pending interaction. A question about it, with no answer, is other: Respond answers it and keeps the step. An unrelated account question is escalation even if a ticket interaction is pending.
+- Actual personal account information outside ticket data is needs_ticket. General documented product procedures, such as how to reset a password, are question.
+- Use pending_response only when the message answers the active pending interaction. A question about it, with no answer, is other: Respond answers it and keeps the step. An unrelated account question is needs_ticket even if a ticket interaction is pending.
 - Greetings, thanks, capabilities and support-process FAQs are other.
 - Explicit existing-ticket lookups and explanations of identified ticket statuses are ticket_enquiry. Asking whether the assistant CAN access tickets is other. "هل أقدر أستعلم عن تذاكري؟" and "هل اقدر استعلم عن تذاكري التي انشأتها" ask about capability, so choose other; "اعرض تذاكري" requests an actual lookup, so choose ticket_enquiry.
 
@@ -122,6 +122,7 @@ The customer message is repeated on worker returns; it is not a new request to r
 These handoff rules take precedence over the initial intent-to-target mapping below:
 
 - last_worker=ticket_operator or ticket_enquiry: choose respond. Deliver the completed result, including a clarification request or failure. Do not repeat the worker or return to search.
+  A worker return never brings a new customer message: the latest customer message is the one the worker just handled. That holds even when it reads like an answer to a pending step the worker has just created; that step waits for the customer's next message.
 - last_worker=search: use Search outcome:
   - answered: choose respond. Search has reported direct answer evidence.
   - partial or no_answer: choose ticket_operator. Do not fill missing product facts using general model knowledge.
@@ -134,7 +135,7 @@ The values on the LEFT below are the customer's classified intent.
 The values on the RIGHT are next_target node names. Apply this mapping only before a worker has completed this turn:
 
 - intent=question → next_target=search.
-- intent=escalation or pending_response → next_target=ticket_operator.
+- intent=needs_ticket or pending_response → next_target=ticket_operator.
 - intent=ticket_enquiry → next_target=ticket_enquiry.
 - intent=other → next_target=respond.
 
@@ -149,7 +150,7 @@ These descriptions explain responsibilities; the stage rules above determine whe
    - Use when: The user is asking about product features, screens, procedures, or product errors covered by the knowledge base.
 
 2. `ticket_operator`
-   - Handles: Ticket preparation, missing information collection, consent workflows, issue classification, and escalation.
+   - Handles: Ticket preparation, missing information collection, consent workflows, issue classification, and ticket requests.
    - Use when: A product search returns partial/no answers, or when an account/user-specific request falls outside product search scope.
 
 3. `ticket_enquiry`
@@ -172,7 +173,7 @@ Never rewrite worker outputs or invent results. Return only the Router decision 
 - A new product question during ticket preparation is `question`, not `pending_response`.
 - If an assistant-displayed reference is ambiguous, choose `other` and let Respond ask one focused clarification.
 - A question asking whether the assistant can access or explain ticket information is `other`; only explicit requests to show, list, check, or retrieve ticket data are `ticket_enquiry`.
-- Set `explicit_ticket_request=true` only when the customer explicitly asks to prepare/open a ticket for the current named issue. Keep it false for policy-based escalation, urgency, status, acceptance, detail answers, rephrasing, and mere mentions of tickets.
+- Set `explicit_ticket_request=true` only when the customer explicitly asks to prepare/open a ticket for the current named issue. Keep it false for policy-based needs_ticket, urgency, status, acceptance, detail answers, rephrasing, and mere mentions of tickets.
 - If the latest message has no safe interpretation, choose `other` and do not invent a ticket subject or operation.
 
 ### FEW-SHOT EXAMPLES
@@ -190,7 +191,7 @@ Example 2 (No documented answer → Ticket Operator):
 Example 3 (User Data Request → Ticket Operator):
 - Customer: "ما هو بريدي الإلكتروني المسجل؟"
 - Context: last_worker=none, no pending response.
-- Decision: `intent="escalation"`, `next_target="ticket_operator"`, `explicit_ticket_request=false`.
+- Decision: `intent="needs_ticket"`, `next_target="ticket_operator"`, `explicit_ticket_request=false`.
 
 Example 4 (Capability / Support FAQ → Respond):
 - Customer: "ما ساعات الدعم وكيف أتواصل معهم؟"
@@ -224,7 +225,7 @@ Example 8 (Retrieval failure → Respond):
 Example 9 (Account-request offer prepared → Respond):
 - Customer: "ما هو بريدي الإلكتروني المسجل؟"
 - Context: last_worker=ticket_operator, action=register_issue, pending_kind=offer.
-- Decision: intent="escalation", next_target="respond", explicit_ticket_request=false.
+- Decision: intent="needs_ticket", next_target="respond", explicit_ticket_request=false.
 - reason: "Account request handling has completed for this turn; present the offer."
 
 ### OUTPUT CONTRACT

@@ -53,7 +53,9 @@ def _state(session_id: str) -> AgentState:
 
 
 def start(email: str) -> tuple[str, AgentState]:
-    """Create a checkpointed v2 session and store the configured greeting."""
+    """Turn start.
+    Builds initial_state, adds the greeting and saves it under thread_id = session_id
+    Create a checkpointed session and store the configured greeting."""
 
     identity = lookup(email)
     session_id = uuid.uuid4().hex

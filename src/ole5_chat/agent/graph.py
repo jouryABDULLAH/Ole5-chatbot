@@ -24,7 +24,7 @@ def after_router(state: AgentState) -> str:
     intent = state.get("intent")
     if intent == "question":
         return "search"
-    if intent == "pending_response" or intent == "escalation":
+    if intent == "pending_response" or intent == "needs_ticket":
         return "ticket_operator"
     if intent == "ticket_enquiry":
         return "ticket_enquiry"

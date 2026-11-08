@@ -9,16 +9,14 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, create_model
 
-Route = Literal["question", "pending_response", "ticket_enquiry", "escalation", "other"]
-RouteWithoutPending = Literal["question", "ticket_enquiry", "escalation", "other"]
+Route = Literal["question", "pending_response", "ticket_enquiry", "needs_ticket", "other"]
+RouteWithoutPending = Literal["question", "ticket_enquiry", "needs_ticket", "other"]
 NextTarget = Literal["search", "ticket_operator", "ticket_enquiry", "respond"]
 WorkerName = Literal["search", "ticket_operator", "ticket_enquiry"]
 PendingKind = Literal["offer", "detail", "summary"]
 ManagerContext = Literal["none", "offer", "detail", "summary"]
 SearchOutcome = Literal["answered", "partial", "no_answer", "failed"]
 TicketStatusAction = Literal["lookup_status", "explain_status", "clarify"]
-TicketListOutcome = Literal["success", "empty", "error"]
-TicketLookupOutcome = Literal["found", "not_found", "status_unavailable", "error"]
 IssueOperation = Literal["register", "enqueue", "cancel_preparation"]
 OperatorAction = Literal[
     "offer", "request_detail", "show_summary", "declined", "cancelled",
@@ -95,39 +93,6 @@ def manager_schema(context: ManagerContext) -> type[BaseModel]:
     )
 
 
-class TicketStatusDecision(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    action: TicketStatusAction
-    reason: str
-
-
-class TicketListItem(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    ticket_number: str
-    title: str
-    product: str
-    created_at: str
-
-
-class TicketListResult(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    outcome: TicketListOutcome
-    tickets: list[TicketListItem] = []
-    error: str | None = None
-
-
-class TicketLookupResult(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    outcome: TicketLookupOutcome
-    ticket: dict | None = None
-    status_available: bool = False
-    error: str | None = None
-
-
 class TicketEnquiryCompletion(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -144,22 +109,6 @@ class OperatorCompletion(BaseModel):
     reason: str
     issue_id: str | None = None
     requested_detail: str | None = None
-
-
-class OperatorToolResult(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    success: bool
-    operation: str
-    issue_id: str | None = None
-    draft_version: int | None = None
-    missing_fields: list[str] = []
-    unknown_fields: list[str] = []
-    active_issue: dict | None = None
-    pending_issues: list[dict] = []
-    draft: dict | None = None
-    ticket: dict | None = None
-    error: str | None = None
 
 
 class Grounding(BaseModel):
@@ -180,8 +129,3 @@ class Language(BaseModel):
     language: Literal["ar", "en", "none"]
 
 
-class ValidationDecision(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    outcome: ValidationOutcome
-    reason: str

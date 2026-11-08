@@ -1,4 +1,4 @@
-"""Deterministic scope gate shared by Router and Search."""
+"""Deterministic scope gate used by Search."""
 
 import re
 

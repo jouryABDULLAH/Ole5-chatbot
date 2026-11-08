@@ -27,8 +27,8 @@ from pydantic import BaseModel, ConfigDict, create_model
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 DEFAULT_DIR = ROOT / "live_tests_results"
-Route = Literal["question", "pending_response", "ticket_status", "escalation", "other"]
-RouteWithoutPending = Literal["question", "ticket_status", "escalation", "other"]
+Route = Literal["question", "pending_response", "ticket_status", "needs_ticket", "other"]
+RouteWithoutPending = Literal["question", "ticket_status", "needs_ticket", "other"]
 Pending = Literal["none", "offer", "detail", "summary"]
 OFFER_COMMON = ("update_impact", "separate_issue", "clarify")
 DETAIL_COMMON = ("cancel", "update_impact", "separate_issue")
@@ -141,11 +141,11 @@ def build_cases() -> list[Case]:
         ("n05", "ما أبي تذكرة، بس قولي كيف أأرشف", "question", False, None),
         ("n06", "هل أحتاج تذكرة عشان أأرشف؟", "question", False, None),
         ("n08", "ما أقدر أدخل النظام", "question", False, None),
-        ("n09", "افتح لي تذكرة", "escalation", True, "clarify"),
-        ("n10", "نبي ننقل بياناتنا من النظام القديم", "escalation", False, "register_issue"),
-        ("n11", "أبي أرحّل الأرشيف القديم حقنا للنظام", "escalation", False, "register_issue"),
-        ("n12", "ولا موظف عندنا يقدر يسجل دخول", "escalation", False, "urgent_issue"),
-        ("n13", "ما أحد في الجهة يقدر يدخل النظام من الصباح", "escalation", False, "urgent_issue"),
+        ("n09", "افتح لي تذكرة", "needs_ticket", True, "clarify"),
+        ("n10", "نبي ننقل بياناتنا من النظام القديم", "needs_ticket", False, "register_issue"),
+        ("n11", "أبي أرحّل الأرشيف القديم حقنا للنظام", "needs_ticket", False, "register_issue"),
+        ("n12", "ولا موظف عندنا يقدر يسجل دخول", "needs_ticket", False, "urgent_issue"),
+        ("n13", "ما أحد في الجهة يقدر يدخل النظام من الصباح", "needs_ticket", False, "urgent_issue"),
         ("n22", "وش ساعات الدعم؟", "other", False, None),
         ("n23", "مرحبا", "other", False, None),
         ("n24", "what can you do?", "other", False, None),
@@ -158,8 +158,8 @@ def build_cases() -> list[Case]:
     ]:
         add(cid, customer, route, wants, action)
     add("n07", "وعلى الآيباد؟", "question", history=answered)
-    add("n14", "جربت الخطوات ولا زال ما يشتغل", "escalation", action="failed_solution", history=answered)
-    add("n15", "لا زال لا يعمل", "escalation", action="failed_solution", history=answered)
+    add("n14", "جربت الخطوات ولا زال ما يشتغل", "needs_ticket", action="failed_solution", history=answered)
+    add("n15", "لا زال لا يعمل", "needs_ticket", action="failed_solution", history=answered)
     for cid, customer in [("n16", "وش صار على تذكرتي؟"), ("n17", "وش بيصير بعدها؟"),
                           ("n18", "وين يوصل الرد؟"), ("n19", "كم ياخذ الرد عادة؟"),
                           ("n20", "كيف أعرف إذا ردوا علي؟")]:
@@ -183,7 +183,7 @@ def build_cases() -> list[Case]:
         ("o07", "وش حالة تذكرتي السابقة؟", "ticket_status", None),
         ("o08", "شكراً", "other", None),
         ("o09", "مين سواك؟", "other", None),
-        ("o10", "وبعد، ولا موظف يقدر يدخل النظام الحين", "escalation", "separate_issue"),
+        ("o10", "وبعد، ولا موظف يقدر يدخل النظام الحين", "needs_ticket", "separate_issue"),
     ]:
         add(cid, customer, route, action=action, history=offer_history, pending="offer",
             issue=ARCHIVE, group="offer", created=("122",) if cid == "o07" else (),
@@ -198,7 +198,7 @@ def build_cases() -> list[Case]:
         ("d05", "ما عندي شي أضيفه", "pending_response", "skip_detail"),
         ("d06", "ليش تحتاج اسم المتصفح؟", "pending_response", "not_an_answer"),
         ("d07", "خلاص ضبط، ما أبي تذكرة", "pending_response", "cancel"),
-        ("d08", "الحين ولا أحد في الجهة يقدر يدخل", "escalation", "update_impact"),
+        ("d08", "الحين ولا أحد في الجهة يقدر يدخل", "needs_ticket", "update_impact"),
         ("d09", "وبعد زر الأرشفة ما يشتغل", "question", None),
         ("d10", "ايه", "pending_response", "not_an_answer"),
         ("d11", "كيف أصدر تقرير؟", "question", None),
@@ -237,7 +237,7 @@ def build_cases() -> list[Case]:
         ("m09", "كيف أضيف علامة مائية؟", "question", None),
         ("m10", "وش بيصير بعد ما أرسلها؟", "other", None),
         ("m11", "شكراً", "other", None),
-        ("m12", "ولا موظف يقدر يدخل الحين، هذي أهم", "escalation", "separate_issue"),
+        ("m12", "ولا موظف يقدر يدخل الحين، هذي أهم", "needs_ticket", "separate_issue"),
     ]:
         add(cid, customer, route, action=action, pending="summary", issue=ARCHIVE,
             draft="زر الأرشفة لا يعمل | متوسطة", group="summary", issue_type="bug",
@@ -247,8 +247,8 @@ def build_cases() -> list[Case]:
     # Additional contrasting cases not copied verbatim into the prompts. Diagnostic,
     # not a claim of a blind held-out dataset; freeze before tuning prompts.
     for cid, customer, route, wants, action in [
-        ("x01", "افتحوا لي تذكرة لنقل البيانات", "escalation", True, "register_issue"),
-        ("x02", "كل موظفي الجهة عاجزين عن الدخول، جهز تذكرة", "escalation", True, "urgent_issue"),
+        ("x01", "افتحوا لي تذكرة لنقل البيانات", "needs_ticket", True, "register_issue"),
+        ("x02", "كل موظفي الجهة عاجزين عن الدخول، جهز تذكرة", "needs_ticket", True, "urgent_issue"),
         ("x03", "هل ممكن نفتح تذكرة لو واجهتنا مشكلة؟", "other", False, None),
         ("x04", "أريد تذكرة بشأن اختفاء المرفقات", "question", True, None),
         ("x05", "لا تفتح تذكرة، اشرح لي طريقة البحث", "question", False, None),
@@ -304,9 +304,9 @@ def build_cases() -> list[Case]:
         draft="Archive failure", history=heldout_error_summary, group="heldout")
     add("h09", "Yes", "other", history=greeting, group="heldout")
     add("h10", "When should I expect the support reply?", "other", history=greeting, group="heldout")
-    add("h11", "The instructions still did not fix it.", "escalation", action="failed_solution",
+    add("h11", "The instructions still did not fix it.", "needs_ticket", action="failed_solution",
         history=heldout_answer, group="heldout")
-    add("h12", "A separate department-wide sign-in outage started.", "escalation", action="separate_issue",
+    add("h12", "A separate department-wide sign-in outage started.", "needs_ticket", action="separate_issue",
         pending="detail", item="browser name", issue=ARCHIVE, draft="Archive failure",
         history=heldout_detail, group="heldout")
     add("h13", "طيب", "other", history=greeting, group="heldout")
@@ -321,9 +321,9 @@ def build_cases() -> list[Case]:
         issue=LOGIN, draft="Login failure", history=heldout_detail, group="heldout")
     add("h20", "ليش تحتاج اسم المتصفح؟", "pending_response", action="not_an_answer", pending="detail",
         item="browser name", issue=LOGIN, draft="Login failure", history=heldout_detail, group="heldout")
-    add("h21", "ولا موظف في الجهة يقدر يدخل", "escalation", action="update_impact", pending="detail",
+    add("h21", "ولا موظف في الجهة يقدر يدخل", "needs_ticket", action="update_impact", pending="detail",
         item="browser name", issue=LOGIN, draft="Login failure", history=heldout_detail, group="heldout")
-    add("h22", "ولا موظف في الجهة يقدر يدخل", "escalation", action="separate_issue", pending="detail",
+    add("h22", "ولا موظف في الجهة يقدر يدخل", "needs_ticket", action="separate_issue", pending="detail",
         item="browser name", issue=ARCHIVE, draft="Archive failure", history=heldout_detail, group="heldout")
     add("h23", "Raise the priority to high", "pending_response", action="edit_summary", pending="summary",
         issue=ARCHIVE, draft="Archive failure", history=heldout_summary, group="heldout")
@@ -345,12 +345,12 @@ ROUTES AND BOUNDARIES
 question: a product operation, rule, symptom or new condition needing documentation.
 The message must ask or report something; mentioning a product or screen alone is insufficient.
 An explicit ticket request naming an ordinary issue ALSO uses question: our policy searches first.
-The words 'ticket' or 'open' do not override this policy. Escalation exceptions below take priority.
+The words 'ticket' or 'open' do not override this policy. needs_ticket exceptions below take priority.
 
-escalation: a configured always-ticket topic, a configured urgent situation, a report that
+needs_ticket: a configured always-ticket topic, a configured urgent situation, a report that
 previously suggested steps did not resolve the issue, or a bare ticket request with no recoverable subject.
 It sends the issue to Manager; it does not mean submit a ticket. Failed steps normally lead to an offer.
-A new ordinary symptom during preparation is question. A configured urgent situation is escalation
+A new ordinary symptom during preparation is question. A configured urgent situation is needs_ticket
 even during preparation; Manager determines whether it updates the same issue or introduces another.
 One person's login failure is not organization-wide urgency.
 
@@ -371,7 +371,7 @@ other: greetings, thanks, assistant capabilities, basic company/provider identit
 who developed Ole5), support-process questions answered from configuration, off-topic requests,
 unclear intents, or rephrasing a clearly identified previous product answer.
 These remain other even if they mention Ole5 or occur during ticket preparation. Missing About facts
-do not turn a company question into question or escalation. A rephrase changes wording; a new
+do not turn a company question into question or needs_ticket. A rephrase changes wording; a new
 product fact/condition such as mobile compatibility is question. Explaining a ticket status is
 ticket_status; explaining the currently requested detail is pending_response.
 
@@ -386,8 +386,8 @@ IMPORTANT CONTRASTS
   'الأرشفة' after 'Which screen?' -> pending_response.
   'زر الأرشفة لا يعمل' as a new ordinary issue -> question.
 - 'open a ticket for me about the archive button' -> question, explicit_ticket_request=true.
-  'افتح لي تذكرة' with no subject -> escalation, explicit_ticket_request=true.
-- 'جربت الخطوات وما نفعت' after a proposed solution -> escalation.
+  'افتح لي تذكرة' with no subject -> needs_ticket, explicit_ticket_request=true.
+- 'جربت الخطوات وما نفعت' after a proposed solution -> needs_ticket.
   'اشرحها ببساطة' after a product answer -> other, even though it is a follow-up.
   'وعلى الآيباد؟' after a product answer -> question because it asks about another condition.
 - 'مين سواك؟', 'وش تقدر تسوي؟', 'ايش اسم الشركة المسؤولة عن اوليفاي؟' -> other.
@@ -403,13 +403,13 @@ IMPORTANT CONTRASTS
 
 BOOLEAN: explicit_ticket_request
 True only when the latest message explicitly requests a NEW ticket preparation for its issue,
-including a bare request. False for policy-required escalation, hypothetical questions, mentions,
+including a bare request. False for policy-required needs_ticket, hypothetical questions, mentions,
 negations, answers to requested details, acceptance of an existing offer, and summary submission consent.
 This records expressed request, not 'needs a ticket', 'is ready for a ticket' or 'wants support'.
-- 'نبي ننقل بياناتنا من النظام القديم' -> escalation, false (policy only).
-- 'افتحوا تذكرة لنقل البيانات' -> escalation, true (explicit preparation request).
-- 'ولا موظف يقدر يسجل دخول' -> escalation, false (impact report).
-- 'لا زال لا يعمل' after steps -> escalation, false (failed solution).
+- 'نبي ننقل بياناتنا من النظام القديم' -> needs_ticket, false (policy only).
+- 'افتحوا تذكرة لنقل البيانات' -> needs_ticket, true (explicit preparation request).
+- 'ولا موظف يقدر يسجل دخول' -> needs_ticket, false (impact report).
+- 'لا زال لا يعمل' after steps -> needs_ticket, false (failed solution).
 - 'ايه افتحها' answering our existing offer -> pending_response, false.
 - 'أرسلها' answering summary confirmation -> pending_response, false.
 - 'هل ممكن نفتح تذكرة لو واجهتنا مشكلة؟' -> other, false (hypothetical process question answered from configuration).
@@ -553,8 +553,8 @@ def validate_cases(cases: list[Case]) -> None:
             assert c.pending == "summary" and c.summary_shown, c.case_id
         if c.expect_action:
             assert c.expect_action in MANAGER_OPTIONS[c.pending], c.case_id
-            assert c.expect_route in {"escalation", "pending_response"}, c.case_id
-        if c.expect_route in {"escalation", "pending_response"}:
+            assert c.expect_route in {"needs_ticket", "pending_response"}, c.case_id
+        if c.expect_route in {"needs_ticket", "pending_response"}:
             assert c.expect_action, c.case_id
 
 
