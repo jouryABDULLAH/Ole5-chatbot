@@ -62,6 +62,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Rank of the answering passage in RAGent2's raw search.")
     parser.add_argument("ids", nargs="*", help="case ids; all (or all failed) when none are given")
     parser.add_argument("--results", type=Path, help="a reg_kb_answers results.json: replay its failed cases")
+    parser.add_argument("--pause", type=float, default=3.0, help="seconds to wait between cases (default 3)")
     args = parser.parse_args()
     cases = {c["id"]: c for c in json.loads((ROOT / "evals/datasets/reg_kb_answers.json").read_text(
         encoding="utf-8"))["cases"] if c["expected"].get("quote")}
@@ -69,7 +70,9 @@ def main() -> None:
     ids = [i for i in wordings if i in cases and (not args.ids or i in args.ids)]
     tenant = retriever.tenant(get_settings().kb_tenants["OLE5"])
     rows = []
-    for case_id in ids:
+    for n, case_id in enumerate(ids):
+        if n:
+            time.sleep(args.pause)  # spaces the calls out so the search service is not hit back to back
         case = cases[case_id]
         quote, message = case["expected"]["quote"], case["input"]["message"]
         row = {"id": case_id, "message_rank": rank(tenant, message, quote), "quote_rank": rank(tenant, quote, quote),
