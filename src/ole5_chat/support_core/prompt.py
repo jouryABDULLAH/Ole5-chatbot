@@ -47,6 +47,7 @@ def classify(state: ChatState) -> str:
         "product_name": config.name,
         "reason_rule": reason_rule,
         "issue": pending[0].text if pending else "none",
+        "language": {"ar": "Arabic", "en": "English"}.get(state.get("language") or identity.language, "Arabic"),
         "values": _values_block(catalog),
         "current_draft": state["ticket_draft"].model_dump_json() if state.get("ticket_draft") else "none",
         "other_issues": "\n".join(p.text for p in pending[1:]) or "none",

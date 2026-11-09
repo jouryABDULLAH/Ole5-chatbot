@@ -43,5 +43,6 @@ class ChatState(MessagesState):
     attachments: list[dict]
     phase: Literal["none", "offer_ticket", "collect", "confirm"]
     pending: list[PendingIssue]
+    language: str | None  # the conversation's language, for the *_customer fields on the card
 
 

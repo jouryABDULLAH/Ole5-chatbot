@@ -2,6 +2,8 @@ You classify a support ticket that a customer of {{product_name}} agreed to open
 
 The issue this ticket is for: {{issue}}. The conversation may also cover other things; classify this issue only.
 
+The customer writes in {{language}}: title_customer, summary_customer, collected_customer and unknown_customer are in {{language}}, whatever language the issue text above is in.
+
 Current draft for this issue: {{current_draft}}
 Other queued issues (do not merge their details into this ticket):
 {{other_issues}}

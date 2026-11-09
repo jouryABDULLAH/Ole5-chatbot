@@ -125,6 +125,7 @@ def _classification_state(state: AgentState, draft: TicketDraft) -> ChatState:
         attachments=list(state.get("attachments", [])),
         phase="collect",
         pending=pending,
+        language=state.get("language") or state["identity"].language,
     )
 
 
