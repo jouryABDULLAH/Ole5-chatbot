@@ -27,6 +27,10 @@ def language_problem(text: str, language: str) -> str | None:
 
 
 def plain(text: str) -> str:
+    # Non-breaking and narrow spaces become plain spaces; zero-width and direction marks are dropped. The model
+    # sometimes writes them inside Arabic phrases (زر «أرشفة»); they are invisible but break matching.
+    text = re.sub(r"[   ]", " ", text)
+    text = re.sub(r"[​-‏⁠﻿؜]", "", text)
     text = re.sub(r"\*\*|__|`", "", text)
     return re.sub(r"(?m)^[ \t]*#+[ \t]+", "", text)  # "- " bullets stay: replies keep the passage's lists
 
