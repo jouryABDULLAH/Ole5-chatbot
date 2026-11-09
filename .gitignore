@@ -9,6 +9,7 @@ __pycache__/
 uploads/
 *.egg-info/
 exp_results/
+retrieval_results/
 .evalkit/
 _to_delete/
 live_tests_results/
