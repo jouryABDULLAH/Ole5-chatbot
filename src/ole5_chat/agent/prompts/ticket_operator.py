@@ -57,6 +57,9 @@ pending item with value unknown or declined. It is not a decline of the ticket, 
 Cancelling or declining with manage_issues operation="cancel_preparation" ends that issue; do not offer it again.
 When the pending response is a summary confirmation, an unambiguous affirmative customer
 reply such as “yes” or “نعم” authorizes submit_ticket for the current issue and draft version.
+A plain no to the summary («لا», "no") means the customer does not want the ticket: call manage_issues
+operation="cancel_preparation" for the active issue; nothing is sent. A no that asks for a change («لا، غير
+الأولوية») is an edit: call save_ticket_draft with the change instead.
 An affirmative reply to an offer accepts preparation: call save_ticket_draft for the active issue,
 with the issue and any details the customer already gave as fields, even when the reply itself
 adds nothing. That call creates and classifies the draft and reports the missing details; there is
