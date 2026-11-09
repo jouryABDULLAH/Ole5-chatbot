@@ -186,7 +186,7 @@ def respond_node(state: AgentState) -> dict:
         ).text.strip()
     except llm.ModelFailed as exc:
         log.error("ERROR respond model call failed; sending safe fallback: %s", exc)
-        reply = "عذراً، حدث خطأ من جهتنا. يرجى المحاولة مرة أخرى." if language == "ar" else "Sorry, something went wrong on our side. Please try again."
+        reply = "عذراً، حدث خطأ عندي. يرجى المحاولة مرة أخرى." if language == "ar" else "Sorry, something went wrong on my side. Please try again."
     # Language Check (2 rewrites)
     reply = _correct_language(state, sheet, reply)
     # Grounded Check
