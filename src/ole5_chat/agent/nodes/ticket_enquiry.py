@@ -2,6 +2,7 @@
 
 import json
 import logging
+from typing import Literal
 
 from langchain.agents import create_agent
 from langchain_core.tools import tool
@@ -31,59 +32,55 @@ def build_ticket_tools(state: AgentState):
     api = ticket_client()
     email = state["identity"].email.casefold()
 
+    def rows() -> list[dict]:
+        return [row for row in sheets.tickets() if str(row.get("customer_email") or "").casefold() == email]
+
+    def summary(row: dict) -> dict:
+        return {key: str(row.get(key) or "") for key in ("ticket_number", "title", "product", "created_at")}
+
+    def matches(found: list[dict]) -> str:
+        tickets = [summary(row) for row in found]
+        return json.dumps({"outcome": "success" if tickets else "empty", "tickets": tickets}, ensure_ascii=False)
+
     @tool("list_tickets")
-    def list_tickets() -> str:
-        """List the customer's tickets with identifiers and basic metadata."""
+    def list_tickets(order: Literal["as_stored", "oldest_first", "newest_first"] = "as_stored") -> str:
+        """List all the customer's tickets with ticket number, title, product and creation time. order is optional:
+        as stored, oldest first or newest first by creation time.
 
-        rows = [
-            row for row in sheets.tickets()
-            if str(row.get("customer_email") or "").casefold() == email
-        ]
-        tickets = [
-            {
-                "ticket_number": str(row.get("ticket_number") or ""),
-                "title": str(row.get("title") or ""),
-                "product": str(row.get("product") or ""),
-                "created_at": str(row.get("created_at") or ""),
-            }
-            for row in rows
-        ]
-        return json.dumps(
-            {"outcome": "success" if tickets else "empty", "tickets": tickets},
-            ensure_ascii=False,
-        )
+        Call when the customer asks for their tickets, or for their first, oldest, latest or last ticket."""
 
-    @tool("get_ticket")
-    def get_ticket(ticket_number: str) -> str:
-        """Retrieve one of the customer's tickets by exact ticket number."""
+        found = rows()
+        if order != "as_stored":
+            found = sorted(found, key=lambda row: str(row.get("created_at") or ""), reverse=order == "newest_first")
+        return matches(found)
 
-        rows = [
-            row for row in sheets.tickets()
-            if str(row.get("customer_email") or "").casefold() == email
-        ]
-        row = next(
-            (
-                row for row in rows
-                if str(row.get("ticket_number") or "") == ticket_number.strip()
-            ),
-            None,
-        )
+    @tool("find_tickets_by_title")
+    def find_tickets_by_title(text: str) -> str:
+        """The customer's tickets whose title contains the given words, any order, ignoring case. Titles are in
+        English; search with English words for the issue.
+        
+        Call when the customer refers to a ticket by its issue, without its number."""
+
+        words = text.casefold().split()
+        return matches([row for row in rows() if all(w in str(row.get("title") or "").casefold() for w in words)])
+
+    @tool("find_tickets_by_date")
+    def find_tickets_by_date(date_from: str, date_to: str | None = None) -> str:
+        """The customer's tickets created on a day (YYYY-MM-DD), or from date_from to date_to inclusive.
+        
+        Call when the customer refers to a ticket by when it was created, without its number."""
+
+        last = date_to or date_from
+        return matches([row for row in rows() if date_from <= str(row.get("created_at") or "")[:10] <= last])
+
+    def with_status(row: dict | None, key: str, value: str) -> str:
         if row is None:
-            return json.dumps(
-                {"outcome": "not_found", "ticket_number": ticket_number},
-                ensure_ascii=False,
-            )
-
-        ticket = {
-            "ticket_number": str(row.get("ticket_number") or ""),
-            "title": str(row.get("title") or ""),
-            "product": str(row.get("product") or ""),
-            "created_at": str(row.get("created_at") or ""),
-        }
+            return json.dumps({"outcome": "not_found", key: value}, ensure_ascii=False)
+        ticket = summary(row)
         try:
             status = api.get(str(row["ticket_id"]))
         except (TicketApiError, OSError, KeyError) as exc:
-            log.warning("ticket_enquiry  status unavailable ticket=%s: %s", ticket_number, exc)
+            log.warning("ticket_enquiry  status unavailable ticket=%s: %s", ticket["ticket_number"], exc)
             return json.dumps(
                 {
                     "outcome": "status_unavailable",
@@ -104,7 +101,17 @@ def build_ticket_tools(state: AgentState):
             ensure_ascii=False,
         )
 
-    return [list_tickets, get_ticket]
+    @tool("get_ticket")
+    def get_ticket(ticket_number: str) -> str:
+        """Retrieve one of the customer's tickets by its exact ticket number (T-...), with its current status.
+        
+        Call when the customer provides a ticket number, or after a list or find tool returned the ticket asked about."""
+
+        number = ticket_number.strip()
+        return with_status(next((row for row in rows() if str(row.get("ticket_number") or "") == number), None),
+                           "ticket_number", ticket_number)
+
+    return [list_tickets, find_tickets_by_title, find_tickets_by_date, get_ticket]
 
 
 def run_ticket_tool_agent(state: AgentState) -> dict:
@@ -143,7 +150,7 @@ def _log_tool_activity(report: str) -> None:
                 call.get("name"),
                 call.get("args") or {},
             )
-        if entry.get("name") in {"list_tickets", "get_ticket"}:
+        if entry.get("name") in {"list_tickets", "find_tickets_by_title", "find_tickets_by_date", "get_ticket"}:
             try:
                 result = json.loads(entry.get("content") or "{}")
             except (TypeError, json.JSONDecodeError):
@@ -173,7 +180,8 @@ def _compatible_result(
         "tool_report": report,
     }
     entries = json.loads(report)
-    listed = [entry for entry in entries if entry.get("name") == "list_tickets"]
+    listed = [entry for entry in entries
+              if entry.get("name") in {"list_tickets", "find_tickets_by_title", "find_tickets_by_date"}]
     list_results = []
     for entry in listed:
         try:

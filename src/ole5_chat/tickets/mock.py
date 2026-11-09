@@ -18,7 +18,7 @@ class MockTicketClient:
         self.calls.append(("TicketCreate", {"Ticket": ticket, "Article": article}))
         ticket_id = str(uuid.uuid4())
         number = f"T-MOCK-{datetime.now():%Y%m%d%H%M%S}-{next(self._counter):04d}"
-        self.tickets[ticket_id] = {"number": number, "state": "new", "queue": ticket.get("Queue")}
+        self.tickets[ticket_id] = {"number": number, "state": "New", "queue": ticket.get("Queue")}
         log.info("tickets  mock TicketCreate number=%s queue=%s type=%s priority=%s", number, ticket.get("Queue"),
                  ticket.get("Type"), ticket.get("Priority"))
         return {"TicketID": ticket_id, "TicketNumber": number}
@@ -30,5 +30,7 @@ class MockTicketClient:
 
     def get(self, ticket_id: str) -> dict:
         self.calls.append(("TicketGet", {"TicketID": ticket_id}))
+        # Tickets live in memory, so one created before a restart is unknown here. A real system always has a state;
+        # an untouched ticket is still New, the first status in the catalog.
         ticket = self.tickets.get(ticket_id, {})
-        return {"state": ticket.get("state"), "queue": ticket.get("queue")}
+        return {"state": ticket.get("state", "New"), "queue": ticket.get("queue")}
