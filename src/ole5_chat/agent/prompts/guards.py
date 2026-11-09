@@ -10,8 +10,9 @@ def language_prompt() -> str:
 - "ar" when the text is written in Arabic.
 - "en" when the text is written in English.
 - "none" when it has no words: only numbers, symbols, or an empty text.
-- "none" when it is only a value: a name, username, email, code, number, file or browser name, or a quoted error
-  text ("ahmad123", "E403", "Google Chrome", "Access denied").
+- "none" when it is only a value: a name, username, email, code, number, file or browser name, or an error text or
+  message the customer copied, quoted or not ("ahmad123", "E403", "Google Chrome", "Access denied",
+  Invalid credentials).
 
 Judge by the language of the sentences, not by names in them: an Arabic sentence that contains English product, screen or button names stays Arabic. A short message in one language is that language, however short.
 
