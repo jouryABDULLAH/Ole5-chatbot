@@ -54,6 +54,9 @@ def _search_node(state: AgentState) -> dict:
     conversation = [SystemMessage(content=search_prompt({**state, "current_request": request})), *state.get("messages", [])]
     cap = get_settings().kb_max_searches
     log.info("search  request=%r cap=%d", request, cap)
+    # Proposed, not done yet: the first search always uses the customer's message as written. The agent's own
+    # rewrites follow as extra searches, as now. (The rank replay found the answer for the customer's own words in 4
+    # misses that the rewrites lost: kb-24, kb-48, kb-89, kb-98.)
     while len(sink) < cap:
         try:
             reply = llm.invoke(conversation, tool, "auto" if sink else "required")
