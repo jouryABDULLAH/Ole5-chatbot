@@ -237,6 +237,10 @@ def build_ticket_operator_tools(state: AgentState, sink: list | None = None):
         """Record that the customer does not know (unknown) or will not give (declined) one required detail, then
         report the next missing detail or that the summary is ready. Use it instead of asking for that detail again."""
 
+        # Possible, not seen: nothing here (or in nodes/ticket_operator.py) checks that item is the pending detail
+        # (pending_customer_response.item); only the Operator prompt says to skip "the pending item". A «مدري» to the
+        # page question could mark another required detail unknown. Add the check if it ever shows up in a log.
+       
         active = state.get("active_issue")
         if active is None:
             return _json({"success": False, "operation": "skip_detail", "error": "no active issue"})
