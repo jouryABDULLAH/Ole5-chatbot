@@ -81,7 +81,26 @@ def test_router_node_writes_decision_fields():
         "next_target": "search",
         "route_reason": "Product question needs knowledge search.",
         "explicit_ticket_request": False,
+        "pending_before_worker": None,  # the step the message answered, for the return pass
     }
+
+
+def test_router_return_pass_routes_the_worker_result_without_classifying_again(model):
+    from ole5_chat.agent.contracts import ReturnDecision
+    import pytest as _pytest
+    state = _state([AIMessage(content="Would you like a ticket?"), HumanMessage(content="نعم")],
+                   pending=PendingCustomerResponse(kind="summary", issue_id="issue-1"))
+    state.update(last_worker="ticket_operator", intent="pending_response",
+                 active_issue={"id": "issue-1", "description": "Nobody can sign in"},
+                 pending_before_worker=PendingCustomerResponse(kind="offer", issue_id="issue-1"),
+                 ticket_operator_result={"action": "show_summary", "ticket_result": {}})
+    model.add(ReturnDecision(next_target="respond", reason="The Operator showed the summary."))
+    result = router_node(state)
+    assert result["next_target"] == "respond" and "intent" not in result  # the first pass's intent stays
+    prompt = model.calls[-1][1]
+    assert "offer for the request «Nobody can sign in»" in prompt and "summary for the request «Nobody can sign in»" in prompt
+    with _pytest.raises(Exception):  # the return pass cannot send the message to Search again
+        ReturnDecision(next_target="search", reason="r")
 
 
 def test_router_dispatches_search_result_to_the_next_owner():

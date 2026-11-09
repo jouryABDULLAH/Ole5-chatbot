@@ -53,6 +53,7 @@ class AgentState(MessagesState, total=False):
     search_result: dict | None
     current_references: list[dict]
     search_queries: list[str]  # every wording searched this turn: the Search agent's, then find()'s own rephrasings
+    pending_before_worker: PendingCustomerResponse | None  # the step the customer's message answered, before any worker ran
     search_outcome: SearchOutcome | None
     unresolved_information: dict | None
     
@@ -105,6 +106,7 @@ def initial_state(identity: Identity) -> AgentState:
         search_result=None,
         current_references=[],
         search_queries=[],
+        pending_before_worker=None,
         search_outcome=None,
         unresolved_information=None,
         ticket_result=None,

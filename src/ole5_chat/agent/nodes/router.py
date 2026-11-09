@@ -2,33 +2,13 @@
 
 import logging
 
-from langchain_core.messages import HumanMessage
-
 from ole5_chat import llm
-from ole5_chat.agent.contracts import ResponsePacket, router_schema
+from ole5_chat.agent.contracts import ResponsePacket, ReturnDecision, router_schema
 from ole5_chat.agent.context import router_context
-from ole5_chat.agent.prompts.router import router_prompt
+from ole5_chat.agent.prompts.router import router_prompt, router_return_prompt
 from ole5_chat.agent.state import AgentState
 
 log = logging.getLogger(__name__)
-
-NOTE = "Note from the system, not the customer: "
-
-
-def _handoff_note(context: dict) -> HumanMessage | None:
-    """On a worker return, the worker result as the last message the Router reads."""
-    worker = context.get("last_worker")
-    if not worker:
-        return None
-    summary = {
-        "search": context.get("search_summary"),
-        "ticket_operator": context.get("ticket_operator_summary"),
-        "ticket_enquiry": context.get("ticket_enquiry_summary"),
-    }[worker]
-    return HumanMessage(content=(
-        f"{NOTE} last_worker={worker} has completed for the customer message above: {summary}. "
-        "That message was already handled by this worker, including any pending step it just created; "
-        "choose next_target by the worker result rules."))
 
 def _response_packet(state: AgentState) -> dict:
     """Collect the structured facts Router has gathered without rewriting them."""
@@ -63,19 +43,33 @@ def _response_packet(state: AgentState) -> dict:
     return packet.model_dump()
 
 
+def _return_pass(state: AgentState) -> dict:
+    """After a worker: route its result. The message is not classified again, so it cannot be sent to a worker a
+    second time as if it were new; the first pass's intent stays."""
+    try:
+        decision = llm.structured(router_return_prompt(state), [], ReturnDecision, node="router")
+        target, reason = decision.next_target, decision.reason
+    except llm.ModelFailed as exc:
+        log.error("ERROR router return pass failed: %s", exc)
+        target, reason = "respond", "The worker's result could not be routed; it is delivered as it is."
+    log.info("router  return pass worker=%s next_target=%s reason=%r", state["last_worker"], target, reason)
+    update = {"next_target": target, "route_reason": reason}
+    if target == "respond":
+        update["response_packet"] = _response_packet({**state, **update})
+    return update
+
+
 def router_node(state: AgentState) -> dict:
+    if state.get("last_worker"):
+        return _return_pass(state)
     pending = state.get("pending_customer_response")
-    
+
     schema = router_schema(pending is not None)
     context = router_context(state)
     log.info("router  pending=%s latest=%r", pending.kind if pending else "none", context["latest_customer_message"])
-    
-    messages = context["conversation"]
-    note = _handoff_note(context)
-    if note:
-        messages = [*messages, note]
+
     try:
-        router_result = llm.structured(router_prompt(state), messages, schema, node="router")
+        router_result = llm.structured(router_prompt(state), context["conversation"], schema, node="router")
     except llm.ModelFailed as exc:
         log.error("ERROR router model call failed: %s", exc)
         update = {
@@ -96,6 +90,8 @@ def router_node(state: AgentState) -> dict:
         "route_reason": router_result.reason,
         "explicit_ticket_request": router_result.explicit_ticket_request,
     }
+    # The step the customer's message answers, kept so the return pass can tell it from a step a worker creates.
+    update["pending_before_worker"] = pending
     if update["next_target"] == "respond":
         update["response_packet"] = _response_packet({**state, **update})
     return update

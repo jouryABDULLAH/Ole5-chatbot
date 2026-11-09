@@ -6,7 +6,8 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from ole5_chat import api
 from ole5_chat.agent import session
-from ole5_chat.agent.contracts import OperatorCompletion, PendingCustomerResponse, RouterDecision, RouterDecisionWithoutPending
+from ole5_chat.agent.contracts import (OperatorCompletion, PendingCustomerResponse, ReturnDecision,
+                                      RouterDecisionWithoutPending)
 from ole5_chat.agent.nodes.router import router_node
 from ole5_chat.support_core.contracts import Classification
 from ole5_chat.identity import Identity
@@ -108,8 +109,7 @@ def test_v2_ticket_submission_returns_valid_customer_ticket_card(model, operator
             required={"page": "Calendar", "error text or screenshot": "provided"},
         ),
         OperatorCompletion(action="show_summary", reason="Summary ready."),
-        RouterDecision(intent="needs_ticket", next_target="respond", explicit_ticket_request=True,
-                       reason="Ticket summary prepared."),
+        ReturnDecision(next_target="respond", reason="Ticket summary prepared."),
     )
     operator_model.call("manage_issues", operation="register", description="Calendar synchronization issue")
     operator_model.call("save_ticket_draft", fields={"summary": "Calendar synchronization issue"})
@@ -124,8 +124,7 @@ def test_v2_ticket_submission_returns_valid_customer_ticket_card(model, operator
     operator_model.call("submit_ticket", issue_id=prepared["active_issue"]["id"],
                         draft_version=prepared["summary_delivered_version"])
     model.add(OperatorCompletion(action="submitted", reason="Created."),
-              RouterDecisionWithoutPending(intent="needs_ticket", next_target="respond",
-                                           explicit_ticket_request=True, reason="Ticket submitted."))
+              ReturnDecision(next_target="respond", reason="Ticket submitted."))
     with patch.object(llm, "invoke", side_effect=_writer):
         submitted = client.post(f"/chat/sessions/{session_id}/submit")
     assert submitted.status_code == 200, submitted.text
@@ -169,10 +168,8 @@ def test_v2_user_specific_question_goes_to_ticket_offer_without_search(model, op
     model.add(RouterDecisionWithoutPending(
         intent="needs_ticket", next_target="ticket_operator", explicit_ticket_request=False,
         reason="Customer-specific account or user data is outside the chat scope.",
-    ), OperatorCompletion(action="offer", reason="Account data needs support."), RouterDecision(
-        intent="needs_ticket", next_target="respond", explicit_ticket_request=False,
-        reason="Ticket Operator prepared the authorized response.",
-    ))
+    ), OperatorCompletion(action="offer", reason="Account data needs support."),
+        ReturnDecision(next_target="respond", reason="Ticket Operator prepared the authorized response."))
     operator_model.call("manage_issues", operation="register", description="Account permissions question")
 
     with patch.object(llm, "invoke", return_value=AIMessage(
@@ -184,9 +181,9 @@ def test_v2_user_specific_question_goes_to_ticket_offer_without_search(model, op
     view = response.json()
     assert view["phase"] == "offer_ticket"
     assert "ticket" in view["messages"][-1]["text"].lower()
-    # Router classifies both the incoming turn and the completed Ticket Operator result; Search never runs.
+    # Router classifies the incoming turn, then only routes the completed Ticket Operator result; Search never runs.
     from ole5_chat.agent.contracts import Language, TicketActionCheck
-    assert all(schema in (RouterDecision, RouterDecisionWithoutPending, OperatorCompletion, Language, TicketActionCheck)
+    assert all(schema in (RouterDecisionWithoutPending, ReturnDecision, OperatorCompletion, Language, TicketActionCheck)
                for schema, _ in model.calls)
     from ole5_chat.agent.tools.ticket_operator import build_ticket_operator_tools
     operator_tools = {tool.name for tool in build_ticket_operator_tools({})}

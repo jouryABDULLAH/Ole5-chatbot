@@ -1,7 +1,8 @@
 """Router prompt builder and its reusable prompt sections."""
 
-from ole5_chat import products
+from ole5_chat import llm, products
 from ole5_chat.agent.context import router_context
+from ole5_chat.agent.contracts import ReturnDecision
 from ole5_chat.agent.state import AgentState
 
 
@@ -60,6 +61,41 @@ ROUTER_EXAMPLES = {
 
 def join_values(items: list[str]) -> str:
     return "; ".join(items) if items else "none"
+
+
+def _named_step(step, state: AgentState) -> str:
+    """A pending step with the name of the request it belongs to, so a step on one request is not read as another's.
+    A request the worker just cancelled is no longer in the state; its name is in the Operator's result."""
+    if step is None:
+        return "none"
+    requests = [state.get("active_issue") or {}, *(state.get("pending_issues") or [])]
+    name = next((r.get("description") for r in requests if r.get("id") == step.issue_id), None) \
+        or (state.get("ticket_operator_result") or {}).get("cancelled_issue") or step.issue_id
+    return f"{step.kind}{f' ({step.item})' if step.item else ''} for the request «{name}»"
+
+
+def router_return_prompt(state: AgentState) -> str:
+    """The Router's job once a worker has completed: route the worker's result. The customer's message is not
+    classified again; its intent was decided on the first pass."""
+    context = router_context(state)
+    worker = context["last_worker"]
+    summary = {"search": context.get("search_summary"), "ticket_operator": context.get("ticket_operator_summary"),
+               "ticket_enquiry": context.get("ticket_enquiry_summary")}[worker]
+    return f"""A worker has just completed for the customer's latest message. You do not classify that message again:
+its intent was decided before the worker ran ({state.get("intent")}). Your only job is to choose where the worker's
+result goes next.
+
+Customer's latest message (already handled by {worker}): {context['latest_customer_message'] or 'none'}
+Pending step the customer's message answered (before the worker): {_named_step(state.get('pending_before_worker'), state)}
+Pending step the worker has just created (it waits for the customer's NEXT message): {_named_step(context['pending_customer_response'], state)}
+Worker result: {summary}
+
+Rules:
+- worker ticket_operator or ticket_enquiry: respond.
+- worker search: outcome answered or failed: respond; outcome partial or no_answer: ticket_operator.
+
+Return JSON only, matching this schema:
+{llm.schema_text(ReturnDecision)}"""
 
 
 def router_prompt(state: AgentState) -> str:

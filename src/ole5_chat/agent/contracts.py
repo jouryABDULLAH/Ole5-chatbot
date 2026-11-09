@@ -74,6 +74,15 @@ class RouterDecisionWithoutPending(BaseModel):
     reason: str
 
 
+class ReturnDecision(BaseModel):
+    """The Router's return pass, after a worker: where the result goes. The message is not classified again."""
+    model_config = ConfigDict(extra="forbid")
+
+    next_target: Literal["respond", "ticket_operator"] = Field(
+        description="Where the completed worker's result goes next.")
+    reason: str = Field(description="One sentence: the worker result that decides it.")
+
+
 @lru_cache(maxsize=2)
 def router_schema(has_pending: bool) -> type[BaseModel]:
     """Return the Router schema for the current pending-state shape."""
