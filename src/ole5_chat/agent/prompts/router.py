@@ -30,7 +30,8 @@ ROUTER_EXAMPLES = {
         '"ارسلها" after a submission summary; '
         '"ما أعرف" after a required-detail question; '
         '"ما أبي أعطيك" after a required-detail question; '
-        '"نعم، بس لوين ترسل؟" after a summary (an answer with a question: still pending_response)'
+        '"نعم، بس لوين ترسل؟" after a summary (an answer with a question: still pending_response); '
+        '"غير الصفحة الى: صفحة المراسلات" or "الخطأ مو كذا، هو …" after a summary (a change to a ticket value)'
     ),
     "ticket_enquiry": (
         '"وش صار على تذكرتي؟"; '
@@ -207,8 +208,14 @@ Never rewrite worker outputs or invent results. Return only the Router decision 
 ### ADDITIONAL ROUTING RULES
 
 - A pending response is valid only when pending customer response is present. If absent, do not return `pending_response`.
-- A short value such as a browser name can be `pending_response` when the previous assistant asked for it; the same word with no pending question is `other`.
-- A new product question during ticket preparation is `question`, not `pending_response`.
+- With nothing pending, no ticket step is waiting, so a reply to the assistant's own question (a clarification, a request for more information) is not a pending response and not a ticket request: classify it by what it says. A bare «لا» or "no" is `other`, never `needs_ticket`.
+- A short value such as a browser name can be `pending_response` when the previous assistant asked for it; the same word with no pending question and no problem it adds to is `other`.
+- Added information: a message that adds a fact to a problem already in the conversation (a page, a box number, an error text, a device) is never `other`.
+  - With a summary or detail pending for that problem, it is `pending_response`: the Operator adds it to the ticket. «Invalid credentials» after an urgent summary about signing in.
+  - With nothing pending, after a product answer, it is `question`: Search looks again with the new fact. «رقم الصندوق 222» after archive steps. It is `needs_ticket` only when it says the steps did not help.
+  - A different problem on its own is `question`, even while a step is pending for another request: «وكمان ما أقدر أطبع المراسلات، تطلع صفحة فاضية» during archive details.
+  - A message that answers the pending step and also raises a different problem is `pending_response`: the Operator records the answer and queues the new problem. «مدري أي صفحة، وعندي مشكلة ثانية بالفواتير» while the page is pending.
+- A new product question during ticket preparation is `question`, not `pending_response`. A change to a value in the ticket (page, error, priority, description) is `pending_response`, even when it names a product page or feature.
 - If an assistant-displayed reference is ambiguous, choose `other` and let Respond ask one focused clarification.
 - A question asking whether the assistant can access or explain ticket information is `other`; only explicit requests to show, list, check, or retrieve ticket data are `ticket_enquiry`.
 - Set `explicit_ticket_request=true` only when the customer explicitly asks to prepare/open a ticket for the current named issue. Keep it false for policy-based needs_ticket, urgency, status, acceptance, detail answers, rephrasing, and mere mentions of tickets.
