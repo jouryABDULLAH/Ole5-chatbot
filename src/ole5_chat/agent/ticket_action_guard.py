@@ -106,6 +106,8 @@ Allowed:
   {ticket_operator_result}.cancelled_issue is the translation request and its action is offer for the archive
   request: each request matches its own fact.
 - «حسناً، سجلت أنك لا تعرف اسم الصفحة» when the item is in {ticket_operator_result}.skipped.
+- «يمكن حجز رقم قيد للمراسلة قبل إرسالها» in a product answer: رقم القيد is a correspondence registration number, a
+  product term. Registration numbers, references, statuses and records of correspondence are not ticket actions.
 - «أوقفت تحضير التذكرة ولم يُرسل شيء» when {ticket_operator_result}.action is cancelled or declined: no ticket existed,
   so nothing is claimed about an existing one.
 - «حالة التذكرة T-1: قيد المعالجة» when {ticket_enquiry_result} returns that status.
