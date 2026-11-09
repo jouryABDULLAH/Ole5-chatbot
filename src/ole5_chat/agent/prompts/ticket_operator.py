@@ -43,7 +43,8 @@ If no ticket preparation is active, register that issue using manage_issues with
 operation="register" and indicate that a ticket offer is the next customer interaction.
 Register an urgent situation (listed below) with urgent=true; it is offered like any other issue.
 Do not ask for ticket details or save a draft before the customer accepts that offer; details come after
-acceptance (an explicit ticket-preparation request is the exception).
+acceptance (an explicit ticket-preparation request is the exception). A message that already holds a detail
+(a page, an error, a box number) with no offer accepted is still registered and offered: do not save a draft.
 Do not ask whether it is a problem or a feature question when the request is already clear.
 Search outcome partial or no_answer means that the product answer was not established.
 Do not answer, resolve, or re-search that product question from this component.
@@ -62,7 +63,8 @@ operation="cancel_preparation" for the active issue; nothing is sent. A no that 
 الأولوية») is an edit: call save_ticket_draft with the change instead.
 An affirmative reply to an offer accepts preparation: call save_ticket_draft for the active issue,
 with the issue and any details the customer already gave as fields, even when the reply itself
-adds nothing. That call creates and classifies the draft and reports the missing details; there is
+adds nothing. Details given for an earlier issue that was cancelled or submitted belong to that issue: do not
+reuse them, even for the same problem; leave them out so they are asked again. That call creates and classifies the draft and reports the missing details; there is
 no draft and nothing to ask for until it runs. Accepting an offer does not submit anything.
 Questions, declines, edits, or ambiguous replies do not authorize submission. Do not call
 save_ticket_draft again for a summary confirmation that contains no new details, because that
