@@ -71,6 +71,12 @@ def _json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, default=str)
 
 
+def _current_message(state: AgentState) -> int:
+    """Index of this turn's customer message; on a Submit-button turn, the index after the last message."""
+    messages = state.get("messages", [])
+    return len(messages) - 1 if messages and messages[-1].type == "human" else len(messages)
+
+
 def _next_issue_id(state: AgentState) -> str:
     state["issues_registered"] = state.get("issues_registered", 0) + 1
     return f"issue-{state['issues_registered']}"
@@ -118,7 +124,8 @@ def _classification_state(state: AgentState, draft: TicketDraft) -> ChatState:
         source="always_ticket" if issue.get("source") in {"always_ticket", "urgent"} else "no_answer",
     )]
     return ChatState(
-        messages=list(state.get("messages", [])),
+        # Only this issue's part of the chat: details given for an earlier ticket are not this ticket's.
+        messages=list(state.get("messages", []))[issue.get("messages_from", 0):],
         identity=state["identity"],
         ticket_draft=draft,
         corrections=list(state.get("corrections", [])),
@@ -303,13 +310,17 @@ def build_ticket_operator_tools(state: AgentState, sink: list | None = None):
         if operation in {"register", "enqueue"}:
             if not description or not description.strip():
                 return _json({"success": False, "operation": operation, "error": "description is required"})
+            becomes_active = operation == "register" and active is None
             issue = {
                 "id": issue_id or _next_issue_id(state),
                 "description": description.strip(),
                 "source": "urgent" if urgent else "no_answer",
                 "urgent": urgent,
+                # Where this issue's part of the chat starts: after the last finished ticket, or, for a queued issue,
+                # the message that raised it while another one was being prepared.
+                "messages_from": state.get("issues_closed_at", 0) if becomes_active else _current_message(state),
             }
-            if operation == "register" and active is None:
+            if becomes_active:
                 state["active_issue"] = issue
             else:
                 queue.append(issue)
@@ -327,6 +338,7 @@ def build_ticket_operator_tools(state: AgentState, sink: list | None = None):
             if active is None:
                 return _json({"success": False, "operation": operation, "error": "nothing to cancel: no active issue"})
             cancelled = active
+            state["issues_closed_at"] = _current_message(state)
             state["active_issue"] = queue.pop(0) if queue else None
             state["pending_issues"] = queue
             state["ticket_draft"] = None
@@ -398,6 +410,7 @@ def build_ticket_operator_tools(state: AgentState, sink: list | None = None):
         state["summary_shown"] = False
         state["submission_requested"] = False
         # The submitted issue is finished: the next queued issue takes its place, as after a cancel.
+        state["issues_closed_at"] = _current_message(state)
         queue = list(state.get("pending_issues", []))
         state["active_issue"] = queue.pop(0) if queue else None
         state["pending_issues"] = queue

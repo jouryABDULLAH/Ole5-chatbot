@@ -71,7 +71,8 @@ def _apply_completion(state: AgentState, completion: OperatorCompletion, report:
     update = {
         key: state.get(key)
         for key in (
-            "active_issue", "pending_issues", "issues_registered", "ticket_draft", "created_tickets", "attachments",
+            "active_issue", "pending_issues", "issues_registered", "issues_closed_at", "ticket_draft",
+            "created_tickets", "attachments",
             "summary_shown", "submission_requested", "pending_customer_response",
             "draft_version", "summary_delivered_version", "summary_confirmed_version",
         )

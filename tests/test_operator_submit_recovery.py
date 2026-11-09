@@ -241,6 +241,24 @@ def test_issue_registered_after_a_cancel_gets_a_new_id():
     assert state['issues_registered'] == 2
 
 
+def test_classifier_reads_only_the_new_issues_part_of_the_chat():
+    from langchain_core.messages import AIMessage, HumanMessage
+    state = initial_state(Identity(customer_id='test', email='ole5@example.com',
+        name='Test', organization='Test', product='OLE5', language='ar'))
+    state['messages'] = [HumanMessage(content='زر الأرشفة ما يشتغل')]
+    bound = {tool.name: tool for tool in tools.build_ticket_operator_tools(state)}
+    bound['manage_issues'].invoke({'operation': 'register', 'description': 'Archive button'})
+    state['messages'] = [*state['messages'], AIMessage(content='ما نص الخطأ؟'), HumanMessage(content='ERROR404'),
+                         AIMessage(content='الملخص جاهز'), HumanMessage(content='لا الغه')]
+    bound['manage_issues'].invoke({'operation': 'cancel_preparation', 'issue_id': 'issue-1'})
+    state['messages'] = [*state['messages'], AIMessage(content='أوقفت التحضير.'),
+                         HumanMessage(content='ولا موظف يقدر يسجل دخول')]
+    second = json.loads(bound['manage_issues'].invoke({'operation': 'register', 'description': 'Nobody can sign in'}))
+    assert second['issue']['messages_from'] == 4  # the cancel turn's message; the archive details stay out
+    classified = tools._classification_state(state, TicketDraft(product='OLE5'))
+    assert [m.content for m in classified['messages']] == ['لا الغه', 'أوقفت التحضير.', 'ولا موظف يقدر يسجل دخول']
+
+
 def test_operator_receives_versions():
     prompt = ticket_operator_tool_prompt(ready_state())
     assert 'Current draft version: 1' in prompt
