@@ -118,7 +118,7 @@ Product scope: {config.scope or 'none'}
 Knowledge-base boundary: the knowledge base covers {config.name} product documentation. Ticketing procedures,
 support hours, reply channels, and ticket status are handled from configured support information or ticket data,
 not by product search.
-Chat scope: product knowledge and ticket operations only. Requests for actual personal account details, permissions, passwords and user records outside ticket data require ticket handling; never search for that personal data. General documented product procedures, including password-reset instructions, are product questions. After a worker completes, use the handoff rules below rather than repeating the initial operation.
+Chat scope: product knowledge and ticket operations only. A request about a specific account's data, or a change to a specific account, requires ticket handling; never search for that data. How Ole5 handles accounts in general (disabling, reactivating, deleting, roles, permissions rules, password reset) is documented, so it is a product question. After a worker completes, use the handoff rules below rather than repeating the initial operation.
 About: {about}
 Always-ticket topics: {join_values(config.always_ticket)}
 Urgent situations: {join_values(config.urgent_when)}
@@ -143,8 +143,10 @@ Intent describes what the customer requested; worker completion alone does not c
 
 ### INTENT CLASSIFICATION RULES
 
-- Actual personal account information outside ticket data is needs_ticket. General documented product procedures, such as how to reset a password, are question.
-- Use pending_response only when the message answers the active pending interaction. A question about it, with no answer, is other: Respond answers it and keeps the step. An unrelated account question is needs_ticket even if a ticket interaction is pending.
+- Accounts: decide by who the message is about, not by the word "account".
+  - About a specific account's data, or a change to a specific account, is needs_ticket: «وش صلاحياتي», «غيروا ايميلي», «فعّلوا حساب أحمد», «ليش حسابي موقوف».
+  - About how Ole5 handles accounts is question, even when a person is mentioned: «موظف استقال، كيف اعطل حسابه واحتفظ بمراسلاته؟», «كيف اعيد تفعيل حساب معطّل», «ليش ما ينحذف الدور».
+- Use pending_response only when the message answers the active pending interaction. A question about it, with no answer, is other: Respond answers it and keeps the step. A request about a specific account's data is needs_ticket even if a ticket interaction is pending.
 - Greetings, thanks, capabilities and support-process FAQs are other.
 - Explicit existing-ticket lookups and explanations of identified ticket statuses are ticket_enquiry. Asking whether the assistant CAN access tickets is other. "هل أقدر أستعلم عن تذاكري؟" and "هل اقدر استعلم عن تذاكري التي انشأتها" ask about capability, so choose other; "اعرض تذاكري" requests an actual lookup, so choose ticket_enquiry.
 
@@ -175,7 +177,7 @@ The values on the RIGHT are next_target node names. Apply this mapping only befo
 - intent=ticket_enquiry → next_target=ticket_enquiry.
 - intent=other → next_target=respond.
 
-Never search the product knowledge base for personal account data or existing ticket data.
+Never search the product knowledge base for a specific account's data or existing ticket data.
 
 ### AVAILABLE TARGETS (`next_target`)
 
@@ -187,7 +189,7 @@ These descriptions explain responsibilities; the stage rules above determine whe
 
 2. `ticket_operator`
    - Handles: Ticket preparation, missing information collection, consent workflows, issue classification, and ticket requests.
-   - Use when: A product search returns partial/no answers, or when an account/user-specific request falls outside product search scope.
+   - Use when: A product search returns partial/no answers, or a request concerns a specific account's data or a change to it.
 
 3. `ticket_enquiry`
    - Handles: Authorized historical ticket lookups, tracking numbers, and checking the status of existing tickets.
