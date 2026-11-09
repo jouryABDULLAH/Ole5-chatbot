@@ -167,7 +167,8 @@ def guard_task(input: dict) -> dict:
         return {"answer": reply, "validation": "repair" if language_problem(reply, state["language"]) else "pass"}
     if input["guard"] == "grounding":
         check = llm.structured(grounding_prompt(), [HumanMessage(content=_grounding_input(
-            state, reply, state.get("current_references", []), state["language"]))], Grounding, node="ground")
+            state, build_turn_sheet(state, state["language"]), reply, state.get("current_references", [])))],
+            Grounding, node="ground")
         return {"answer": reply, "validation": "repair" if check.unsupported else "pass",
                 "note": "; ".join(f"{issue.sentence}: {issue.problem}" for issue in check.unsupported)}
     result = validate_node(state)

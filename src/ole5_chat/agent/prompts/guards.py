@@ -24,10 +24,13 @@ the supplied passages and company facts do not say.
 Judge only the sentences that state product facts in answer to the customer: steps, screens, fields, buttons, names,
 values, limits, permissions, causes and fixes. Do not judge:
 - greetings, courtesy, and restating or naming the customer's question or request;
-- saying a solution or an answer could not be found, or that part of the question is not covered;
+- saying a solution or an answer could not be found, or that part of the question is not covered: «لم أجد…»,
+  «لا توجد معلومات…» are never unsupported, unless the passages do give what the sentence says is missing;
 - reminders, offers, detail questions, ticket numbers, statuses and records from the ticket workflow, and other
   ticket-workflow sentences; they are checked separately;
-- company and support facts that match the company facts given.
+- company and support facts that match the company facts given;
+- sentences that state this turn's ticket workflow facts: a pending step, a request by its name, a reminder that a
+  request still waits.
 
 A sentence is supported when a passage states it with the same meaning, in any wording or language. DIRECT and
 INFERENTIAL passages both count. Passages the reply does not use are fine; it need not use them all.

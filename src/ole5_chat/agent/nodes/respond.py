@@ -115,9 +115,10 @@ def _seen_passages(state: AgentState, sheet: TurnSheet) -> list[dict]:
     return [*state.get("current_references", []), *retained]
 
 
-def _grounding_input(state: AgentState, reply: str, passages: list[dict], language: str) -> str:
-    """What the check reads: the reply, the exchange it answers, the passages as Respond saw them, and the company
-    facts Respond may also state."""
+def _grounding_input(state: AgentState, sheet: TurnSheet, reply: str, passages: list[dict]) -> str:
+    """What the check reads: the reply, the exchange it answers, the passages as Respond saw them, the company
+    facts Respond may also state, and this turn's workflow facts (Respond's turn note)."""
+    language = sheet["language"]
     customer = next((str(message.content) for message in reversed(state.get("messages", []))
                      if message.type == "human"), "")
     before = state.get("messages", [])[:-1]
@@ -129,7 +130,8 @@ def _grounding_input(state: AgentState, reply: str, passages: list[dict], langua
     ) if value) or "none"
     return (f"Assistant's previous message:\n{previous}\n\nCustomer's message:\n{customer}\n\nReply:\n{reply}\n\n"
             f"Passages the reply's author saw (it need not use them all):\n{_evidence(passages)}\n\n"
-            f"Company facts the reply may also state:\n{company}")
+            f"Company facts the reply may also state:\n{company}\n\n"
+            f"This turn's ticket workflow facts, as the reply's author read them:\n{turn_note(sheet)}")
 
 
 def _grounded_reply(state: AgentState, sheet: TurnSheet, reply: str) -> str:
@@ -146,7 +148,7 @@ def _grounded_reply(state: AgentState, sheet: TurnSheet, reply: str) -> str:
 
     try:
         check = llm.structured(grounding_prompt(), [HumanMessage(content=_grounding_input(
-            state, reply, passages, sheet["language"]))], Grounding, node="ground", check=quoted)
+            state, sheet, reply, passages))], Grounding, node="ground", check=quoted)
     except llm.GuardrailFailed as exc:
         check = exc.result  # the quotes still did not match; the findings stand
     except llm.ModelFailed as exc:
