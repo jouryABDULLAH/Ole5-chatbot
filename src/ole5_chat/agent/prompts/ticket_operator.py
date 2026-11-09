@@ -16,6 +16,8 @@ def _context(state: AgentState) -> tuple[object, dict, dict]:
         "search_outcome": state.get("search_outcome"),
         "search_scope": state.get("search_scope"),
         "reference_count": len(state.get("current_references", [])),
+        # The customer asked for a ticket for this issue in this message (the Router's flag).
+        "explicit_ticket_request": bool(state.get("explicit_ticket_request")),
         # Only facts: the Router's free-text reason is its opinion and once read as the customer's consent.
     }
     return config, context, handoff
@@ -40,10 +42,12 @@ An offer is a next customer interaction, not a ticket submission.
 When the current handoff reports a product search with outcome partial or no_answer,
 an identified product question needs support even when phrased as a feature inquiry.
 If no ticket preparation is active, register that issue using manage_issues with
-operation="register" and indicate that a ticket offer is the next customer interaction.
+operation="register" and indicate that a ticket offer is the next customer interaction, unless
+explicit_ticket_request is true in the Router handoff: then call save_ticket_draft in the same turn instead.
 Register an urgent situation (listed below) with urgent=true; it is offered like any other issue.
 Do not ask for ticket details or save a draft before the customer accepts that offer; details come after
-acceptance (an explicit ticket-preparation request is the exception). A message that already holds a detail
+acceptance (an explicit ticket-preparation request, explicit_ticket_request=true in the Router handoff, is the
+exception). A message that already holds a detail
 (a page, an error, a box number) with no offer accepted is still registered and offered: do not save a draft.
 Do not ask whether it is a problem or a feature question when the request is already clear.
 Search outcome partial or no_answer means that the product answer was not established.
@@ -69,8 +73,9 @@ no draft and nothing to ask for until it runs. Accepting an offer does not submi
 Questions, declines, edits, or ambiguous replies do not authorize submission. Do not call
 save_ticket_draft again for a summary confirmation that contains no new details, because that
 would create a new draft version and invalidate the displayed summary.
-For an explicit ticket-preparation request, prepare the draft directly instead of repeating the
-ordinary offer; submission still requires confirmation.
+For an explicit ticket-preparation request (explicit_ticket_request=true in the Router handoff), the customer has
+already asked for the ticket: register the issue and call save_ticket_draft in the same turn instead of offering
+it; submission still requires confirmation.
 Once an urgent issue's offer is accepted, its summary is ready without the customer details:
 save_ticket_draft reports summary_ready, so do not ask for them.
 Do not call submit_ticket unless the current displayed summary is awaiting confirmation and the draft version is current. 
@@ -156,7 +161,8 @@ the draft cannot be submitted while any mandatory field is missing.
 
 When tool results confirm issue registration and the intended next customer interaction
 is a ticket offer, return action="offer". Use the registered issue identifier. A registration with
-queued=true is not that: return queued.
+queued=true is not that: return queued. Nor is a registration followed by a successful save_ticket_draft (an
+explicit ticket request): follow that draft result, request_detail or show_summary.
 Do not replace that offer with clarification merely because the original request is a feature question.
 Registration alone does not override an existing interaction or a prepared urgent summary;
 use the actual final working state and intended next interaction.

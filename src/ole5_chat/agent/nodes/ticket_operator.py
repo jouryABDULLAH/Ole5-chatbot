@@ -259,6 +259,18 @@ def _ticket_operator_node(state: AgentState) -> dict:
         # The tools may have changed the working state before the failure; their results say what was done.
         report = json.dumps([*results, {"tool_agent_error": str(exc)}], ensure_ascii=False)
 
+    registered = any(item["name"] == "manage_issues" and item["result"].get("operation") == "register"
+                     and item["result"].get("success") and not item["result"].get("queued")
+                     for item in _tool_results(report))
+    if state.get("explicit_ticket_request") and registered and working.get("active_issue") \
+            and not working.get("ticket_draft"):
+        # The customer asked for this ticket, so there is no offer to accept: the prompt says to save the draft in
+        # the same turn, and the tool agent kept offering instead. The draft is saved here, once.
+        save = next(t for t in build_ticket_operator_tools(working, results) if t.name == "save_ticket_draft")
+        save.invoke({"fields": {}, "issue_id": working["active_issue"]["id"]})
+        report = json.dumps([*json.loads(report or "[]"), results[-1]], ensure_ascii=False)
+        log.info("ticket_operator  explicit request: draft saved after registration")
+
     try:
         completion = llm.structured(
             ticket_operator_result_prompt(state, report, _working_summary(working)),
