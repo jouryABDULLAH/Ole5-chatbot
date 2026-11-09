@@ -90,7 +90,8 @@ def main() -> None:
         metrics = report.get("metrics", {})
         summary.append({"mode": mode, "top_k": top_k, "pool": pool, "seconds": seconds,
                         "per_question_s": round(seconds / max(len(questions), 1), 2), "metrics": metrics})
-        rates = {k: v for k, v in metrics.items() if k.endswith("_rate") or k in ("errors", "outcomes")}
+        overall = metrics.get("overall", {})  # evaluate() nests the totals under overall, then per question type
+        rates = {k: v for k, v in overall.items() if k.endswith("_rate") or k in ("errors", "outcomes")}
         print(f"{name:24} {seconds:>7}s  {rates}")
     (out / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"\n{len(questions)} questions x {len(combos)} combinations. Saved {out}")
