@@ -1,12 +1,10 @@
 """Search the knowledge base and classify the retrieval outcome."""
 
 import logging
-import re
 
 from langchain_core.messages import SystemMessage
 
 from ole5_chat import llm
-from ole5_chat.agent.scope import is_user_specific_request
 from ole5_chat.agent.prompts.search import search_prompt
 from ole5_chat.config import get_settings
 from ole5_chat.knowledge.contracts import Retrieval, Verdict, merge
@@ -16,36 +14,12 @@ from ole5_chat.agent.state import AgentState
 
 log = logging.getLogger(__name__)
 
-_OUTSIDE_PRODUCT_SCOPE = re.compile(
-    r"\b(?:what can you do|what do you do|your capabilities|ticketing process|support ticket work|"
-    r"support hours|how do i contact support|where will the reply|ticket status|my account|my permissions)\b",
-    re.IGNORECASE)
-
-
 def _search_node(state: AgentState) -> dict:
+    # What reaches Search is decided by the Router alone: account-data requests and support-process questions are
+    # routed elsewhere before this node runs.
     request = state.get("current_request") or next(
         (str(message.content) for message in reversed(state.get("messages", [])) if message.type == "human"), ""
     )
-    if is_user_specific_request(request):
-        log.info("search  skipped: customer-specific data is outside chat scope") # Change
-        return {
-            "current_request": request,
-            "current_references": [],
-            "search_outcome": "no_answer",
-            "unresolved_information": {"request": request, "outside_scope": True},
-            "route_reason": "Customer-specific account or user data is outside the chat scope.",
-            "search_scope": "outside_scope",
-        }
-    if _OUTSIDE_PRODUCT_SCOPE.search(request):
-        log.info("search scope=outside_product no_search=true request=%r", request)
-        return {
-            "current_request": request,
-            "current_references": [],
-            "search_outcome": "no_answer",
-            "search_scope": "outside_scope",
-            "unresolved_information": {"request": request, "outside_scope": True},
-            "route_reason": "The request is outside the product knowledge-base scope.",
-        }
     if get_settings().kb_retrieval_mode == "direct":
         retrieval = knowledge_search(request, state["identity"].product)
         references = [
