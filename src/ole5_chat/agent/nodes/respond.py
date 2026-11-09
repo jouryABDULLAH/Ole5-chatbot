@@ -20,7 +20,7 @@ log = logging.getLogger(__name__)
 LANGUAGE_RETRIES = 2
 # Temporary diagnostic mode: run the grounding check once, log unsupported
 # claims, and keep the generated reply. Set to True to restore retries/fallbacks.
-GROUNDING_ENFORCE = False
+GROUNDING_ENFORCE = True 
 
 
 _VALUE_FIELD_RE = re.compile(
