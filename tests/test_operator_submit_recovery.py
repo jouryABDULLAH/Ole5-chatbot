@@ -229,6 +229,18 @@ def test_undelivered_revision_cannot_submit(monkeypatch):
     submit.assert_not_called()
 
 
+def test_issue_registered_after_a_cancel_gets_a_new_id():
+    state = initial_state(Identity(customer_id='test', email='ole5@example.com',
+        name='Test', organization='Test', product='OLE5', language='ar'))
+    bound = {tool.name: tool for tool in tools.build_ticket_operator_tools(state)}
+    first = json.loads(bound['manage_issues'].invoke({'operation': 'register', 'description': 'Archive button'}))
+    bound['manage_issues'].invoke({'operation': 'cancel_preparation', 'issue_id': first['issue']['id']})
+    second = json.loads(bound['manage_issues'].invoke({'operation': 'register', 'description': 'Printing'}))
+    assert first['issue']['id'] == 'issue-1'
+    assert second['issue']['id'] == 'issue-2'
+    assert state['issues_registered'] == 2
+
+
 def test_operator_receives_versions():
     prompt = ticket_operator_tool_prompt(ready_state())
     assert 'Current draft version: 1' in prompt

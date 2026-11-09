@@ -72,13 +72,8 @@ def _json(value: Any) -> str:
 
 
 def _next_issue_id(state: AgentState) -> str:
-    used = {str(issue.get("id")) for issue in state.get("pending_issues", [])}
-    if state.get("active_issue"):
-        used.add(str(state["active_issue"].get("id")))
-    number = 1
-    while f"issue-{number}" in used:
-        number += 1
-    return f"issue-{number}"
+    state["issues_registered"] = state.get("issues_registered", 0) + 1
+    return f"issue-{state['issues_registered']}"
 
 
 def _draft(state: AgentState) -> TicketDraft:

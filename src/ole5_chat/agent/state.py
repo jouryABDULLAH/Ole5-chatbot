@@ -24,6 +24,7 @@ class AgentState(MessagesState, total=False):
 
     active_issue: dict | None
     pending_issues: list[dict]
+    issues_registered: int  # issue ids are numbered from this count, so a finished issue's id is never reused
     ticket_draft: dict | None
     pending_customer_response: PendingCustomerResponse | None
     
@@ -83,6 +84,7 @@ def initial_state(identity: Identity) -> AgentState:
         language=None,
         active_issue=None,
         pending_issues=[],
+        issues_registered=0,
         ticket_draft=None,
         pending_customer_response=None,
         summary_shown=False,
