@@ -10,7 +10,7 @@ from ole5_chat.agent.contracts import Grounding, GroundingIssue
 from ole5_chat.support_core.state import TicketDraft
 from ole5_chat.agent.contracts import Language
 from ole5_chat.agent import graph
-from ole5_chat.agent.contracts import (OperatorCompletion, PendingCustomerResponse, RouterDecision,
+from ole5_chat.agent.contracts import (OperatorCompletion, PendingCustomerResponse, ReturnDecision, RouterDecision,
                                       RouterDecisionWithoutPending, manager_schema)
 from ole5_chat.agent.nodes import respond
 from ole5_chat.agent.state import initial_state
@@ -44,7 +44,7 @@ def test_username_remains_arabic_when_operator_advances(model, operator_model, n
     # A bare value names no language; the reply keeps the conversation's.
     model.add(RouterDecision(intent="pending_response", next_target="ticket_operator", explicit_ticket_request=False, reason="Requested username"),
               completion,
-              RouterDecision(intent="pending_response", next_target="respond", explicit_ticket_request=False, reason="Ticket detail was processed."),
+              ReturnDecision(next_target="respond", reason="Ticket detail was processed."),
               Language(language="none"))
     with patch("ole5_chat.support_core.classify.classify", return_value={"ticket_draft": draft}),          patch.object(llm, "invoke", return_value=AIMessage(content="تم تسجيل اسم المستخدم.")) as writer:
         result = graph.build().invoke(state)
@@ -74,12 +74,13 @@ def test_conversational_messages_use_language_detector(text, route, action):
 @pytest.mark.parametrize("item,text", [("browser name", "Google Chrome"), ("error text", '"Access denied"'),
                                       ("error code", "E403"), ("filename", "screen.png")])
 def test_literal_values_preserve_language(item, text):
+    # The language model, not a regex, decides that a bare value names no language ("none" -> None).
     state = conversation(text)
     state.update(intent="pending_response", manager_action="provide",
                  answered_detail=PendingCustomerResponse(kind="detail", issue_id="issue-1", item=item))
-    with patch.object(respond, "language_of") as detector:
+    with patch.object(respond, "language_of", return_value=None) as detector:
         assert respond._expected_language(state) == "ar"
-    detector.assert_not_called()
+    detector.assert_called_once_with(text)
 
 
 @pytest.mark.parametrize("failure", ["rewritten", "check_error", "rewrite_error"])

@@ -46,16 +46,15 @@ def test_arabic_with_english_product_terms_needs_no_rewrite():
     assert generate.call_count == 1
 
 
-def test_character_guard_still_corrects_when_semantic_detection_unavailable():
+def test_conversation_language_kept_when_semantic_detection_unavailable():
+    # No regex fallback: when the detector gives no language, the conversation's language (here the profile's) stays.
     values = state("Hello")
     with patch.object(respond, "language_of", return_value=None), \
          patch.object(respond, "language_problem", return_value=None), \
-         patch.object(respond.llm, "invoke", side_effect=[
-             AIMessage(content="مرحبا"), AIMessage(content="Hello")
-         ]) as generate:
+         patch.object(respond.llm, "invoke", return_value=AIMessage(content="مرحبا")) as generate:
         result = respond.respond_node(values)
-    assert result == {"reply": "Hello", "language": "en"}
-    assert generate.call_count == 2
+    assert result == {"reply": "مرحبا", "language": "ar"}
+    assert generate.call_count == 1
 
 
 def test_username_detail_keeps_established_arabic_language():
@@ -68,12 +67,13 @@ def test_username_detail_keeps_established_arabic_language():
             kind="detail", issue_id="issue-1", item="username"
         ),
     })
-    with patch.object(respond.llm, "structured", return_value=Language(language="ar")) as detector, \
+    # The detector reads the bare username and finds no language; the reply is then checked in Arabic.
+    detections = [Language(language="none"), Language(language="ar")]
+    with patch.object(respond.llm, "structured", side_effect=detections) as detector, \
          patch.object(respond.llm, "invoke", return_value=AIMessage(content="تم تسجيل اسم المستخدم.")):
         result = respond.respond_node(values)
     assert result["language"] == "ar"
-    # The latest username was not sent to the previous implementation language detector.
-    assert all("ahmad123" not in str(call.args[1][-1].content) for call in detector.call_args_list)
+    assert detector.call_args_list[0].args[1][-1].content == "ahmad123"
 
 
 def test_new_english_question_still_switches_language_during_ticket_prep():

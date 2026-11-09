@@ -23,51 +23,12 @@ LANGUAGE_RETRIES = 2
 GROUNDING_ENFORCE = True 
 
 
-_VALUE_FIELD_RE = re.compile(
-    r"username|user name|browser|file|filename|email|error|code|identifier|version|page",
-    re.IGNORECASE,
-)
-
-
-def _is_detail_value(state: AgentState, latest: str) -> bool:
-    """Recognize a short pending ticket value such as a username without treating normal sentences as values."""
-    if state.get("intent") != "pending_response" or state.get("manager_action") != "provide":
-        return False
-    pending = state.get("answered_detail")
-    item = str(getattr(pending, "item", "") or "")
-    if not pending or getattr(pending, "kind", None) != "detail" or not item:
-        return False
-    value = latest.strip()
-    if not value or len(value) > 160 or "\n" in value:
-        return False
-    if value.casefold() in {"yes", "no", "hello", "hi", "thanks", "english", "arabic", "why", "cancel"}:
-        return False
-    if re.search(r"browser", item, re.IGNORECASE):
-        return bool(re.fullmatch(r"(?:google chrome|chrome|microsoft edge|edge|firefox|safari|opera)(?: [\d.]+)?", value, re.IGNORECASE))
-    if re.search(r"error|message|text", item, re.IGNORECASE):
-        # Explicitly quoted error text or a compact code, never a word-count guess.
-        quoted = any(value.startswith(a) and value.endswith(b) for a, b in [('"', '"'), ('“', '”'), ('`', '`')])
-        return (quoted and len(value) > 2) or bool(re.fullmatch(r"(?=[A-Za-z0-9_:-]*\d)[A-Za-z0-9_:-]+", value))
-    return bool(_VALUE_FIELD_RE.search(item)) and bool(re.fullmatch(r"[\w@+.-]+", value)) and value[-1:] not in "."
-
-
 def _expected_language(state: AgentState) -> str:
-    """Use sentence-level detection; retain character checks as fallback."""
+    """The language of the customer's latest message. A message that names no language (a bare value such as a
+    username or an error code) keeps the conversation's language."""
     latest = next((str(message.content) for message in reversed(state.get("messages", []))
                    if message.type == "human"), "")
-    if _is_detail_value(state, latest):
-        # An isolated ticket value (for example, ``ahmad123``) is not a
-        # conversation-language change. Keep the language already established.
-        return state.get("language") or state["identity"].language or "ar"
-    detected = language_of(latest)
-    if detected:
-        return detected
-    # regex fallback 
-    if re.search(r"[\u0600-\u06ff]", latest):
-        return "ar"
-    if re.search(r"[A-Za-z]", latest):
-        return "en"
-    return state.get("language") or state["identity"].language or "ar"
+    return language_of(latest) or state.get("language") or state["identity"].language or "ar"
 
 
 def _language_mismatch(text: str, expected: str) -> bool:
