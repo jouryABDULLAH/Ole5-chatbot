@@ -150,7 +150,10 @@ def _grounded_reply(state: AgentState, sheet: TurnSheet, reply: str) -> str:
         check = llm.structured(grounding_prompt(), [HumanMessage(content=_grounding_input(
             state, sheet, reply, passages))], Grounding, node="ground", check=quoted)
     except llm.GuardrailFailed as exc:
-        check = exc.result  # the quotes still did not match; the findings stand
+        # The quotes still did not match: keep only the findings whose sentence is in the reply. A misquoted
+        # finding is about a sentence the reply does not have (kb-83: «لا يمكن…» for the reply's «يمكن…»).
+        check = exc.result.model_copy(update={"unsupported": [
+            issue for issue in exc.result.unsupported if issue.sentence.strip() in reply]})
     except llm.ModelFailed as exc:
         log.error("ERROR respond grounding check failed: %s", exc)
         return reply
