@@ -378,6 +378,41 @@
           }
         ]
       }
+    },
+    {
+      "id": "no-to-summary-cancels",
+      "input": {
+        "turns": [
+          "ولا موظف عندنا يقدر يسجل دخول للنظام",
+          "نعم",
+          "لا",
+          "زر الارشفة لا يعمل"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "pending": "offer",
+            "language": "ar"
+          },
+          {
+            "pending": "summary",
+            "language": "ar"
+          },
+          {
+            "pending": null,
+            "created": 0,
+            "queued": 0,
+            "language": "ar"
+          },
+          {
+            "pending": "offer",
+            "queued": 0,
+            "language": "ar"
+          }
+        ]
+      },
+      "notes": "A plain no to the summary cancels the request, so the next problem gets its own offer instead of queuing behind a dead request."
     }
   ]
 }
