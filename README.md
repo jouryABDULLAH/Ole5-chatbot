@@ -114,7 +114,8 @@ RUN_LIVE=1 pytest tests/test_router_live.py -s
 | `src/ole5_chat/knowledge/` | Knowledge search over RAGent2, and the stub. |
 | `src/ole5_chat/tickets/` | The Ticket API client, its mock, submit and status lookup. |
 | `products/<code>/chat.yaml` | Each product's persona, ticket topics and urgency rules. |
-| `prompts/chat/*.md` | The system prompts of each model node. |
+| `src/ole5_chat/agent/prompts/` | The system prompts of each model node. |
+| `src/ole5_chat/support_core/classify.md` | The ticket classifier's prompt. |
 | `sheets/` | Customers, ticket field values, attachments and mock tickets, as Excel sheets. |
 | `kb_export/` | The knowledge base documents as Markdown, served to the page. |
 | `web/` | The stand-in page and the chat widget. |

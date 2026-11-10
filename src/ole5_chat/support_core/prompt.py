@@ -1,9 +1,9 @@
 """Build the structured ticket-classification prompt from the product catalog."""
 
 from functools import lru_cache
+from pathlib import Path
 
 from ole5_chat import products, values
-from ole5_chat.config import ROOT
 from ole5_chat.llm import schema_text
 from ole5_chat.support_core.contracts import Classification
 from ole5_chat.support_core.state import ChatState
@@ -11,7 +11,7 @@ from ole5_chat.support_core.state import ChatState
 
 @lru_cache(maxsize=4)
 def _template() -> str:
-    return (ROOT / "prompts" / "chat" / "classify.md").read_text(encoding="utf-8")
+    return (Path(__file__).parent / "classify.md").read_text(encoding="utf-8")
 
 
 def _values_block(catalog: values.Catalog) -> str:
