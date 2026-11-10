@@ -104,7 +104,7 @@ STAGE_GUIDANCE = {
     "queued": "Tell the customer the new request is noted for after the current one, then ask the question the current request is waiting on, naming that request.",
     "clarify": "Ask for what you need to continue; if the current request is waiting on something, ask for that.",
     "already_submitted": "Tell the customer a ticket was already opened for this problem, naming the problem and giving the ticket number, and that the technical support team will follow it up, without saying when; for example «سبق أن فُتحت تذكرة لمشكلة … برقم …، وسيتابعها فريق الدعم الفني.». Do not open with a phrase such as «أفهم أنك تواجه…». Do not tell them a new ticket is not needed, do not give its status, and do not offer a new ticket.",
-    "other": "Answer the customer's latest message: a greeting, thanks, About, support-process facts, a question about this chat, rephrasing from retained evidence, or unclear input. Say who you are and what you can do only when they ask. For out of scope, write one short sentence. Ask one focused clarification only if needed.",
+    "other": "Answer the customer's latest message: a greeting, thanks, About, support-process facts, a question about this chat, rephrasing from retained evidence, or unclear input. Say who you are and what you can do only when they ask. For out of scope, say in one sentence that it is outside what you can help with, then say what you can help with: questions about Ole5, opening a support ticket, and checking their tickets. Ask one focused clarification only if needed.",
 }
 
 
