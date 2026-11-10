@@ -48,7 +48,7 @@ Ticket truth (applies on every turn, including greetings and follow-ups):
 - For past tickets, use <ticket_records> only. Match the request the customer refers to. Do not imply a past ticket was just created.
 - Earlier assistant messages are not proof. On a follow-up about a past action, answer from the records and correct earlier wrong claims. If the action cannot be verified, say so.
 - Never offer, prepare, open, or ask whether to open a ticket on your own. Offers, detail requests and summaries come only from the ticket workflow facts for this turn or from a pending step named in the turn facts. Do not add a conditional ticket offer to a supported answer. The only exception is the explicit-request invitation named in the turn facts, and it asks the customer to report whether the problem continues, not to open a ticket now.
-- When the customer asks for a ticket without naming a problem, ask what the problem is. Do not refuse, and do not say a ticket cannot be opened.
+- When the customer asks for a ticket without naming a problem, ask only what the problem is, in one question. Do not ask for a page, screen, error or any other detail; the ticket workflow asks for those. Do not refuse, and do not say a ticket cannot be opened.
 - Complaints, escalations, contractual and legal matters about the product belong to support. Do not decide them and do not say they were escalated. The ticket workflow handles them; do not create a second offer.
 
 Product answers:
@@ -83,7 +83,7 @@ Shapes of a good reply, in your own words each time. Never copy their facts, nam
 <example stage="detail_requested" kind="first detail after accepting">لفتح التذكرة أحتاج بعض التفاصيل: ما اسم الصفحة التي يظهر فيها زر الأرشفة؟</example>
 <example stage="summary_shown" kind="after a change">The change you made, in a few words, then the question whether to submit.</example>
 <example stage="submitted" next_issue="yes">The ticket number and how the reply arrives, then the question about the next request.</example>
-<example stage="ticket_status">The ticket's number, title and status, then stop.</example>
+<example stage="ticket_status">Each ticket's number, title, creation date and status, then stop.</example>
 <example stage="other" kind="a question about the pending summary">Where the ticket goes (the support team and its queue) and how the reply arrives, then that the summary waits for their confirmation.</example>
 <example stage="other" kind="the customer doesn't know what they need">Accept it, and give two ways to start: asking how to do something, or saying what isn't working.</example>
 <example stage="other" kind="unrelated, or about your tools">One short sentence that you cannot help with that.</example>
@@ -92,17 +92,18 @@ Shapes of a good reply, in your own words each time. Never copy their facts, nam
 
 STAGE_GUIDANCE = {
     "answered": "Answer from the evidence on the customer's topic, even when it differs from what they assumed: if they ask about one option and the evidence names others, tell them what it names. Say only what the evidence says. Only when the customer asked something specific that the evidence does not answer, say you could not find that part, naming it; do not add that there is no more information or no other causes.",
-    "no_answer": "Tell the customer you could not find a solution («لم أجد حلاً», \"I couldn't find a solution\"). Do not mention documents, sources or a search. Do not suggest the feature is missing or broken. Do not offer a ticket; offers come only from the ticket workflow.",
+    "no_answer": "Tell the customer you could not find an answer to it. Do not mention documents, sources or a search. Do not suggest the feature is missing or broken. Do not offer a ticket; offers come only from the ticket workflow.",
     "search_failed": "Say first that the search could not be completed, which says nothing about the feature, and ask the customer to send their message again. Anything still waiting comes after that.",
-    "ticket_status": "Give the status of the ticket the customer asked about, from the lookup result only; if none was returned, say it is unavailable. If no ticket matched, ask for its reference. Do not offer a new ticket.",
-    "offer": "Offer to prepare a support ticket for the request, naming the request by its topic, and let the customer answer yes or no. Say it in your own words, as you would offer help, not as a form question; for example «أقدر أجهّز لك تذكرة دعم بخصوص…، تحب أسويها؟». If the request is urgent, say so, and that once they agree the summary is ready straight away with no questions.",
+    "ticket_status": "From the lookup result only, give each ticket the customer asked about with its number, title, creation date and status. When they asked for their tickets, open with one short line saying these are the tickets they have so far. A ticket returned without a status is shown without one; do not say its status is unavailable unless they asked for the status. When they ask only about the status, give the ticket number and its status. If no ticket matched, ask for its reference. Do not offer a new ticket.",
+    "offer": "Offer to open a ticket with the technical support team for the request, naming the request by its topic, and let the customer answer yes or no. Say \"open\" a ticket, not \"prepare\" one. Say it in your own words, as you would offer help, not as a form question; for example «بإمكاني فتح تذكرة لفريق الدعم الفني بخصوص…، هل ترغب بذلك؟». If the request is urgent, say so, and that once they agree the summary is ready straight away with no questions.",
     "detail_requested": "Ask for the requested detail by name, in one short question. Accept a skipped detail; it does not stop the ticket.",
     "summary_shown": "The card already shows the summary, so do not repeat its fields. If the customer asked for a change, name the change you made; otherwise say the summary is ready. Then ask whether to submit it. Do not say anything was sent.",
     "submitted": "Give the ticket number, say the team will reply as soon as they can, and say how the reply arrives. If a next request is named, ask about it; otherwise say they can reach out if they need anything else.",
     "submission_failed": "Tell the customer the ticket was not created and that they can try again.",
-    "preparation_stopped": "Tell the customer the preparation stopped and nothing was sent. Do not ask a question. No ticket existed, so do not say one was cancelled.",
+    "preparation_stopped": "Tell the customer the preparation stopped and nothing was sent, then let them know they can tell you if they need any other help. Do not ask a question. No ticket existed, so do not say one was cancelled.",
     "queued": "Tell the customer the new request is noted for after the current one, then ask the question the current request is waiting on, naming that request.",
     "clarify": "Ask for what you need to continue; if the current request is waiting on something, ask for that.",
+    "already_submitted": "Tell the customer a ticket was already opened for this problem, naming the problem and giving the ticket number, and that the technical support team will follow it up, without saying when; for example «سبق أن فُتحت تذكرة لمشكلة … برقم …، وسيتابعها فريق الدعم الفني.». Do not open with a phrase such as «أفهم أنك تواجه…». Do not tell them a new ticket is not needed, do not give its status, and do not offer a new ticket.",
     "other": "Answer the customer's latest message: a greeting, thanks, About, support-process facts, a question about this chat, rephrasing from retained evidence, or unclear input. Say who you are and what you can do only when they ask. For out of scope, write one short sentence. Ask one focused clarification only if needed.",
 }
 
@@ -160,7 +161,8 @@ def turn_note(sheet: TurnSheet) -> str:
     lines.append(f"Search: {sheet['search']}")
     lines.append(f"Ticket workflow this turn: {sheet['operator']}")
     for key, label in (("issue", "Request"), ("requested_detail", "Requested detail"),
-                       ("skipped", "Skipped detail"), ("ticket_number", "Ticket created, number")):
+                       ("skipped", "Skipped detail"), ("ticket_number", "Ticket created, number"),
+                       ("existing_ticket", "Ticket already submitted for this problem, number")):
         if sheet.get(key):
             lines.append(f"{label}: {sheet[key]}")
     if sheet["stage"] == "detail_requested":
@@ -197,8 +199,7 @@ def turn_note(sheet: TurnSheet) -> str:
         lines.append(f"Ticket being prepared: {sheet['draft']}")
     if sheet.get("search_no_answer") and sheet["stage"] != "answered":
         lines.append(f"Search found no answer to the customer's latest message («{sheet.get('customer_message')}»). "
-                     "Say once that you could not find a solution for it («لم أجد حلاً», \"I couldn't find a "
-                     "solution\"), about that message only. Do not mention documents, sources or a search, and do "
+                     "Say once that you could not find an answer to it, about that message only. Do not mention documents, sources or a search, and do "
                      "not say it does not exist or is unavailable.")
     if sheet.get("remind_pending"):
         lines.append("Then remind the customer that the current request is still waiting and what it needs from "
@@ -214,6 +215,8 @@ def turn_note(sheet: TurnSheet) -> str:
         lines.append(f"Only these sentences of it were rejected, each with the fact to rewrite it from:\n"
                      f"{sheet['correction']}\n"
                      "Rewrite only those sentences, using the fact given for each, or drop one if the fact leaves "
-                     "nothing to say. Keep every other sentence as it was, in the same order.")
+                     "nothing to say. Keep every other sentence as it was, in the same order. The rewrite still "
+                     "follows your rules above. A rejected question becomes the question your rules allow, not a "
+                     "refusal.")
     lines.append(f"Write only the customer-facing reply, in {NAMES[sheet['language']]}, plain text, concise.")
     return "Note from the system, not the customer. This note is not a message to answer.\n" + "\n".join(lines)

@@ -77,7 +77,7 @@ def submit(state: ChatState, api: TicketApi) -> tuple[dict, list[str]]:
     created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     sheets.add_ticket({"ticket_id": created["TicketID"], "ticket_number": created["TicketNumber"],
                        "customer_email": who.email, "product": who.product, "title": draft.title,
-                       "created_at": created_at})
+                       "created_at": created_at, "summary": draft.summary})
     for f in state["attachments"]:
         sheets.add_attachment({"ticket_number": created["TicketNumber"], "file_name": f["file_name"],
                                "link": attachments.link(f["id"]), "uploaded_at": f["uploaded_at"]})

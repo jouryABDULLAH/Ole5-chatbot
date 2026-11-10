@@ -27,7 +27,7 @@ def test_progress_is_set_before_search_and_uses_state_language(monkeypatch):
     session._run("progress-test", {"language": "en"}, "en")
     assert seen[0]["key"] == "searching"
     assert seen[0]["language"] == "ar"
-    assert seen[0]["ar"] == "أبحث في قاعدة المعرفة…"
+    assert seen[0]["ar"] == "أفكر…"
     assert session.progress("progress-test")["key"] == "done"
 
 

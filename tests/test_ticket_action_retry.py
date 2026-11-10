@@ -90,7 +90,7 @@ def test_fallback_says_what_happened_then_asks_what_the_current_request_waits_on
 
 
 def test_fallback_with_nothing_to_say_asks_to_send_again():
-    assert "إعادة إرسال" in fallback({"identity": IDENTITY, "language": "ar"})
+    assert "إرسال رسالتك مرة أخرى" in fallback({"identity": IDENTITY, "language": "ar"})
 
 
 def test_checker_receives_authoritative_records_and_a_failed_check_lets_the_reply_pass(model):

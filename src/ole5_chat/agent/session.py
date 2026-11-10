@@ -84,7 +84,7 @@ _progress_subscribers: dict[str, set[queue.Queue[dict]]] = {}
 
 _PROGRESS_TEXT = {
     "understanding": ("Understanding your request…", "أفهم طلبك…"),
-    "searching": ("Searching the knowledge base…", "أبحث في قاعدة المعرفة…"),
+    "searching": ("Thinking…", "أفكر…"),
     "ticket_enquiry": ("Reviewing ticket information and policy…", "أراجع سياسة ومعلومات التذاكر…"),
     "ticket": ("Preparing support details…", "أجهز تفاصيل طلب الدعم…"),
     "answering": ("Preparing the answer…", "أجهز الإجابة…"),

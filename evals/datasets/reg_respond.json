@@ -900,6 +900,25 @@
         ],
         "max_questions": 0
       }
-    }
+    },
+    {"id": "bare-ticket-request", "input": {"state": {
+      "messages": [{"role": "user", "content": "ابغى تفتح لي تذكرة عاجلا"}], "language": "ar", "intent": "other"}},
+      "expected": {"language": "ar", "must_have": [["المشكلة", "مشكلتك"]], "max_questions": 1, "offer_allowed": true},
+      "notes": "A ticket request with no problem stated: Respond asks what the problem is, once."},
+    {"id": "earlier-ticket-not-queued", "input": {"state": {
+      "messages": [{"role": "user", "content": "زر الارشفة ما يشتغل"},
+                   {"role": "assistant", "content": "تم إنشاء التذكرة رقم T-1001 بخصوص «زر الأرشفة لا يعمل»، وسيصلك رد فريق الدعم على بريدك."},
+                   {"role": "user", "content": "ولا موظف عندنا يقدر يسجل دخول من الصباح"},
+                   {"role": "assistant", "content": "هذا طلب عاجل. هل ترغب في فتح تذكرة دعم لعدم قدرة الموظفين على تسجيل الدخول؟"},
+                   {"role": "user", "content": "نعم"}],
+      "language": "ar", "intent": "pending_response",
+      "created_tickets": [{"ticket_number": "T-1001", "title_customer": "زر الأرشفة لا يعمل", "created_at": "2026-11-09"}],
+      "active_issue": {"id": "issue-2", "description": "عدم قدرة جميع الموظفين على تسجيل الدخول"},
+      "ticket_draft": {"title_customer": "عدم قدرة جميع الموظفين على تسجيل الدخول", "queue": "Ole5 Technical", "type": "Bug",
+                       "subtype": "خلل برمجي", "priority": "High", "missing": []},
+      "ticket_operator_result": {"action": "show_summary", "issue_id": "issue-2", "issue": "عدم قدرة جميع الموظفين على تسجيل الدخول"},
+      "pending_customer_response": {"kind": "summary", "issue_id": "issue-2", "item": null}}},
+      "expected": {"language": "ar", "must_not": ["قائمة الانتظار", "Ole5 Technical"], "max_questions": 1, "offer_allowed": true},
+      "notes": "9 Nov, two-ticket check run 3: Respond said the already-created archive ticket was queued."}
   ]
 }

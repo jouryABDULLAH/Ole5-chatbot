@@ -32,11 +32,22 @@ The customer may be asking for an offer, accepting or declining an offer, provid
 
 Use tools only for state or ticket operations:
 - get_ticket_requirements reads configured classifications and required customer details;
+- check_submitted_tickets returns the tickets the customer already submitted (titles and summaries are in English);
 - save_ticket_draft stores validated draft changes and reports missing fields;
 - skip_detail records that the customer does not know (unknown) or will not give (declined) one required detail;
 - manage_issues registers, queues, or cancels local preparation; the next queued issue becomes active on its own
   when the current one is submitted or cancelled;
 - submit_ticket submits only a displayed, confirmed, current draft and returns the actual ticket result.
+
+Before registering an issue, call check_submitted_tickets. If the problem was already submitted in one of the customer's
+tickets, do not register it; report that ticket. To decide whether the problem was already submitted, compare what
+fails, not where. A ticket's title names the feature; its summary says what goes wrong. A matching title is not
+enough: one feature or screen can have several different problems, and each needs its own ticket. It is the same
+problem only when the summary describes the same failure. A ticket with no summary is judged by its title.
+- Ticket summary: "The attach button does nothing when clicked." Customer: «زر الإرفاق ما يستجيب» -> same.
+- Same ticket. Customer: «أرفق الملف ويطلع خطأ إن الحجم كبير» -> different: the button works, the upload fails.
+- Ticket summary: "Search returns no results." Customer: «البحث بطيء جداً» -> different: results come, slowly. This applies only when registering, not to a reply to a pending
+offer, detail or summary.
 
 An offer is a next customer interaction, not a ticket submission.
 When the current handoff reports a product search with outcome partial or no_answer,
@@ -122,7 +133,9 @@ Choose the action that describes what Respond should communicate:
 - queued: a distinct issue was added to the queue;
 - submitted: the tool returned an actual created ticket;
 - submission_failed: submission was attempted and failed;
-- clarify: no safe workflow operation or customer response can be identified.
+- clarify: no safe workflow operation or customer response can be identified;
+- already_submitted: check_submitted_tickets showed the problem was already submitted in one of the customer's tickets and
+  nothing was registered; put that ticket's number in existing_ticket.
 
 Tool results are authoritative. Do not invent, modify, or upgrade their facts. A request, offer, prepared draft, or submit intent is not a created ticket. Use submitted only when submit_ticket returned success and a ticket number. Preserve missing details and unavailable values honestly.
 
@@ -181,7 +194,7 @@ Tool transcript and results:
 
 Return one JSON object only. Include action and reason.
 reason must briefly explain the chosen action using the supplied evidence.
-Use issue_id and requested_detail when applicable; otherwise use null.
+Use issue_id, requested_detail and existing_ticket when applicable; otherwise use null.
 Do not add a type field or wrap the object in another object.
 Required output schema:
 {json.dumps(OperatorCompletion.model_json_schema(), ensure_ascii=False)}"""

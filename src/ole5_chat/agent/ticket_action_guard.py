@@ -19,7 +19,8 @@ FACTS = (
 )
 
 # Each {name} must be in FACTS and AgentState, so renaming or deleting a state field stops the import with a KeyError.
-ACTION_RULES = """You are a Ticket Action Guard. Evaluate the reply in the payload for ticket-action consistency only.
+ACTION_RULES = """You are a Ticket Action Guard for a customer support chatbot, you job is to read the agent's responses and make sure it doesn't make up or claim and action that it is not done, you recieve enough evidence to judge the truthness of the agent's words.
+ Evaluate the reply in the payload for ticket-action consistency only.
 
 ## 1. Scope & Evidence
 - Evaluate ticket-related actions and claims, not product knowledge or language.
@@ -34,10 +35,9 @@ Flag false or unverified claims of:
 - Escalation, assignment, or support notification/progress.
 - Response deadlines involving any stated time or date.
 
-Allow:
-- "Support will reply as soon as they can" (not a deadline).
-- The configured support_hours (not a deadline).
-- Descriptions of configured reply channels, provided they do not imply a ticket was submitted.
+Allow statements about support hours, support and reply channels, and when support replies, when they match the
+company facts in the payload (support_hours, support_channel, reply_channel) and do not imply a ticket was submitted.
+Flag any reply time, deadline or channel the company facts do not state.
 
 ## 3. Ticket Creation & History
 - Verify new ticket creation ONLY if:
@@ -50,17 +50,29 @@ Allow:
 
 Allow:
 - Reporting a ticket or its status from {ticket_enquiry_result}.
+- Saying a ticket was already opened or submitted for the problem as ticket T-1, and that the support team will
+  follow it up, when {ticket_operator_result}.action = already_submitted and its existing_ticket is T-1.
 
 ## 4. Ticket Operator Authorization
-- Ticket offers, detail requests, and summaries require:
-  - {ticket_operator_result}.action = offer, request_detail, or show_summary
-  - OR authorization through the pending workflow.
-- Flag unauthorized offers, preparation, opening, creation, or questions about whether to open a ticket.
-- A product answer without a {ticket_operator_result} must NOT include a ticket offer.
+Definitions:
+- Offer: asks whether to open a ticket now («هل تريد فتح تذكرة؟»).
+- Detail request: asks for one of the ticket's required details (a page, an error text, a start time) that the
+  Operator is collecting.
+- Summary: presents a ticket summary or asks to submit it.
+
+An offer, detail request, or summary is allowed only when:
+- {ticket_operator_result}.action = offer, request_detail, or show_summary, OR
+- {pending_customer_response} is that step (a reminder).
+
+Flag:
+- Any of the three without that authorization.
+- A product answer without a {ticket_operator_result} that ends with a ticket offer.
 
 Allow:
-- Asking the customer to confirm a displayed/pending summary.
-- Reminders about pending offers, details, or summaries.
+- Asking the customer to describe their problem is not a ticket action, whatever they said before, as long as it asks
+  for no ticket detail and offers nothing («ما هي المشكلة التي تواجهك حتى أفتح لك تذكرة؟»).
+- Asking the customer to confirm a displayed or pending summary.
+- Reminders about a pending offer, detail, or summary.
 - Saying a new issue will be handled after the current one, when {ticket_operator_result}.queued_issue is set.
 
 ## 5. Cancellation & Skipped Details
@@ -124,6 +136,8 @@ Flag:
   stopped, not pending.
 - «لا توجد تذكرة قيد التجهيز» when {active_issue} or {pending_customer_response} is set: contradicts the state.
 - «هل تريد فتح تذكرة؟» when neither {ticket_operator_result} nor the pending workflow authorized an offer.
+- «أحتاج اسم الصفحة لفتح التذكرة» when {pending_customer_response} is empty and no {ticket_operator_result}: asks for
+  a required detail without the Operator.
 - «ألغيت تذكرتك رقم T-1»: a created ticket cannot be cancelled here; stopping a preparation is not cancelling a ticket.
 - «تم تصعيد طلبك» or «يعمل الفريق على طلبك الآن» without a record of that action: invented progress.
 - «سيردون خلال ساعتين»: invented deadline.
@@ -151,7 +165,8 @@ def violations(state: dict, reply: str) -> list[TicketViolation]:
     facts = {key: state.get(key) for key in FACTS}
     facts.update(reply=reply, conversation=[{"role": m.type, "text": str(m.content)}
                                            for m in state.get("messages", [])],
-                 support_hours=config.support_hours, reply_channel=config.reply_channel)
+                 support_hours=config.support_hours, support_channel=config.support_channel,
+                 reply_channel=config.reply_channel)
     try:
         result = llm.structured(
             ACTION_RULES + llm.schema_text(TicketActionCheck),
@@ -204,5 +219,5 @@ def fallback(state: dict) -> str:
     elif kind == "summary":
         parts.append(f"ملخص الطلب «{current}» جاهز، هل تريد إرسال التذكرة؟" if arabic
                      else f"The summary for «{current}» is ready. Do you want to submit the ticket?")
-    return " ".join(parts) or ("لم أتمكن من إعداد رد موثوق الآن. يرجى إعادة إرسال رسالتك." if arabic
-                               else "I couldn't prepare a reliable reply right now. Please send your message again.")
+    return " ".join(parts) or ("عذراً، حدث خلل من جهتي أثناء إعداد الرد. يرجى إرسال رسالتك مرة أخرى." if arabic
+                               else "Sorry, something went wrong on my side while preparing the reply. Please send your message again.")

@@ -10,6 +10,7 @@ from langchain_core.tools import tool
 
 from ole5_chat import products, values
 from ole5_chat.agent.contracts import PendingCustomerResponse
+from ole5_chat.agent.nodes.ticket_enquiry import _rows, _summary
 from ole5_chat.agent.state import AgentState
 from ole5_chat.support_core import classify as ticket_classifier
 from ole5_chat.support_core.contracts import PendingIssue
@@ -159,6 +160,17 @@ def build_ticket_operator_tools(state: AgentState, sink: list | None = None):
             "priorities": [item.value for item in catalog.priorities],
         })
 
+    @tool("check_submitted_tickets")
+    @_logged_tool(sink)
+    def check_submitted_tickets() -> str:
+        """Return the tickets this customer already submitted, with ticket number, title and summary (in English) and
+        creation time.
+
+        Call before registering any problem, to check whether it was already submitted in one of these tickets."""
+
+        tickets = [{**_summary(row), "summary": str(row.get("summary") or "")} for row in _rows(state)]
+        return _json({"success": True, "operation": "check_submitted_tickets", "tickets": tickets})
+
     @tool("save_ticket_draft")
     @_logged_tool(sink)
     def save_ticket_draft(fields: dict, issue_id: str | None = None) -> str:
@@ -303,7 +315,10 @@ def build_ticket_operator_tools(state: AgentState, sink: list | None = None):
         urgent: bool = False,
     ) -> str:
         """Register, enqueue, or cancel preparation of a local issue. The next queued issue becomes active on its
-        own when the current one is submitted or cancelled."""
+        own when the current one is submitted or cancelled.
+
+        Call register only after check_submitted_tickets, and only when the problem is not already in one of those
+        tickets."""
 
         queue = list(state.get("pending_issues", []))
         active = state.get("active_issue")
@@ -425,4 +440,5 @@ def build_ticket_operator_tools(state: AgentState, sink: list | None = None):
             "pending_issues": queue,
         })
 
-    return [get_ticket_requirements, save_ticket_draft, skip_detail, manage_issues, submit_ticket]
+    return [get_ticket_requirements, check_submitted_tickets, save_ticket_draft, skip_detail, manage_issues,
+            submit_ticket]

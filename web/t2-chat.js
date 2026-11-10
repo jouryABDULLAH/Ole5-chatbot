@@ -6,7 +6,7 @@
       signinTitle: "Chat with support", signinBody: "Enter the email you use for support.",
       email: "Email", cont: "Continue", checking: "Checking",
       placeholder: "Write a message", send: "Send", writing: "Writing a reply",
-      progress: { understanding: "Understanding your request…", searching: "Searching the knowledge base…", ticket_enquiry: "Reviewing ticket information and policy…", ticket: "Preparing support details…", answering: "Preparing the answer…", checking: "Checking the answer…", done: "Completed", error: "Unable to complete the request." },
+      progress: { understanding: "Understanding your request…", searching: "Thinking…", ticket_enquiry: "Reviewing ticket information and policy…", ticket: "Preparing support details…", answering: "Preparing the answer…", checking: "Checking the answer…", done: "Completed", error: "Unable to complete the request." },
       source: "Source", sources: "Sources",
       summary: "Ticket summary", submit: "Submit ticket", submitting: "Submitting", submitted: "Ticket {number} submitted", submittedButton: "Submitted",
       fields: { queue: "Queue", type: "Type", subtype: "Subtype", priority: "Priority", title: "Title", summary: "Summary",
@@ -20,7 +20,7 @@
       tooMany: "No more files can be attached to this ticket.",
     },
     ar: {
-      progress: { understanding: "أفهم طلبك…", searching: "أبحث في قاعدة المعرفة…", ticket_enquiry: "أراجع سياسة ومعلومات التذاكر…", ticket: "أجهز تفاصيل طلب الدعم…", answering: "أجهز الإجابة…", checking: "أتحقق من الإجابة…", done: "اكتمل الطلب", error: "تعذر إكمال الطلب." },
+      progress: { understanding: "أفهم طلبك…", searching: "أفكر…", ticket_enquiry: "أراجع سياسة ومعلومات التذاكر…", ticket: "أجهز تفاصيل طلب الدعم…", answering: "أجهز الإجابة…", checking: "أتحقق من الإجابة…", done: "اكتمل الطلب", error: "تعذر إكمال الطلب." },
       open: "محادثة", close: "إغلاق المحادثة", title: "الدعم",
       signinTitle: "تحدث مع الدعم", signinBody: "أدخل البريد الإلكتروني الذي تستخدمه للدعم.",
       email: "البريد الإلكتروني", cont: "متابعة", checking: "جارٍ التحقق",
@@ -279,8 +279,8 @@
       }
       if (this.busy) {
         const key = this.progress && this.progress.key;
-        const progressText = TEXT[this.progress?.language || this.lang] || TEXT.en;
-        const label = (key && progressText.progress[key]) || this.t.writing;
+        const progressText = TEXT[this.progress?.language || this.progressLanguage || this.lang] || TEXT.ar;
+        const label = (key && progressText.progress[key]) || progressText.writing;
         const progressLabel = el("span", { class: "progress-label" }, label);
         this.progressElement = progressLabel;
         log.append(el("div", { class: "writing", "aria-live": "polite" }, el("span", { class: "dots", "aria-hidden": "true" },
@@ -456,7 +456,7 @@
       const latin = (text.match(/[A-Za-z]/g) || []).length;
       if (arabic > latin) return "ar";
       if (latin > arabic) return "en";
-      return this.lang;
+      return "ar";
     }
 
     watchProgress(sessionId, language = this.lang) {
@@ -496,8 +496,8 @@
       /* Keep the UI in the outgoing message language until the request finishes. */
       this.progress = { ...value, language: this.progressLanguage || value.language || this.lang };
       if (!this.progressElement) return;
-      const progressText = TEXT[this.progress.language] || TEXT.en;
-      this.progressElement.textContent = (this.progress.key && progressText.progress[this.progress.key]) || this.t.writing;
+      const progressText = TEXT[this.progress.language] || TEXT.ar;
+      this.progressElement.textContent = (this.progress.key && progressText.progress[this.progress.key]) || progressText.writing;
     }
 
     stopProgress() {

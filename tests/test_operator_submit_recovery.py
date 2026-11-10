@@ -210,6 +210,29 @@ def test_two_new_issues_offer_the_first_and_queue_the_second():
     assert result['pending_customer_response'].kind == 'offer'
 
 
+def test_already_submitted_problem_registers_nothing_and_names_the_ticket(monkeypatch):
+    state = ready_state()
+    state.update(active_issue=None, pending_customer_response=None, ticket_draft=None,
+                 summary_shown=False, submission_requested=False)
+    monkeypatch.setattr('ole5_chat.agent.nodes.ticket_enquiry.sheets.tickets', lambda: [
+        {'customer_email': 'ole5@example.com', 'ticket_number': 'T-1', 'title': 'Archive button not working'},
+        {'customer_email': 'other@example.com', 'ticket_number': 'T-2', 'title': 'Login fails'}])
+    bound = {tool.name: tool for tool in tools.build_ticket_operator_tools(state)}
+    listed = bound['check_submitted_tickets'].invoke({})
+    assert [t['ticket_number'] for t in json.loads(listed)['tickets']] == ['T-1']  # only this customer's tickets
+    report = json.dumps([{'name': 'check_submitted_tickets', 'content': listed}])
+    result = _apply_completion(state, OperatorCompletion(action='already_submitted', reason='Same problem as T-1',
+                                                         existing_ticket='T-1'), report)
+    assert result['ticket_operator_result']['action'] == 'already_submitted'
+    assert result['ticket_operator_result']['existing_ticket'] == 'T-1'
+    assert result['pending_customer_response'] is None and result['active_issue'] is None
+    # A ticket check_submitted_tickets did not return is not reported as the customer's ticket.
+    result = _apply_completion(state, OperatorCompletion(action='already_submitted', reason='Same problem as T-2',
+                                                         existing_ticket='T-2'), report)
+    assert result['ticket_operator_result']['action'] == 'clarify'
+    assert result['ticket_operator_result']['existing_ticket'] is None
+
+
 def test_cancel_with_nothing_active_is_not_a_success():
     state = detail_state()
     state['active_issue'] = None

@@ -10,7 +10,7 @@ Stage = Literal[
     "answered", "no_answer", "search_failed", "ticket_status",
     "offer", "detail_requested", "summary_shown",
     "submitted", "submission_failed", "preparation_stopped",
-    "queued", "clarify", "other",
+    "queued", "clarify", "already_submitted", "other",
 ]
 
 
@@ -31,6 +31,7 @@ class TurnSheet(TypedDict):
     next_issue: str | None          # the queued issue offered after a submit
     transition: str | None          # one sentence when one issue stopped and the next one is offered
     ticket_number: str | None       # only when the submission succeeded
+    existing_ticket: str | None     # already_submitted: the customer's ticket that has this problem
     current_issue: str | None       # the active issue and what it is waiting for, stated so the model need not work it out
     urgent: bool                    # the active issue is urgent: its summary is ready as soon as the offer is accepted
     next_in_queue: str | None       # the queued issues, in order
@@ -53,6 +54,8 @@ OPERATOR_FACT = {
     "cancelled": "stopped preparing the ticket because the customer cancelled",
     "queued": "will handle the new request after the current one",
     "clarify": "needs a clarification before it can act",
+    "already_submitted": "found that this problem was already submitted in one of the customer's tickets, so no new "
+                         "ticket was prepared",
 }
 
 
@@ -95,7 +98,7 @@ def build_turn_sheet(state: AgentState, language: str) -> TurnSheet:
         stage = "detail_requested"
     elif action in {"declined", "cancelled"}:
         stage = "preparation_stopped"
-    elif action in {"offer", "queued", "clarify"}:
+    elif action in {"offer", "queued", "clarify", "already_submitted"}:
         stage = action
     elif intent == "other":
         stage = "other"
@@ -130,6 +133,7 @@ def build_turn_sheet(state: AgentState, language: str) -> TurnSheet:
         transition=(f"Preparation for «{op['cancelled_issue']}» was stopped; the next issue «{op.get('issue')}» "
                     "is now offered." if op.get("cancelled_issue") and action == "offer" else None),
         ticket_number=(result.get("ticket") or {}).get("ticket_number") if succeeded else None,
+        existing_ticket=op.get("existing_ticket"),
         current_issue=_current_issue(state),
         urgent=bool((state.get("active_issue") or {}).get("urgent")),
         next_in_queue=", ".join(f"«{i.get('description')}»" for i in state.get("pending_issues") or []) or None,

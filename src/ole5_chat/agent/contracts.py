@@ -20,7 +20,7 @@ TicketStatusAction = Literal["lookup_status", "explain_status", "clarify"]
 IssueOperation = Literal["register", "enqueue", "cancel_preparation"]
 OperatorAction = Literal[
     "offer", "request_detail", "show_summary", "declined", "cancelled",
-    "queued", "submitted", "submission_failed", "clarify",
+    "queued", "submitted", "submission_failed", "clarify", "already_submitted",
 ]
 ValidationOutcome = Literal["pass", "repair", "fallback"]
 
@@ -118,6 +118,7 @@ class OperatorCompletion(BaseModel):
     reason: str
     issue_id: str | None = None
     requested_detail: str | None = None
+    existing_ticket: str | None = None  # already_submitted: the number of the ticket that has this problem
 
 
 class GroundingIssue(BaseModel):

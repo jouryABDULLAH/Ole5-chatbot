@@ -55,7 +55,8 @@ def _tool_results(report: str) -> list[dict]:
     results = []
     entries = json.loads(report or "[]")
     for entry in entries if isinstance(entries, list) else []:
-        if entry.get("name") not in {"get_ticket_requirements", "save_ticket_draft", "skip_detail", "manage_issues", "submit_ticket"}:
+        if entry.get("name") not in {"get_ticket_requirements", "save_ticket_draft", "skip_detail", "manage_issues",
+                                     "submit_ticket", "check_submitted_tickets"}:
             continue
         try:
             results.append({
@@ -121,6 +122,17 @@ def _apply_completion(state: AgentState, completion: OperatorCompletion, report:
         # The tool reported every required detail answered; asking again would loop over settled details.
         log.warning("ticket_operator  request_detail with a summary-ready draft replaced with show_summary")
         completion = completion.model_copy(update={"action": "show_summary", "requested_detail": None})
+    listed = {ticket.get("ticket_number") for item in tool_results if item["name"] == "check_submitted_tickets"
+              for ticket in item["result"].get("tickets") or []}
+    if completion.action == "already_submitted" and (registered or queued or completion.existing_ticket not in listed):
+        # The issue was registered after all, or the ticket is not one check_submitted_tickets returned.
+        replacement = "offer" if registered else "queued" if queued else "clarify"
+        log.error("ERROR ticket_operator already_submitted existing_ticket=%s listed=%s, replaced with %s",
+                  completion.existing_ticket, sorted(listed), replacement)
+        completion = completion.model_copy(update={"action": replacement})
+    if completion.action != "already_submitted":
+        # Only already_submitted names an existing ticket.
+        completion = completion.model_copy(update={"existing_ticket": None})
     issue = state.get("active_issue")
     issue_id = completion.issue_id or (issue or {}).get("id")
     if completion.action == "offer" and issue_id:
@@ -152,6 +164,7 @@ def _apply_completion(state: AgentState, completion: OperatorCompletion, report:
         "offer": "register_issue", "request_detail": "provide", "show_summary": "clarify",
         "declined": "decline", "cancelled": "cancel", "queued": "separate_issue",
         "submitted": "submit", "submission_failed": "submit", "clarify": "clarify",
+        "already_submitted": "already_submitted",
     }
     update.update({
         "manager_action": compatibility[completion.action],
@@ -165,6 +178,7 @@ def _apply_completion(state: AgentState, completion: OperatorCompletion, report:
             "issue": ((cancelled if completion.action in {"declined", "cancelled"} and cancelled else issue)
                       or {}).get("description"),
             "requested_detail": completion.requested_detail,
+            "existing_ticket": completion.existing_ticket,
             # What the customer settled this turn without giving it, and an issue they stopped, whatever comes next.
             "skipped": [{"item": item["result"].get("item"), "value": item["result"].get("value")}
                         for item in tool_results if item["name"] == "skip_detail" and item["result"].get("success")],

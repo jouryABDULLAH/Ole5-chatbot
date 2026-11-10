@@ -26,21 +26,25 @@ def _definitions(state: AgentState) -> list[dict]:
     ]
 
 
+def _rows(state: AgentState) -> list[dict]:
+    """The current customer's tickets, and no one else's. The Ticket Operator's check_submitted_tickets reads them too."""
+    email = state["identity"].email.casefold()
+    return [row for row in sheets.tickets() if str(row.get("customer_email") or "").casefold() == email]
+
+
+def _summary(row: dict) -> dict:
+    return {key: str(row.get(key) or "") for key in ("ticket_number", "title", "product", "created_at")}
+
+
+def _matches(found: list[dict]) -> str:
+    tickets = [_summary(row) for row in found]
+    return json.dumps({"outcome": "success" if tickets else "empty", "tickets": tickets}, ensure_ascii=False)
+
+
 def build_ticket_tools(state: AgentState):
     """Build state-bound tools that can only access the current customer's tickets."""
 
     api = ticket_client()
-    email = state["identity"].email.casefold()
-
-    def rows() -> list[dict]:
-        return [row for row in sheets.tickets() if str(row.get("customer_email") or "").casefold() == email]
-
-    def summary(row: dict) -> dict:
-        return {key: str(row.get(key) or "") for key in ("ticket_number", "title", "product", "created_at")}
-
-    def matches(found: list[dict]) -> str:
-        tickets = [summary(row) for row in found]
-        return json.dumps({"outcome": "success" if tickets else "empty", "tickets": tickets}, ensure_ascii=False)
 
     @tool("list_tickets")
     def list_tickets(order: Literal["as_stored", "oldest_first", "newest_first"] = "as_stored") -> str:
@@ -49,10 +53,10 @@ def build_ticket_tools(state: AgentState):
 
         Call when the customer asks for their tickets, or for their first, oldest, latest or last ticket."""
 
-        found = rows()
+        found = _rows(state)
         if order != "as_stored":
             found = sorted(found, key=lambda row: str(row.get("created_at") or ""), reverse=order == "newest_first")
-        return matches(found)
+        return _matches(found)
 
     @tool("find_tickets_by_title")
     def find_tickets_by_title(text: str) -> str:
@@ -62,7 +66,7 @@ def build_ticket_tools(state: AgentState):
         Call when the customer refers to a ticket by its issue, without its number."""
 
         words = text.casefold().split()
-        return matches([row for row in rows() if all(w in str(row.get("title") or "").casefold() for w in words)])
+        return _matches([row for row in _rows(state) if all(w in str(row.get("title") or "").casefold() for w in words)])
 
     @tool("find_tickets_by_date")
     def find_tickets_by_date(date_from: str, date_to: str | None = None) -> str:
@@ -71,12 +75,12 @@ def build_ticket_tools(state: AgentState):
         Call when the customer refers to a ticket by when it was created, without its number."""
 
         last = date_to or date_from
-        return matches([row for row in rows() if date_from <= str(row.get("created_at") or "")[:10] <= last])
+        return _matches([row for row in _rows(state) if date_from <= str(row.get("created_at") or "")[:10] <= last])
 
     def with_status(row: dict | None, key: str, value: str) -> str:
         if row is None:
             return json.dumps({"outcome": "not_found", key: value}, ensure_ascii=False)
-        ticket = summary(row)
+        ticket = _summary(row)
         try:
             status = api.get(str(row["ticket_id"]))
         except (TicketApiError, OSError, KeyError) as exc:
@@ -108,7 +112,7 @@ def build_ticket_tools(state: AgentState):
         Call when the customer provides a ticket number, or after a list or find tool returned the ticket asked about."""
 
         number = ticket_number.strip()
-        return with_status(next((row for row in rows() if str(row.get("ticket_number") or "") == number), None),
+        return with_status(next((row for row in _rows(state) if str(row.get("ticket_number") or "") == number), None),
                            "ticket_number", ticket_number)
 
     return [list_tickets, find_tickets_by_title, find_tickets_by_date, get_ticket]
@@ -206,6 +210,10 @@ def _compatible_result(
         result["tickets"] = [
             item["ticket"] for item in parsed if item.get("ticket") is not None
         ]
+        if not lookups:
+            # A list or find request with no get_ticket: the listed tickets are the result, without a status.
+            result["tickets"] = [ticket for item in list_results for ticket in item.get("tickets") or []]
+            result["lookup_succeeded"] = bool(result["tickets"])
         result["lookup_outcomes"] = [item.get("outcome") for item in parsed]
         log.info(
             "ticket_enquiry completion action=%s list_succeeded=%s lookup_succeeded=%s tickets=%d",

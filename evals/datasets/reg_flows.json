@@ -413,6 +413,34 @@
         ]
       },
       "notes": "A plain no to the summary cancels the request, so the next problem gets its own offer instead of queuing behind a dead request."
-    }
+    },
+    {"id": "explicit-request-with-problem",
+      "input": {"turns": ["افتح لي تذكرة، زر الأرشفة ما يشتغل"]},
+      "expected": {"turns": [{"pending": ["detail", "summary"], "language": "ar"}]},
+      "notes": "An explicit ticket request with a problem: Search first, then the draft starts without an offer."},
+    {"id": "bare-ticket-request",
+      "input": {"turns": ["ابغى تفتح لي تذكرة عاجلا", "ما رح اوضحها افتح لي تذكرة بسرعة"]},
+      "expected": {"turns": [{"pending": null, "created": 0, "language": "ar"}, {"language": "ar"}]},
+      "notes": "9 Nov, logs/chat-20261109-161234.log 16:38: the guard refused asking for the problem, and turn 2 fell back. What turn 2 should do when the customer will not describe the problem is not decided; only no fallback is checked."},
+    {"id": "two-tickets-in-one-chat",
+      "input": {"turns": ["زر الارشفة ما يشتغل", "نعم", "لا اعلم", "ERROR404", "ارسلها",
+                          "ولا موظف عندنا يقدر يسجل دخول من الصباح", "نعم"]},
+      "expected": {"turns": [
+        {"pending": "offer", "language": "ar"},
+        {"pending": "detail", "language": "ar"},
+        {"pending": "detail", "language": "ar"},
+        {"pending": "summary", "language": "ar"},
+        {"pending": null, "created": 1, "language": "ar"},
+        {"pending": "offer", "created": 1, "language": "ar"},
+        {"pending": "summary", "created": 1, "language": "ar"}]},
+      "notes": "9 Nov, session a0e90c56: the second ticket took the first one's ERROR404 (classifier leak, fixed in c9ea8e2; the unit test checks the fields). Also a bare value «ERROR404» keeps the reply in Arabic."},
+    {"id": "enquiry-oldest-ticket",
+      "input": {"turns": ["وش حالة اقدم تذكرة عندي؟"]},
+      "expected": {"turns": [{"pending": null, "created": 0, "language": "ar"}]},
+      "notes": "The oldest ticket means among all the customer's tickets (list_tickets oldest_first), not only this chat's."},
+    {"id": "enquiry-list-tickets",
+      "input": {"turns": ["وش التذاكر اللي عندي؟"]},
+      "expected": {"turns": [{"pending": null, "created": 0, "language": "ar"}]},
+      "notes": "Asking for their tickets calls list_tickets."}
   ]
 }

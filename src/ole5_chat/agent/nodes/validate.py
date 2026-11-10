@@ -11,8 +11,8 @@ from ole5_chat.agent import ticket_action_guard
 log = logging.getLogger(__name__)
 
 SAFE_FALLBACK = {
-    "ar": "عذراً، لم أتمكن من إعداد إجابة موثوقة الآن. يرجى المحاولة مرة أخرى.",
-    "en": "Sorry, I couldn't prepare a reliable answer right now. Please try again.",
+    "ar": "عذراً، حدث خلل من جهتي أثناء إعداد الرد. يرجى إرسال رسالتك مرة أخرى.",
+    "en": "Sorry, something went wrong on my side while preparing the reply. Please send your message again.",
 }
 
 
