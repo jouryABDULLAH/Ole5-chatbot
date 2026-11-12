@@ -4,15 +4,7 @@ from typing import Literal, TypedDict
 
 from langgraph.graph import MessagesState
 
-from ole5_chat.agent.contracts import (
-    PendingCustomerResponse,
-    NextTarget,
-    Route,
-    ResponsePacket,
-    SearchOutcome,
-    ValidationOutcome,
-    WorkerName,
-)
+from ole5_chat.agent.contracts import PendingCustomerResponse, ResponsePacket
 from ole5_chat.identity import Identity
 
 
@@ -42,9 +34,9 @@ class AgentState(MessagesState, total=False):
     source_details: list[dict]
 
     # Current-turn routing and workflow state.
-    intent: Route | None
-    next_target: NextTarget | None
-    last_worker: WorkerName | None
+    intent: Literal["question", "pending_response", "ticket_enquiry", "needs_ticket", "other"] | None
+    next_target: Literal["search", "ticket_operator", "ticket_enquiry", "respond"] | None
+    last_worker: Literal["search", "ticket_operator", "ticket_enquiry"] | None
     response_packet: ResponsePacket | None
     route_reason: str | None
     explicit_ticket_request: bool
@@ -56,7 +48,7 @@ class AgentState(MessagesState, total=False):
     current_references: list[dict]
     search_queries: list[str]  # every wording searched this turn: the Search agent's, then find()'s own rephrasings
     pending_before_worker: PendingCustomerResponse | None  # the step the customer's message answered, before any worker ran
-    search_outcome: SearchOutcome | None
+    search_outcome: Literal["answered", "partial", "no_answer", "failed"] | None
     unresolved_information: dict | None
     
     ticket_result: dict | None
@@ -69,7 +61,7 @@ class AgentState(MessagesState, total=False):
     answered_detail: PendingCustomerResponse | None
     reply: str | None
     
-    validation_outcome: ValidationOutcome | None
+    validation_outcome: Literal["pass", "repair", "fallback"] | None
     validation_reason: str | None
     validation_note: str | None
     validation_retries: int

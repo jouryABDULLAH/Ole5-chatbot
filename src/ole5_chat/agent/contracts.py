@@ -9,22 +9,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
-Route = Literal["question", "pending_response", "ticket_enquiry", "needs_ticket", "other"]
-RouteWithoutPending = Literal["question", "ticket_enquiry", "needs_ticket", "other"]
-NextTarget = Literal["search", "ticket_operator", "ticket_enquiry", "respond"]
-WorkerName = Literal["search", "ticket_operator", "ticket_enquiry"]
-PendingKind = Literal["offer", "detail", "summary"]
-ManagerContext = Literal["none", "offer", "detail", "summary"]
-SearchOutcome = Literal["answered", "partial", "no_answer", "failed"]
-TicketStatusAction = Literal["lookup_status", "explain_status", "clarify"]
-IssueOperation = Literal["register", "enqueue", "cancel_preparation"]
-OperatorAction = Literal[
-    "offer", "request_detail", "show_summary", "declined", "cancelled",
-    "queued", "submitted", "submission_failed", "clarify", "already_submitted",
-]
-ValidationOutcome = Literal["pass", "repair", "fallback"]
-
-MANAGER_ACTIONS: dict[ManagerContext, tuple[str, ...]] = {
+MANAGER_ACTIONS: dict[Literal["none", "offer", "detail", "summary"], tuple[str, ...]] = {
     "none": ("register_issue", "urgent_issue", "failed_solution", "clarify"),
     "offer": ("accept", "decline", "update_impact", "separate_issue", "clarify"),
     "detail": ("provide", "skip_detail", "not_an_answer", "cancel", "update_impact", "separate_issue"),
@@ -35,7 +20,7 @@ MANAGER_ACTIONS: dict[ManagerContext, tuple[str, ...]] = {
 class PendingCustomerResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    kind: PendingKind
+    kind: Literal["offer", "detail", "summary"]
     issue_id: str
     item: str | None = None
 
@@ -47,7 +32,7 @@ class ResponsePacket(BaseModel):
 
     customer_message: str
     language: Literal["ar", "en"] | None = None
-    intent: Route | None = None
+    intent: Literal["question", "pending_response", "ticket_enquiry", "needs_ticket", "other"] | None = None
     search: dict | None = None
     ticket_operator: dict | None = None
     ticket_enquiry: dict | None = None
@@ -59,8 +44,8 @@ class ResponsePacket(BaseModel):
 class RouterDecision(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    intent: Route
-    next_target: NextTarget
+    intent: Literal["question", "pending_response", "ticket_enquiry", "needs_ticket", "other"]
+    next_target: Literal["search", "ticket_operator", "ticket_enquiry", "respond"]
     explicit_ticket_request: bool
     reason: str
 
@@ -68,8 +53,8 @@ class RouterDecision(BaseModel):
 class RouterDecisionWithoutPending(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    intent: RouteWithoutPending
-    next_target: NextTarget
+    intent: Literal["question", "ticket_enquiry", "needs_ticket", "other"]
+    next_target: Literal["search", "ticket_operator", "ticket_enquiry", "respond"]
     explicit_ticket_request: bool
     reason: str
 
@@ -91,7 +76,7 @@ def router_schema(has_pending: bool) -> type[BaseModel]:
 
 
 @lru_cache(maxsize=4)
-def manager_schema(context: ManagerContext) -> type[BaseModel]:
+def manager_schema(context: Literal["none", "offer", "detail", "summary"]) -> type[BaseModel]:
     """Return the Manager action schema for one pending interaction kind."""
 
     return create_model(
@@ -105,7 +90,7 @@ def manager_schema(context: ManagerContext) -> type[BaseModel]:
 class TicketEnquiryCompletion(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    action: TicketStatusAction
+    action: Literal["lookup_status", "explain_status", "clarify"]
     reason: str
     selected_ticket_numbers: list[str] = []
     clarification_question: str | None = None
@@ -114,7 +99,10 @@ class TicketEnquiryCompletion(BaseModel):
 class OperatorCompletion(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    action: OperatorAction
+    action: Literal[
+        "offer", "request_detail", "show_summary", "declined", "cancelled",
+        "queued", "submitted", "submission_failed", "clarify", "already_submitted",
+    ]
     reason: str
     issue_id: str | None = None
     requested_detail: str | None = None
