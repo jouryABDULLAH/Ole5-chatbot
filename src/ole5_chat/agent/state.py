@@ -30,6 +30,7 @@ class AgentState(MessagesState, total=False):
     created_tickets: list[dict]
     
     last_answer_evidence: dict | None
+    last_lookup: dict | None  # the tickets the latest ticket lookup showed, kept until the next lookup
     sources: list[str]
     source_details: list[dict]
 
@@ -89,6 +90,7 @@ def initial_state(identity: Identity) -> AgentState:
         attachments=[],
         created_tickets=[],
         last_answer_evidence=None,
+        last_lookup=None,
         sources=[],
         source_details=[],
         intent=None,

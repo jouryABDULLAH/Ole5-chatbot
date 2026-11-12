@@ -92,6 +92,9 @@ def _turn(sid: str, state: dict) -> dict:
         "search_outcome": before.get("search_outcome"),
         "search_queries": list(before.get("search_queries") or []),
         "operator_action": (before.get("ticket_operator_result") or {}).get("action"),
+        # The tickets the lookup returned this turn, by number: a case can check it found the right one.
+        "enquiry_tickets": [t.get("ticket_number") for t in
+                            (before.get("ticket_enquiry_result") or {}).get("tickets") or []],
         "validation": before.get("validation_outcome"),
         "sources": list(before.get("sources") or []),
         # Every passage Respond saw, DIRECT and INFERENTIAL: the made-up judge and answer_retrieved read it.

@@ -50,7 +50,7 @@ def cases():
             last_worker="ticket_operator", pending_customer_response=offer,
             ticket_operator_result=operator), "needs_ticket", "respond"),
         ("after_ticket_lookup", state("اعرض تذاكري", intent="ticket_enquiry", last_worker="ticket_enquiry",
-            ticket_enquiry_result={"action": "lookup_status", "lookup_succeeded": True,
+            ticket_enquiry_result={"action": "lookup_status", "outcome": "found",
                                    "tickets": [], "definitions": []}), "ticket_enquiry", "respond"),
     ]
     for outcome in ("answered", "partial", "no_answer", "failed"):

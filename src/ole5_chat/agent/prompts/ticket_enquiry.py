@@ -1,5 +1,7 @@
 """Prompts for the Ticket Enquiry tool agent and result interpretation phase."""
 
+import json
+
 from ole5_chat import products, values
 from ole5_chat.agent.context import router_context
 from ole5_chat.agent.state import AgentState
@@ -26,8 +28,10 @@ Gather the information needed to answer the customer's latest ticket question. T
 - find_tickets_by_date: tickets created on a day or in a date range.
 When the customer refers to a ticket without its number (the first or latest one, one about an issue, one from a
 date), find it with list_tickets or a find tool, then call get_ticket with its exact ticket number.
-"First", "oldest", "latest" or "last" ticket («اول تذكرة», «اقدم تذكرة», «آخر تذكرة») always means among all the
-customer's tickets, not only those created in this chat: use list_tickets with that order.
+"First", "oldest", "latest" or "last" ticket («اول تذكرة», «اقدم تذكرة», «آخر تذكرة») means among all the
+customer's tickets: use list_tickets with that order and limit=1. For example «هلا وش اقدم تذكرة عندي» or "hi, what
+is my oldest ticket?" → oldest_first, limit=1. Only when the customer limits it to this chat
+(«في هذه المحادثة», "in this chat"), take it from the tickets created in this chat below, then call get_ticket for it.
 When the customer asks for their available tickets or what tickets they have, call list_tickets.
 Use no tool when the customer asks only for the meaning of an already identified status.
 Ask for clarification only when the requested ticket cannot be identified safely.
@@ -41,16 +45,20 @@ An unavailable status must remain unavailable.
 Approved status definitions: {statuses}
 Latest customer message: {context['latest_customer_message'] or 'none'}
 Previous assistant message: {context['previous_assistant_message'] or 'none'}
-Tickets created in this chat only (not all the customer's tickets; use the tools for the others): {state.get('created_tickets') or 'none'}
+Tickets created in this chat: {state.get('created_tickets') or 'none'}
+Use them only to identify a ticket from this chat that the customer refers to, or when they limit the question to
+this chat. Otherwise, for their tickets or for the first, oldest, latest or last one, use the tools.
 
 Call only the provided ticket tools. Do not produce a customer-facing answer."""
 
 
-def ticket_enquiry_structured_prompt(state: AgentState, tool_report: str) -> str:
+def ticket_enquiry_structured_prompt(state: AgentState, tool_results: list[dict], error: str | None) -> str:
     config, context, statuses = _context(state)
+    stopped = (f"\nThe lookup stopped with an error after these results ({error}). Select only from the results "
+               "above; code reports the rest as not retrieved.\n" if error else "")
     return f"""You are the Ticket Enquiry result interpreter for {config.name}.
 
-Convert the tool-agent transcript and tool results into the required structured result.
+Read the customer's latest message and the tool results, and say which tickets the customer asked about.
 Do not answer the customer and do not create or offer a new ticket.
 
 Choose action:
@@ -58,13 +66,15 @@ Choose action:
 - explain_status: the customer asks what an identified status means;
 - clarify: the requested ticket cannot be identified safely.
 
-The tool results are authoritative evidence.
-Do not invent, remove, rename, or modify ticket numbers, titles, dates, or statuses.
-Do not mark a lookup as successful unless a tool returned the requested ticket.
-Do not turn a missing or unavailable status into a positive status.
+A ticket named by position (first, oldest, latest, last), by its issue or by its date is identified once the tools
+return it: the customer does not need to give its number. Use clarify only when the results still leave several
+possible tickets.
+
+selected_ticket_numbers: every ticket number the customer asked about, exactly as the tool results give it,
+including a number get_ticket did not find. For all their tickets, every listed number. For the first, oldest,
+latest or last one, only that one. Only numbers in the tool results can be selected.
 A ticket that get_ticket found but whose status is unavailable (status_available false) is still identified:
-return lookup_status with its ticket number, not clarify; its status is reported as unavailable.
-Include exact selected ticket numbers when known.
+return lookup_status with its ticket number, not clarify.
 Include a clarification question only when action is clarify.
 If the previous assistant already reported a missing ticket and the customer only confirms
 the same identifier, use a final clarification instead of repeating the same request.
@@ -73,9 +83,9 @@ Approved status definitions: {statuses}
 Latest customer message: {context['latest_customer_message'] or 'none'}
 Previous assistant message: {context['previous_assistant_message'] or 'none'}
 
-Tool-agent transcript and tool results:
-{tool_report}
-
+Tool results, in the order they ran:
+{json.dumps(tool_results, ensure_ascii=False, default=str)}
+{stopped}
 Return JSON only with action, reason, selected_ticket_numbers, and clarification_question."""
 
 

@@ -50,6 +50,11 @@ def finalize_node(state: AgentState) -> dict:
     if (state.get("search_outcome") == "answered" and state.get("current_references")
             and state.get("validation_outcome") != "fallback"):
         result["last_answer_evidence"] = {"evidence": state["current_references"]}
+    # Kept only behind a delivered lookup, so a follow-up about a shown ticket has a record of it.
+    lookup = state.get("ticket_enquiry_result") or {}
+    if (lookup.get("tickets") or lookup.get("failed_lookups")) and state.get("validation_outcome") != "fallback":
+        result["last_lookup"] = {"tickets": lookup.get("tickets") or [],
+                                 "failed_lookups": lookup.get("failed_lookups") or []}
     return result
 
 

@@ -67,7 +67,7 @@ def _router_ticket_enquiry_summary(state: AgentState) -> dict | None:
     tickets = result.get("tickets") or []
     return {
         "action": result.get("action") or "none",
-        "lookup_succeeded": result.get("lookup_succeeded"),
+        "outcome": result.get("outcome") or "none",
         "ticket_count": len(tickets),
         "error": bool(result.get("error")),
     }

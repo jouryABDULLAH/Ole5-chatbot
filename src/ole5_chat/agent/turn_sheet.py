@@ -7,7 +7,7 @@ from typing import Literal, TypedDict
 from ole5_chat.agent.state import AgentState
 
 Stage = Literal[
-    "answered", "no_answer", "search_failed", "ticket_status",
+    "answered", "no_answer", "search_failed", "ticket_status", "ticket_lookup_failed",
     "offer", "detail_requested", "summary_shown",
     "submitted", "submission_failed", "preparation_stopped",
     "queued", "clarify", "already_submitted", "other",
@@ -87,7 +87,8 @@ def build_turn_sheet(state: AgentState, language: str) -> TurnSheet:
     if intent == "question" and outcome == "answered":
         stage = "answered"
     elif intent == "ticket_enquiry" and state.get("ticket_enquiry_result"):
-        stage = "ticket_status"
+        failed = state["ticket_enquiry_result"].get("action") == "lookup_failed"
+        stage = "ticket_lookup_failed" if failed else "ticket_status"
     elif action == "submitted" and succeeded:
         stage = "submitted"
     elif action in {"submission_failed", "submitted"}:

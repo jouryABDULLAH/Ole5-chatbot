@@ -13,7 +13,7 @@ from ole5_chat import products
 log = logging.getLogger(__name__)
 
 FACTS = (
-    "manager_action", "ticket_result", "ticket_enquiry_result", "created_tickets",
+    "manager_action", "ticket_result", "ticket_enquiry_result", "last_lookup", "created_tickets",
     "active_issue", "pending_customer_response", "summary_shown", "ticket_draft",
     "explicit_ticket_request", "search_outcome", "intent", "last_worker", "ticket_operator_result",
 )
@@ -50,6 +50,10 @@ Flag any reply time, deadline or channel the company facts do not state.
 
 Allow:
 - Reporting a ticket or its status from {ticket_enquiry_result}.
+- Referring to a ticket in {last_lookup}: it was shown to the customer in an earlier lookup. Its status is as it
+  was then. It does not prove the ticket was created in this chat.
+- Saying the ticket information could not be retrieved when {ticket_enquiry_result}.action = lookup_failed, or that
+  a ticket number could not be found when it is in {ticket_enquiry_result}.failed_lookups.
 - Saying a ticket was already opened or submitted for the problem as ticket T-1, and that the support team will
   follow it up, when {ticket_operator_result}.action = already_submitted and its existing_ticket is T-1.
 

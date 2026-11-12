@@ -9,7 +9,7 @@ from ole5_chat.agent.state import AgentState
 ROUTER_ROUTES = {
     "question": "A product question or problem report needing the knowledge base. A named ordinary issue remains question even when the customer asks for a ticket: Search runs first.",
     "pending_response": "An answer to the active pending offer, required detail, or submission summary: accepting, declining, giving or refusing the detail, confirming, editing, or cancelling. A question about the pending step (where it goes, why a detail is needed, what happens next) is other, not an answer. Use only when pending customer response is present.",
-    "ticket_enquiry": "A lookup of the customer's ticket data, or an explanation of an identified ticket status. Support-process questions such as hours or reply channel are other.",
+    "ticket_enquiry": "A lookup of the customer's ticket data, or an explanation of an identified ticket status. A customer disputing or correcting a lookup result just shown (it is the wrong ticket, or not the one they asked for) is also ticket_enquiry: the lookup runs again. Support-process questions such as hours or reply channel are other.",
     "needs_ticket": "A configured always-ticket topic, configured urgent situation, or a report that suggested steps did not help.",
     "other": "A greeting, thanks, capability/About/company question, configured support-process question, off-topic message, evidence-grounded rephrasing, or unclear intent. General questions about support hours, response times, reply channels, and how support tickets work are other and go directly to respond, using configured support information.",
 }
@@ -38,6 +38,7 @@ ROUTER_EXAMPLES = {
     "ticket_enquiry": (
         '"وش صار على تذكرتي؟"; '
         '"What is the status of my ticket?"; '
+        '"هلا وش اقدم تذكرة عندي" or "hi, what is my oldest ticket?" → ticket_enquiry; '
         '"ما معنى غير متوفرة؟" after a ticket-status reply; '
         '"What happened to the ticket I opened earlier?"'
     ),
@@ -257,7 +258,7 @@ Example 5 (Operator completed after Search → Respond):
 
 Example 6 (Ticket lookup completed → Respond):
 - Customer: "اعرض تذاكري."
-- Context: last_worker=ticket_enquiry, lookup_succeeded=true, ticket_count=3.
+- Context: last_worker=ticket_enquiry, outcome=found, ticket_count=3.
 - Decision: intent="ticket_enquiry", next_target="respond", explicit_ticket_request=false.
 - reason: "The requested lookup is complete; present its authorized result."
 

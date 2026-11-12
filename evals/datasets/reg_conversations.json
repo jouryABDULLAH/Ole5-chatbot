@@ -150,6 +150,93 @@
           }
         ]
       }
+    },
+    {
+      "id": "greeting-with-oldest-ticket-enquiry",
+      "notes": "logs/chat-20261112-163857.log 16:49 and 16:50: the Router chose other twice ('how to submit a ticket': it read اقدم as أُقدّم, submit, not أقدم, oldest; عندي makes it oldest) and Respond only greeted back. Without «هلا» the same question went to ticket_enquiry.",
+      "input": {
+        "turns": [
+          "هلا وش اقدم تذكرة عندي"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "ran": ["ticket_enquiry"],
+            "not_ran": ["search", "ticket_operator"],
+            "facts": {"intent": "ticket_enquiry", "enquiry_tickets": ["T-MOCK-20261110103732-0001"]},
+            "must_have": [["T-MOCK-20261110103732-0001"], ["أقدم", "اقدم"]],
+            "pending": null,
+            "created": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "greeting-with-oldest-ticket-enquiry-hamza",
+      "notes": "logs/chat-20261112-171709.log 17:17: with the example «هلا وش اقدم تذكرة عندي» already in the Router prompt, the same sentence written «أقدم» (with the hamza) still went to other ('which ticket to submit'). This wording is in no prompt, so it measures the reading, not the example.",
+      "input": {
+        "turns": [
+          "هلا وش أقدم تذكرة عندي"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "ran": ["ticket_enquiry"],
+            "not_ran": ["search", "ticket_operator"],
+            "facts": {"intent": "ticket_enquiry", "enquiry_tickets": ["T-MOCK-20261110103732-0001"]},
+            "must_have": [["T-MOCK-20261110103732-0001"], ["أقدم", "اقدم"]],
+            "pending": null,
+            "created": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "oldest-ticket-is-the-oldest",
+      "notes": "logs/chat-20261112-163857.log 16:51: the tool agent called list_tickets(order=newest_first, limit=1) for «وش اقدم تذكرة عندي» and showed the newest ticket. The expected number is the oldest ole5.test@example.com ticket in sheets/tickets.xlsx (2026-11-10); update it if that sheet is reset.",
+      "input": {
+        "turns": [
+          "وش اقدم تذكرة عندي"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "ran": ["ticket_enquiry"],
+            "facts": {"intent": "ticket_enquiry", "enquiry_tickets": ["T-MOCK-20261110103732-0001"]},
+            "must_have": [["T-MOCK-20261110103732-0001"], ["أقدم", "اقدم"]],
+            "pending": null,
+            "created": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "disputed-lookup-looks-again",
+      "notes": "logs/chat-20261112-163857.log 16:52: after the wrong (newest) ticket was shown, «هذي جديدة مو قديمة» went to other; Respond invented a creation and then denied any record, and the customer got the fallback. The first turn asks for the latest ticket so the second is a dispute whatever the first returns.",
+      "input": {
+        "turns": [
+          "وش آخر تذكرة عندي",
+          "هذي جديدة مو قديمة، أبي القديمة"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "ran": ["ticket_enquiry"],
+            "facts": {"intent": "ticket_enquiry"}
+          },
+          {
+            "ran": ["ticket_enquiry"],
+            "facts": {"intent": "ticket_enquiry", "enquiry_tickets": ["T-MOCK-20261110103732-0001"],
+                      "validation": "pass"},
+            "pending": null,
+            "created": 0
+          }
+        ]
+      }
     }
   ]
 }

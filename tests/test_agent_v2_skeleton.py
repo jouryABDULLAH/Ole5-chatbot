@@ -329,16 +329,12 @@ def test_ticket_status_lookup_returns_authorized_data():
          "created_at": "2026-11-01", "customer_email": "other@example.com"},
     ]
 
-    def tool_agent(current):
+    def tool_agent(current, sink):
         # The real tools, called the way the tool agent would: one call for the customer's ticket, one for another's.
-        get_ticket = {t.name: t for t in ticket_enquiry.build_ticket_tools(current)}["get_ticket"]
-        messages = []
-        for n, number in enumerate(("T1", "T2")):
-            messages.append(AIMessage(content="", tool_calls=[
-                {"name": "get_ticket", "args": {"ticket_number": number}, "id": f"call-{n}"}]))
-            messages.append(ToolMessage(content=get_ticket.invoke({"ticket_number": number}),
-                                        name="get_ticket", tool_call_id=f"call-{n}"))
-        return {"messages": messages}
+        get_ticket = {t.name: t for t in ticket_enquiry.build_ticket_tools(current, sink)}["get_ticket"]
+        for number in ("T1", "T2"):
+            get_ticket.invoke({"ticket_number": number})
+        return {"messages": []}
 
     completion = TicketEnquiryCompletion(action="lookup_status", reason="Customer asks for current status.",
                                          selected_ticket_numbers=["T1"])
@@ -346,10 +342,11 @@ def test_ticket_status_lookup_returns_authorized_data():
         client.return_value.get.return_value = {"state": "open"}
         result = ticket_enquiry_node(state)
     enquiry = result["ticket_enquiry_result"]
-    assert enquiry["lookup_succeeded"] is True
+    assert enquiry["outcome"] == "partial"
     assert enquiry["tickets"] == [{"ticket_number": "T1", "title": "Archive button fails", "product": "OLE5",
-                                   "created_at": "2026-11-01", "state": "open"}]
-    assert enquiry["lookup_outcomes"] == ["found", "not_found"]
+                                   "created_at": "2026-11-01", "state": "open", "status_available": True}]
+    # Another customer's T2 is not found for this customer: reported as not found, never its data.
+    assert enquiry["failed_lookups"] == [{"ticket_number": "T2", "reason": "not_found"}]
     client.return_value.get.assert_called_once_with("id-1")
 
 

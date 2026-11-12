@@ -55,7 +55,7 @@ def test_router_omits_payloads_without_changing_response_facts():
             {"text": "PRIVATE_CHUNK_SENTINEL", "document": "Guide", "relation": "DIRECT"}]},
         ticket_operator_result={"action": "submit", "ticket_result": {
             "submission_succeeded": False, "response_instruction": "PRIVATE_INSTRUCTION_SENTINEL"}},
-        ticket_enquiry_result={"action": "lookup_status", "lookup_succeeded": True,
+        ticket_enquiry_result={"action": "lookup_status", "outcome": "found",
                                "tickets": [{"title": "PRIVATE_TICKET_SENTINEL"}],
                                "definitions": ["PRIVATE_DEFINITION_SENTINEL"]},
     )
@@ -87,7 +87,8 @@ def test_latest_worker_replaces_previous_marker_and_finalize_clears_it(worker, f
     result = {"search_outcome": "failed" if failed else "answered"} if worker == "search" else (
         {"manager_action": "submit", "ticket_result": {"submission_succeeded": not failed}}
         if worker == "ticket_operator" else
-        {"ticket_enquiry_result": {"action": "lookup_status", "lookup_succeeded": not failed}})
+        {"ticket_enquiry_result": {"action": "lookup_failed" if failed else "lookup_status",
+                                   "outcome": None if failed else "found"}})
     with patch.object(module, f"_{worker}_node", return_value=result):
         update = getattr(module, f"{worker}_node")(current)
     current.update(update)
