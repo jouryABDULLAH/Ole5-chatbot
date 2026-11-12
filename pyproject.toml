@@ -59,6 +59,12 @@ task = "evals.regression_task:flow_task"
 graders = ["evals.regression_graders:pending_matches", "evals.regression_graders:counts_match", "evals.regression_graders:no_fallback", "evals.graders:language_matches"]
 timeout = 900
 
+# Conversations from docs/11_nov_bugs_last.md, replayed with the real Search: route, state and records per turn.
+[tool.evalkit.suites.reg_conversations]
+task = "evals.regression_task:conversation_task"
+graders = ["evals.regression_graders:nodes_match", "evals.regression_graders:facts_match", "evals.regression_graders:records_match", "evals.regression_graders:pending_matches", "evals.regression_graders:counts_match", "evals.regression_graders:required_text"]
+timeout = 900
+
 [tool.evalkit.suites.reg_guards]
 task = "evals.regression_task:guard_task"
 graders = ["evals.regression_graders:guard_outcome", "evals.regression_graders:required_text"]

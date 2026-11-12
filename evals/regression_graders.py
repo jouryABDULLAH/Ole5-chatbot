@@ -1,6 +1,7 @@
 """Graders for the reg_* suites. All are plain checks on the task's output except grounded, which reuses the
 correctness judge."""
 
+import json
 import re
 
 from phoenix.client.resources.experiments.types import ExperimentEvaluation as EvaluationResult
@@ -109,6 +110,42 @@ def counts_match(input: dict, output: dict, expected: dict) -> EvaluationResult:
     if not any(key in expected for key in ("created", "queued")):
         return _skip("no expected counts")
     return _result(not wrong, f"wrong: {wrong or 'nothing'}")
+
+
+def nodes_match(input: dict, output: dict, expected: dict) -> EvaluationResult:
+    """expected["ran"]: nodes the turn must reach; expected["not_ran"]: nodes it must not. A plausible reply from the
+    wrong worker fails here."""
+    if not ("ran" in expected or "not_ran" in expected):
+        return _skip("no expected nodes")
+    nodes = output.get("nodes") or []
+    missing = [node for node in expected.get("ran", []) if node not in nodes]
+    extra = [node for node in expected.get("not_ran", []) if node in nodes]
+    return _result(not missing and not extra, f"missing {missing}, should not run {extra}; ran {nodes}")
+
+
+def facts_match(input: dict, output: dict, expected: dict) -> EvaluationResult:
+    """expected["facts"]: output fields with the value they must have, e.g. intent, search_outcome, draft."""
+    if "facts" not in expected:
+        return _skip("no expected facts")
+    wrong = {key: output.get(key) for key, value in expected["facts"].items() if output.get(key) != value}
+    return _result(not wrong, f"wrong: {wrong or 'nothing'}")
+
+
+def records_match(input: dict, output: dict, expected: dict) -> EvaluationResult:
+    """The selected records hold the right details. expected["draft_excludes"]: text not anywhere in the draft;
+    expected["draft_unknown_excludes"]: details not in the draft's unknown list; expected["tickets_include"]: text in
+    the created tickets."""
+    keys = ("draft_excludes", "draft_unknown_excludes", "tickets_include")
+    if not any(key in expected for key in keys):
+        return _skip("no expected records")
+    draft = output.get("draft") or {}
+    draft_text = json.dumps(draft, ensure_ascii=False)
+    tickets_text = json.dumps(output.get("tickets") or [], ensure_ascii=False)
+    problems = [f"draft has {text!r}" for text in expected.get("draft_excludes", []) if text in draft_text]
+    problems += [f"draft unknown has {item!r}" for item in expected.get("draft_unknown_excludes", [])
+                 if item in (draft.get("unknown") or [])]
+    problems += [f"tickets lack {text!r}" for text in expected.get("tickets_include", []) if text not in tickets_text]
+    return _result(not problems, "; ".join(problems) or "records as expected")
 
 
 def no_fallback(input: dict, output: dict, expected: dict) -> EvaluationResult:

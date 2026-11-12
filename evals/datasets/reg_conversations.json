@@ -1,0 +1,155 @@
+{
+  "cases": [
+    {
+      "id": "password-not-working-searches",
+      "input": {
+        "turns": [
+          "عندي مشكلة في كلمة المرور ما تضبط معي"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "ran": ["search"],
+            "facts": {"intent": "question"}
+          }
+        ]
+      }
+    },
+    {
+      "id": "password-forgotten-searches",
+      "input": {
+        "turns": [
+          "نسيت كلمة المرور"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "ran": ["search"],
+            "facts": {"intent": "question"}
+          }
+        ]
+      }
+    },
+    {
+      "id": "account-suspended-needs-ticket",
+      "input": {
+        "turns": [
+          "ليش حسابي موقوف"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "ran": ["ticket_operator"],
+            "not_ran": ["search"],
+            "facts": {"intent": "needs_ticket"}
+          }
+        ]
+      }
+    },
+    {
+      "id": "new-ticket-does-not-reuse-earlier-details",
+      "input": {
+        "turns": [
+          "زر الارشفة ما يشتغل",
+          "ما ضبطت معي",
+          "نعم",
+          "لا اعلم",
+          "ERROR404",
+          "نعم",
+          "ولا موظف عندنا يقدر يسجل دخول من الصباح",
+          "نعم"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {},
+          {},
+          {},
+          {},
+          {},
+          {
+            "pending": null,
+            "created": 1,
+            "queued": 0,
+            "tickets_include": ["ERROR404"]
+          },
+          {
+            "created": 1,
+            "queued": 0
+          },
+          {
+            "pending": "summary",
+            "created": 1,
+            "queued": 0,
+            "draft_excludes": ["ERROR404"],
+            "draft_unknown_excludes": ["page"],
+            "must_not": ["قائمة الانتظار"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "explicit-ticket-after-answer",
+      "input": {
+        "turns": [
+          "كيف انشئ مراسلة داخلية",
+          "ما فهمت",
+          "افتح لي تذكرة عن  انشاء مراسلة داخلية"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "ran": ["search"],
+            "facts": {"search_outcome": "answered"}
+          },
+          {},
+          {
+            "ran": ["ticket_operator"],
+            "facts": {"explicit_ticket_request": true},
+            "pending": ["offer", "detail", "summary"],
+            "must_not": ["لم أتمكن من العثور", "لم أستطع العثور"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "out-of-scope-ticket-request",
+      "input": {
+        "turns": [
+          "افح لي تيكت في مشكلة الاجواء الممطرة"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "not_ran": ["search", "ticket_operator"],
+            "facts": {"intent": "other", "active_issue": null, "draft": null},
+            "pending": null,
+            "created": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "out-of-scope-question",
+      "input": {
+        "turns": [
+          "ما هي مشكلة الاجواء الممطرةلا"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "not_ran": ["search", "ticket_operator"],
+            "facts": {"intent": "other"},
+            "pending": null
+          }
+        ]
+      }
+    }
+  ]
+}

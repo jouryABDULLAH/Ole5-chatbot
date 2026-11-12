@@ -79,11 +79,16 @@ def _turn(sid: str, state: dict) -> dict:
     """finalize clears the turn's facts, so they are read from the checkpoint just before it."""
     history = list(agent_session._graph.get_state_history(agent_session._config(sid)))
     before = next(snapshot.values for snapshot in history if snapshot.next == ("finalize",))
+    start = next(i for i, snapshot in enumerate(history) if snapshot.metadata.get("source") == "input")
     return {
         **_timings(history),
         "answer": state["messages"][-1].text,
+        # The nodes this turn ran, in order, from the checkpoints: which workers the route actually reached.
+        "nodes": [node for snapshot in reversed(history[:start + 1]) for node in snapshot.next
+                  if node != "__start__"],
         "stage": _stage(before),
         "intent": before.get("intent"),
+        "explicit_ticket_request": before.get("explicit_ticket_request"),
         "search_outcome": before.get("search_outcome"),
         "search_queries": list(before.get("search_queries") or []),
         "operator_action": (before.get("ticket_operator_result") or {}).get("action"),
@@ -95,6 +100,9 @@ def _turn(sid: str, state: dict) -> dict:
         "pending": _kind(state),
         "queued": len(state.get("pending_issues") or []),
         "created": len(state.get("created_tickets") or []),
+        "active_issue": state.get("active_issue"),
+        "draft": state.get("ticket_draft"),
+        "tickets": list(state.get("created_tickets") or []),
     }
 
 
@@ -116,6 +124,12 @@ def flow_task(input: dict) -> dict:
         state = sessions.submit(sid) if text == SUBMIT else sessions.send(sid, text)
         turns.append(_turn(sid, state))
     return {"turns": turns}
+
+
+def conversation_task(input: dict) -> dict:
+    """A logged conversation replayed with the real Search, so a wrong route is not hidden by a stubbed result."""
+    sid, _ = sessions.start(_email())
+    return {"turns": [_turn(sid, sessions.send(sid, text)) for text in input["turns"]]}
 
 
 def _state(fixture: dict) -> dict:
