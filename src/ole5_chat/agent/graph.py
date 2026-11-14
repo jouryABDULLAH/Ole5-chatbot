@@ -1,4 +1,4 @@
-﻿"""Graph skeleton for the new owner-routing design."""
+"""Graph skeleton for the new owner-routing design."""
 
 from collections.abc import Callable
 

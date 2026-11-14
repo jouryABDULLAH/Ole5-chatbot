@@ -1,4 +1,4 @@
-﻿"""The Submit flow: checks the ready draft again, creates the ticket with the summary and the conversation, classifies it with an internal note that links the attached files, records it in tickets.xlsx and the files in attachments.xlsx, and returns the ticket."""
+"""The Submit flow: checks the ready draft again, creates the ticket with the summary and the conversation, classifies it with an internal note that links the attached files, records it in tickets.xlsx and the files in attachments.xlsx, and returns the ticket."""
 
 import logging
 from datetime import datetime, timezone

@@ -1,4 +1,4 @@
-﻿"""The state of one conversation, as LangGraph carries it between messages. Field names follow the requirements' model output."""
+"""The state of one conversation, as LangGraph carries it between messages. Field names follow the requirements' model output."""
 
 from typing import Literal
 

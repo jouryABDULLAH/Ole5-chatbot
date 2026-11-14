@@ -1,4 +1,4 @@
-﻿"""Response guardrails owned by the v2 graph."""
+"""Response guardrails owned by the v2 graph."""
 
 import re
 

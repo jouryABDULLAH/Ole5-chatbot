@@ -1,4 +1,4 @@
-﻿"""Search prompt builder."""
+"""Search prompt builder."""
 
 from ole5_chat import products
 from ole5_chat.agent.context import search_context
