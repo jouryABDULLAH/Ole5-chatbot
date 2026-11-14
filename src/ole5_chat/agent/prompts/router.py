@@ -7,10 +7,10 @@ from ole5_chat.agent.state import AgentState
 
 
 ROUTER_ROUTES = {
-    "question": "A product question or problem report needing the knowledge base. A named ordinary issue remains question even when the customer asks for a ticket: Search runs first.",
+    "question": "A question or problem report about the product, within the product scope, needing the knowledge base. A named product issue remains question even when the customer asks for a ticket: Search runs first. A subject outside the product scope is never question.",
     "pending_response": "An answer to the active pending offer, required detail, or submission summary: accepting, declining, giving or refusing the detail, confirming, editing, or cancelling. A question about the pending step (where it goes, why a detail is needed, what happens next) is other, not an answer. Use only when pending customer response is present.",
     "ticket_enquiry": "A lookup of the customer's ticket data, or an explanation of an identified ticket status. A customer disputing or correcting a lookup result just shown (it is the wrong ticket, or not the one they asked for) is also ticket_enquiry: the lookup runs again. Support-process questions such as hours or reply channel are other.",
-    "needs_ticket": "A configured always-ticket topic, configured urgent situation, or a report that suggested steps did not help.",
+    "needs_ticket": "A configured always-ticket topic, configured urgent situation, or a report that suggested steps did not help, always about the product, within the product scope. A subject outside the product scope is never needs_ticket.",
     "other": "A greeting, thanks, capability/About/company question, configured support-process question, off-topic message, evidence-grounded rephrasing, or unclear intent. General questions about support hours, response times, reply channels, and how support tickets work are other and go directly to respond, using configured support information.",
 }
 
@@ -21,6 +21,8 @@ ROUTER_EXAMPLES = {
         'explicit_ticket_request=true; '
         '"افتح لي تذكرة عن الطباعة اللي تطلع صفحة فاضية" → question, explicit_ticket_request=true '
         '(a named problem: Search runs first); '
+        '"افتح لي تذكرة عن زر الأرشفة ما يشتغل" → question, explicit_ticket_request=true '
+        '(a product problem with a ticket request); '
         '"وعلى الآيباد؟" after a product answer → question; '
         '"A letter sent to the CEO for signature was signed and sent back, '
         'but it does not appear in the system."'
@@ -45,6 +47,7 @@ ROUTER_EXAMPLES = {
     "needs_ticket": (
         '"نبي ننقل بياناتنا من النظام القديم"; '
         '"ولا موظف عندنا يقدر يسجل دخول"; '
+        '"بعد المطر ما عاد يفتح نظام Ole5 عند الموظفين" (a product failure; the rain is only when it started); '
         '"لا زال لا يعمل" after suggested steps; '
         '"افتحوا تذكرة لنقل البيانات" → needs_ticket, '
         'explicit_ticket_request=true (data migration is an always-ticket topic)'
@@ -55,6 +58,8 @@ ROUTER_EXAMPLES = {
         '"اشرحها ببساطة" after a product answer; '
         '"لوين ترسل التذكرة؟" or "لماذا تحتاج اسم المتصفح؟" while a step is pending (a question about the step); '
         '"الأرشفة" with nothing pending; "عندي مشكلة" or "افتح لي تذكرة" with no problem named (Respond asks what the problem is); '
+        '"افتح لي تذكرة عن الأيام الممطرة" → other, explicit_ticket_request=false (the subject is outside the '
+        'product scope; asking for a ticket does not change that: no Search and no ticket); '
         '"الغها" with nothing pending and no active issue (there is nothing to cancel); '
         'an unrelated/off-topic question; '
         'an ambiguous reference such as "الثانية" when no clear referent exists'
@@ -125,7 +130,7 @@ Product scope: {config.scope or 'none'}
 Knowledge-base boundary: the knowledge base covers {config.name} product documentation. Ticketing procedures,
 support hours, reply channels, and ticket status are handled from configured support information or ticket data,
 not by product search.
-Chat scope: product knowledge and ticket operations only. A direct request to act on a specific account requires ticket handling. How Ole5 handles accounts in general (disabling, reactivating, deleting, roles, permissions rules, password reset) is documented, so it is a product question. After a worker completes, use the handoff rules below rather than repeating the initial operation.
+Chat scope: product knowledge, and tickets about the product, only. Decide first whether the subject of the message is within the product scope: asking for a ticket does not make a subject part of the product. A direct request to act on a specific account requires ticket handling. How Ole5 handles accounts in general (disabling, reactivating, deleting, roles, permissions rules, password reset) is documented, so it is a product question. After a worker completes, use the handoff rules below rather than repeating the initial operation.
 About: {about}
 Always-ticket topics: {join_values(config.always_ticket)}
 Urgent situations: {join_values(config.urgent_when)}
@@ -154,7 +159,12 @@ Intent describes what the customer requested; worker completion alone does not c
   - A direct request to act on a specific account is needs_ticket: «غيروا ايميلي», «فعّلوا حساب أحمد», «أضيفوا لي صلاحية الأرشفة».
   - Anything else about accounts is question, even about the customer's own account: a problem («كلمة المرور ما تضبط معي»), or how Ole5 handles accounts («موظف استقال، كيف اعطل حسابه واحتفظ بمراسلاته؟», «كيف اعيد تفعيل حساب معطّل», «ليش ما ينحذف الدور»).
 - Use pending_response only when the message answers the active pending interaction. A question about it, with no answer, is other: Respond answers it and keeps the step. A direct request to act on a specific account is needs_ticket even if a ticket interaction is pending.
-- A ticket request is classified by what it names, not by the word "ticket": when it names a product problem, it is `question` with explicit_ticket_request=true, and Search runs first. With no problem named, it is `other`: Respond asks what the problem is. It is `needs_ticket` when it names an always-ticket topic or an urgent situation. It is `other` when what it names is outside the product scope, like any off-topic message: no Search and no ticket.
+- A ticket request is classified by what it names, not by the word "ticket". Requesting a ticket does not establish that the subject is about the product: check the subject against the product scope first.
+  - It names something outside the product scope: `other`, like any off-topic message, with explicit_ticket_request=false. No Search and no ticket.
+  - It names a problem within the product scope: `question` with explicit_ticket_request=true, and Search runs first.
+  - It names an always-ticket topic or an urgent situation: `needs_ticket`.
+  - It names no problem: `other`. Respond asks what the problem is.
+  - A product failure stays a product problem when the message also mentions something unrelated as its circumstances.
 - Greetings, thanks, capabilities and support-process FAQs are other.
 - Explicit existing-ticket lookups and explanations of identified ticket statuses are ticket_enquiry. Asking whether the assistant CAN access tickets is other. "هل أقدر أستعلم عن تذاكري؟" and "هل اقدر استعلم عن تذاكري التي انشأتها" ask about capability, so choose other; "اعرض تذاكري" requests an actual lookup, so choose ticket_enquiry.
 
@@ -220,7 +230,7 @@ Never rewrite worker outputs or invent results. Return only the Router decision 
 - Added information: a message that adds a fact to a problem already in the conversation (a page, a box number, an error text, a device) is never `other`.
   - With a summary or detail pending for that problem, it is `pending_response`: the Operator adds it to the ticket. «Invalid credentials» after an urgent summary about signing in.
   - With nothing pending, after a product answer, it is `question`: Search looks again with the new fact. «رقم الصندوق 222» after archive steps. It is `needs_ticket` only when it says the steps did not help.
-  - A different problem on its own is `question`, even while a step is pending for another request: «وكمان ما أقدر أطبع المراسلات، تطلع صفحة فاضية» during archive details.
+  - A different problem within the product scope, on its own, is `question`, even while a step is pending for another request: «وكمان ما أقدر أطبع المراسلات، تطلع صفحة فاضية» during archive details.
   - A message that answers the pending step and also raises a different problem is `pending_response`: the Operator records the answer and queues the new problem. «مدري أي صفحة، وعندي مشكلة ثانية بالفواتير» while the page is pending.
 - A new product question during ticket preparation is `question`, not `pending_response`. A change to a value in the ticket (page, error, priority, description) is `pending_response`, even when it names a product page or feature.
 - If an assistant-displayed reference is ambiguous, choose `other` and let Respond ask one focused clarification.
