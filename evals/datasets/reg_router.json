@@ -222,8 +222,8 @@
       "notes": "Asks support to change an account."},
     {"id": "account-own-permissions", "input": {"state": {"language": "ar", "messages": [
       {"role": "user", "content": "وش صلاحياتي في النظام؟"}]}},
-      "expected": {"facts": {"intent": "needs_ticket", "next_target": "ticket_operator"}},
-      "notes": "The customer's own account data: needs_ticket under today's policy (decided 2026-11-14)."},
+      "expected": {"facts": {"intent": "question", "next_target": "search"}},
+      "notes": "The prompt treats asking how to check one's own permissions as documented guidance; it does not reveal the actual account record."},
     {"id": "account-change-email", "input": {"state": {"language": "ar", "messages": [
       {"role": "user", "content": "غيروا الإيميل حقي في النظام"}]}},
       "expected": {"facts": {"intent": "needs_ticket", "next_target": "ticket_operator"}}},
@@ -244,6 +244,131 @@
       "expected": {"facts": {"intent": "other", "next_target": "respond"}}},
     {"id": "support-other-channel", "input": {"state": {"language": "ar", "messages": [
       {"role": "user", "content": "كيف أتواصل معكم غير هنا؟"}]}},
-      "expected": {"facts": {"intent": "other", "next_target": "respond"}}}
+      "expected": {"facts": {"intent": "other", "next_target": "respond"}}},
+
+    {"id": "urgent-explicit-ticket", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "افتحوا تذكرة عاجلة، ولا موظف عندنا يقدر يسجل دخول"}]}},
+      "expected": {"facts": {"intent": "needs_ticket", "next_target": "ticket_operator", "explicit_ticket_request": true}},
+      "notes": "The configured urgent situation and the explicit ticket request both apply."},
+    {"id": "urgent-without-ticket-request", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "ولا موظف عندنا يقدر يسجل دخول"}]}},
+      "expected": {"facts": {"intent": "needs_ticket", "next_target": "ticket_operator", "explicit_ticket_request": false}},
+      "notes": "Urgency/policy starts ticket handling but does not make the explicit-request flag true."},
+    {"id": "account-inspection-on-behalf", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "شيكوا أنتم على الصلاحيات الموجودة في حسابي"}]}},
+      "expected": {"facts": {"intent": "needs_ticket", "next_target": "ticket_operator"}}},
+    {"id": "account-permission-guidance", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "كيف أتحقق من الصلاحيات الموجودة على حسابي؟"}]}},
+      "expected": {"facts": {"intent": "question", "next_target": "search"}},
+      "notes": "Asks for documented steps, not support to inspect the record."},
+    {"id": "account-guidance-failed", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "جربت خطوات تغيير البريد وما قدرت"}]}},
+      "expected": {"facts": {"intent": "needs_ticket", "next_target": "ticket_operator"}}},
+    {"id": "pending-account-edit", "input": {"state": {"language": "ar",
+      "active_issue": {"id": "issue-1", "description": "تفعيل حساب موظف"},
+      "pending_customer_response": {"kind": "detail", "issue_id": "issue-1", "item": "person"},
+      "messages": [
+        {"role": "user", "content": "فعّلوا حساب محمد"},
+        {"role": "assistant", "content": "ما اسم الموظف الذي تريد تفعيل حسابه؟"},
+        {"role": "user", "content": "فعّلوا حساب أحمد بدل محمد"}]}},
+      "expected": {"facts": {"intent": "pending_response", "next_target": "ticket_operator"}},
+      "notes": "The account-action wording edits the active request; it is not a separate intervention."},
+    {"id": "separate-account-action-while-pending", "input": {"state": {"language": "ar",
+      "active_issue": {"id": "issue-1", "description": "زر الأرشفة لا يعمل"},
+      "pending_customer_response": {"kind": "detail", "issue_id": "issue-1", "item": "page"},
+      "messages": [
+        {"role": "user", "content": "زر الأرشفة لا يعمل"},
+        {"role": "assistant", "content": "ما اسم الصفحة؟"},
+        {"role": "user", "content": "فعّلوا حساب أحمد"}]}},
+      "expected": {"facts": {"intent": "needs_ticket", "next_target": "ticket_operator"}},
+      "notes": "The unrelated pending interaction does not change a separate account intervention."},
+    {"id": "pending-question-about-detail", "input": {"state": {"language": "ar",
+      "active_issue": {"id": "issue-1", "description": "المرفقات ما ترفع"},
+      "pending_customer_response": {"kind": "detail", "issue_id": "issue-1", "item": "browser"},
+      "messages": [
+        {"role": "assistant", "content": "ما المتصفح الذي تستخدمه؟"},
+        {"role": "user", "content": "ليش تحتاجون اسم المتصفح؟"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond"}}},
+    {"id": "failed-steps-short-no", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "ما أقدر أطبع المراسلات"},
+      {"role": "assistant", "content": "جرّب تحديث الصفحة ثم أعد الطباعة. هل اشتغلت الخطوات؟"},
+      {"role": "user", "content": "لا"}]}},
+      "expected": {"facts": {"intent": "needs_ticket", "next_target": "ticket_operator"}},
+      "notes": "A short reply is interpreted using the previous assistant question."},
+    {"id": "ambiguous-short-no", "input": {"state": {"language": "ar", "messages": [
+      {"role": "assistant", "content": "هل تفضل اللون الأزرق أم الأخضر؟"},
+      {"role": "user", "content": "لا"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond"}},
+      "notes": "There is no failed-troubleshooting meaning to inherit."},
+    {"id": "bare-ticket-resolved-from-context", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "زر الأرشفة ما يشتغل"},
+      {"role": "user", "content": "افتح لي تذكرة"}]}},
+      "expected": {"facts": {"intent": "question", "next_target": "search", "explicit_ticket_request": true}},
+      "notes": "The omitted subject is clear from the immediately preceding customer request."},
+    {"id": "bare-ticket-context-out-of-scope", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "السيارة ما تشتغل"},
+      {"role": "user", "content": "افتح لي تذكرة"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond", "explicit_ticket_request": false}},
+      "notes": "Context can supply a subject, but cannot bring an out-of-scope subject into scope."},
+    {"id": "ticket-for-support-process", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "افتحوا تذكرة عشان أعرف ساعات الرد"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond", "explicit_ticket_request": false}},
+      "notes": "A ticket request does not turn a support-process question into a product issue."},
+    {"id": "ticket-account-change-explicit", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "افتحوا تذكرة لتغيير بريدي الإلكتروني"}]}},
+      "expected": {"facts": {"intent": "needs_ticket", "next_target": "ticket_operator", "explicit_ticket_request": true}}},
+    {"id": "explicit-ticket-product-search-first", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "افتحوا تذكرة، زر الأرشفة لا يعمل منذ أمس"}]}},
+      "expected": {"facts": {"intent": "question", "next_target": "search", "explicit_ticket_request": true}},
+      "notes": "A named product problem remains Search-first unless it meets a needs_ticket rule."},
+    {"id": "enquiry-followup-status-explanation", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "وش حالة تذكرتي؟"},
+      {"role": "assistant", "content": "تذكرتك حالتها New."},
+      {"role": "user", "content": "تقدر تشرح لي وش يعني جديدة؟"}]}},
+      "expected": {"facts": {"intent": "ticket_enquiry", "next_target": "ticket_enquiry"}},
+      "notes": "A polite capability-shaped phrase is still a status explanation in context."},
+    {"id": "enquiry-followup-correction", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "وش أقدم تذكرة عندي؟"},
+      {"role": "assistant", "content": "أقدم تذكرة هي 1001."},
+      {"role": "user", "content": "لا، هذه أحدث تذكرة وليست أقدمها"}]}},
+      "expected": {"facts": {"intent": "ticket_enquiry", "next_target": "ticket_enquiry"}}},
+    {"id": "greeting-account-guidance", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "هلا، كيف أتحقق من بريدي المسجل؟"}]}},
+      "expected": {"facts": {"intent": "question", "next_target": "search"}},
+      "notes": "The greeting does not override the substantive account-guidance request."},
+    {"id": "thanks-account-change", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "شكراً، غيروا بريدي في النظام"}]}},
+      "expected": {"facts": {"intent": "needs_ticket", "next_target": "ticket_operator"}}},
+    {"id": "greeting-out-of-scope-ticket", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "هلا، افتح لي تذكرة عن زحمة الطريق"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond", "explicit_ticket_request": false}}},
+    {"id": "product-failure-with-unrelated-circumstance", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "من يوم سافرت ما أقدر أفتح المراسلات في Ole5"}]}},
+      "expected": {"facts": {"intent": "question", "next_target": "search"}},
+      "notes": "The travel detail is a circumstance; the product failure remains in scope."},
+    {"id": "ambiguous-followup-reference", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "الثانية"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond"}},
+      "notes": "No referent exists in the conversation, so Respond asks for clarification."},
+    {"id": "baseline-product-how-to", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "كيف أصدّر تقرير من النظام؟"}]}},
+      "expected": {"facts": {"intent": "question", "next_target": "search"}}},
+    {"id": "baseline-greeting-alone", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "صباح الخير"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond"}}},
+    {"id": "pending-summary-edit-priority", "input": {"state": {"language": "ar",
+      "active_issue": {"id": "issue-1", "description": "الطباعة تطلع صفحة فاضية"},
+      "pending_customer_response": {"kind": "summary", "issue_id": "issue-1"},
+      "messages": [
+        {"role": "assistant", "content": "ملخص التذكرة جاهز. هل تريد إرساله؟"},
+        {"role": "user", "content": "خلوا الأولوية عاجلة"}]}},
+      "expected": {"facts": {"intent": "pending_response", "next_target": "ticket_operator"}},
+      "notes": "Editing a field in the active ticket takes precedence over treating it as a new account or product request."},
+    {"id": "bare-ticket-after-no-answer", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "ايش هو بريدي الإلكتروني المسجل؟"},
+      {"role": "assistant", "content": "عذرًا، لا أستطيع العثور على إجابة لسؤالك."},
+      {"role": "user", "content": "زين افتح لي تذكرة"}]}},
+      "expected": {"facts": {"intent": "needs_ticket", "next_target": "ticket_operator", "explicit_ticket_request": true}},
+      "notes": "After the assistant could not answer, the explicit ticket request escalates the same resolved issue to the Ticket Operator."}
   ]
 }
