@@ -1,0 +1,249 @@
+{
+  "cases": [
+    {"id": "prompt-example-out-of-scope-ticket", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "افتح لي تذكرة عن الأيام الممطرة"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond", "explicit_ticket_request": false}},
+      "notes": "Same wording as an example in prompts/router.py: checks the example is followed, not the rule."},
+    {"id": "prompt-example-product-ticket", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "افتح لي تذكرة عن زر الأرشفة ما يشتغل"}]}},
+      "expected": {"facts": {"intent": "question", "next_target": "search", "explicit_ticket_request": true}},
+      "notes": "Same wording as an example in prompts/router.py."},
+    {"id": "prompt-example-urgent-with-weather", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "بعد المطر ما عاد يفتح نظام Ole5 عند الموظفين"}]}},
+      "expected": {"facts": {"intent": "needs_ticket", "next_target": "ticket_operator"}},
+      "notes": "Same wording as an example in prompts/router.py. Nobody can sign in: the configured urgent situation."},
+    {"id": "prompt-example-bare-ticket", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "افتح لي تذكرة"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond"}},
+      "notes": "Same wording as an example in prompts/router.py. Respond asks what the problem is."},
+
+    {"id": "out-of-scope-traffic-ticket", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "ابغى تذكرة عن مشكلة الزحمة في الطريق"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond", "explicit_ticket_request": false}}},
+    {"id": "out-of-scope-car-ticket-en", "input": {"state": {"language": "en", "messages": [
+      {"role": "user", "content": "open a ticket about my car not starting"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond", "explicit_ticket_request": false}}},
+    {"id": "out-of-scope-recipe", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "كيف اسوي كبسة؟"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond"}}},
+    {"id": "out-of-scope-opinion", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "وش رأيك في الواتساب؟"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond"}}},
+    {"id": "out-of-scope-home-internet-ticket", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "افتح تذكرة عن مشكلة الإنترنت في البيت"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond", "explicit_ticket_request": false}}},
+    {"id": "out-of-scope-other-product", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "مشكلة في إكسل ما يحفظ الملف"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond"}},
+      "notes": "A different product, not Ole5."},
+
+    {"id": "in-scope-power-cut-background", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "من أمس بعد انقطاع الكهرباء ما يطلع زر الأرشفة"}]}},
+      "expected": {"facts": {"intent": "question", "next_target": "search"}},
+      "notes": "The power cut is only when it started; the archive button is the product problem."},
+    {"id": "in-scope-at-home-background", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "لما أكون في البيت ما أقدر أفتح المراسلات الواردة"}]}},
+      "expected": {"facts": {"intent": "question", "next_target": "search"}}},
+    {"id": "in-scope-windows-update-ticket", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "افتح تذكرة: بعد تحديث الويندوز الطباعة من النظام تطلع فاضية"}]}},
+      "expected": {"facts": {"intent": "question", "next_target": "search", "explicit_ticket_request": true}}},
+
+    {"id": "ticket-request-product-subject", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "ابي تكت عن البحث في الأرشيف بطيء"}]}},
+      "expected": {"facts": {"intent": "question", "next_target": "search", "explicit_ticket_request": true}},
+      "notes": "Pairs with ticket-request-no-subject: decided by the subject, not by the word ticket."},
+    {"id": "ticket-request-product-subject-en", "input": {"state": {"language": "en", "messages": [
+      {"role": "user", "content": "I need a ticket, attachments won't upload"}]}},
+      "expected": {"facts": {"intent": "question", "next_target": "search", "explicit_ticket_request": true}}},
+    {"id": "ticket-request-no-subject", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "سو لي تذكرة"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond"}}},
+    {"id": "problem-no-subject", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "عندي مشكلة"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond"}}},
+
+    {"id": "repeated-question-reworded", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "كيف أحفظ المراسلة كمسودة؟"},
+      {"role": "assistant", "content": "في أسفل شاشة إنشاء المراسلة اضغط زر \"حفظ\" لنقلها إلى المسودات والعودة إليها لاحقاً بدلاً من إرسالها."},
+      {"role": "user", "content": "كيف احفظها مسودة؟"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond"}},
+      "notes": "Already answered in the previous message: no new Search."},
+    {"id": "repeated-question-steps-again", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "كيف أحفظ المراسلة كمسودة؟"},
+      {"role": "assistant", "content": "في أسفل شاشة إنشاء المراسلة اضغط زر \"حفظ\" لنقلها إلى المسودات والعودة إليها لاحقاً بدلاً من إرسالها."},
+      {"role": "user", "content": "طيب وش الخطوات مرة ثانية؟"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond"}}},
+    {"id": "follow-up-with-new-detail", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "كيف أحفظ المراسلة كمسودة؟"},
+      {"role": "assistant", "content": "في أسفل شاشة إنشاء المراسلة اضغط زر \"حفظ\" لنقلها إلى المسودات والعودة إليها لاحقاً بدلاً من إرسالها."},
+      {"role": "user", "content": "وعلى الجوال؟"}]}},
+      "expected": {"facts": {"intent": "question", "next_target": "search"}},
+      "notes": "Same topic with a new detail: a new Search."},
+    {"id": "repeated-earlier-question", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "كيف أحفظ المراسلة كمسودة؟"},
+      {"role": "assistant", "content": "في أسفل شاشة إنشاء المراسلة اضغط زر \"حفظ\" لنقلها إلى المسودات والعودة إليها لاحقاً بدلاً من إرسالها."},
+      {"role": "user", "content": "وكيف أربط مراسلة بمراسلة ثانية؟"},
+      {"role": "assistant", "content": "من حقل \"المراسلات المرتبطة\" في شاشة إنشاء المراسلة، اختر المراسلة التي تريد ربطها."},
+      {"role": "user", "content": "طيب ارجع لي، كيف احفظ المراسلة مسودة؟"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond"}},
+      "notes": "Answered two answers back. Expected other (no new Search), but not achievable yet: only the latest answer's passages are kept (last_answer_evidence, finalize.py) and the Router is not told about them (router_context, context.py), so Respond would have no passages for it. Solving it is deferred."},
+    {"id": "repeated-question-after-no-answer", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "كيف أضيف علامة مائية على المراسلة؟"},
+      {"role": "assistant", "content": "لم أتمكن من العثور على إجابة حول إضافة علامة مائية على المراسلة."},
+      {"role": "user", "content": "كيف أضيف علامة مائية على المراسلة؟"}]}},
+      "expected": {"facts": {"intent": "question", "next_target": "search"}},
+      "notes": "There was no answer the first time, so Search may run again."},
+
+    {"id": "composite-detail-answer-plus-new-problem", "input": {"state": {"language": "ar",
+      "active_issue": {"id": "issue-1", "description": "زر الأرشفة لا يعمل"},
+      "pending_customer_response": {"kind": "detail", "issue_id": "issue-1", "item": "page"},
+      "messages": [
+        {"role": "user", "content": "زر الأرشفة ما يشتغل"},
+        {"role": "assistant", "content": "لفتح التذكرة أحتاج بعض التفاصيل: ما اسم الصفحة التي يظهر فيها زر الأرشفة؟"},
+        {"role": "user", "content": "مدري، وكمان البحث ما يشتغل"}]}},
+      "expected": {"facts": {"intent": "pending_response", "next_target": "ticket_operator"}},
+      "notes": "Answers the pending detail and raises a new problem: the Operator records the answer and queues the problem."},
+    {"id": "composite-accept-plus-question", "input": {"state": {"language": "ar",
+      "active_issue": {"id": "issue-1", "description": "الطباعة تطلع صفحة فاضية"},
+      "pending_customer_response": {"kind": "offer", "issue_id": "issue-1"},
+      "messages": [
+        {"role": "user", "content": "الطباعة تطلع صفحة فاضية"},
+        {"role": "assistant", "content": "لم أجد إجابة حول الطباعة. بإمكاني فتح تذكرة لفريق الدعم الفني بخصوص الطباعة التي تطلع صفحة فاضية، هل ترغب بذلك؟"},
+        {"role": "user", "content": "نعم، وعندي سؤال ثاني: كيف أضيف مرفق؟"}]}},
+      "expected": {"facts": {"intent": "pending_response", "next_target": "ticket_operator"}}},
+    {"id": "composite-enquiry-plus-question", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "وش حالة تذكرتي، وكيف أطبع مراسلة؟"}]}},
+      "expected": {"facts": {"intent": "UNDECIDED"}},
+      "notes": "Fails on purpose until the expected behaviour is decided: the Router can return only one intent, so one of the two requests is lost. Decide the expected value (and the multi-request design) later."},
+    {"id": "composite-thanks-plus-question", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "شكراً، وكيف أأرشف مراسلة؟"}]}},
+      "expected": {"facts": {"intent": "question", "next_target": "search"}},
+      "notes": "Thanks plus a request is the request."},
+    {"id": "composite-greeting-plus-problem", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "هلا، زر الأرشفة ما يشتغل"}]}},
+      "expected": {"facts": {"intent": "question", "next_target": "search"}},
+      "notes": "A greeting plus a request is the request."},
+
+    {"id": "enquiry-oldest-with-greeting", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "مساء الخير، ابي أعرف أقدم تذكرة لي"}]}},
+      "expected": {"facts": {"intent": "ticket_enquiry", "next_target": "ticket_enquiry"}},
+      "notes": "Finding 13: أقدم (oldest) misread as أُقدّم (submit), worst after a greeting."},
+    {"id": "enquiry-oldest-hamza", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "هلا وش أقدم تذكرة عندي"}]}},
+      "expected": {"facts": {"intent": "ticket_enquiry", "next_target": "ticket_enquiry"}},
+      "notes": "logs/chat-20261112-171709.log 17:17: went to other with the example (without the hamza) already in the prompt."},
+    {"id": "enquiry-latest-en", "input": {"state": {"language": "en", "messages": [
+      {"role": "user", "content": "what is my latest ticket?"}]}},
+      "expected": {"facts": {"intent": "ticket_enquiry", "next_target": "ticket_enquiry"}}},
+    {"id": "enquiry-last-submitted", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "وش آخر تذكرة رفعتها؟"}]}},
+      "expected": {"facts": {"intent": "ticket_enquiry", "next_target": "ticket_enquiry"}}},
+    {"id": "enquiry-by-date", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "وش التذاكر اللي فتحتها اليوم؟"}]}},
+      "expected": {"facts": {"intent": "ticket_enquiry", "next_target": "ticket_enquiry"}}},
+    {"id": "enquiry-dispute", "input": {"state": {"language": "ar",
+      "last_lookup": {"tickets": [{"ticket_number": "T-MOCK-20261112143312-0003", "title": "Create favorite group",
+                                   "created_at": "2026-11-12", "state": "New", "status_available": true}], "failed_lookups": []},
+      "messages": [
+        {"role": "user", "content": "وش أقدم تذكرة عندي"},
+        {"role": "assistant", "content": "رقم التذكرة: T-MOCK-20261112143312-0003، العنوان: Create favorite group، تاريخ الإنشاء: 2026-11-12، الحالة: New"},
+        {"role": "user", "content": "لا مو هذي، أقصد الأقدم منها"}]}},
+      "expected": {"facts": {"intent": "ticket_enquiry", "next_target": "ticket_enquiry"}},
+      "notes": "Disputing a lookup just shown runs the lookup again (logs/chat-20261112-163857.log 16:52 went to other)."},
+    {"id": "enquiry-status-meaning", "input": {"state": {"language": "ar",
+      "last_lookup": {"tickets": [{"ticket_number": "T-MOCK-20261110103732-0001", "title": "Automatic translation of message text",
+                                   "created_at": "2026-11-10", "state": "New", "status_available": true}], "failed_lookups": []},
+      "messages": [
+        {"role": "user", "content": "وش أقدم تذكرة عندي"},
+        {"role": "assistant", "content": "أقدم تذكرة لديك هي T-MOCK-20261110103732-0001، أُنشئت في 2026-11-10، وحالتها New."},
+        {"role": "user", "content": "يعني وش معنى جديدة؟"}]}},
+      "expected": {"facts": {"intent": "ticket_enquiry", "next_target": "ticket_enquiry"}},
+      "notes": "The meaning of a status just shown (logs/chat-20261112-161732.log 16:27: «كيف جديدة» went to Search)."},
+    {"id": "enquiry-capability-question", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "هل أقدر أشوف تذاكري؟"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond"}},
+      "notes": "Asks whether it can, not to show them."},
+
+    {"id": "pending-offer-yes", "input": {"state": {"language": "ar",
+      "active_issue": {"id": "issue-1", "description": "البحث في الأرشيف بطيء"},
+      "pending_customer_response": {"kind": "offer", "issue_id": "issue-1"},
+      "messages": [
+        {"role": "user", "content": "البحث في الأرشيف بطيء"},
+        {"role": "assistant", "content": "لم أجد إجابة حول بطء البحث في الأرشيف. بإمكاني فتح تذكرة لفريق الدعم الفني بخصوص ذلك، هل ترغب بذلك؟"},
+        {"role": "user", "content": "ايه"}]}},
+      "expected": {"facts": {"intent": "pending_response", "next_target": "ticket_operator"}}},
+    {"id": "pending-offer-no", "input": {"state": {"language": "ar",
+      "active_issue": {"id": "issue-1", "description": "البحث في الأرشيف بطيء"},
+      "pending_customer_response": {"kind": "offer", "issue_id": "issue-1"},
+      "messages": [
+        {"role": "user", "content": "البحث في الأرشيف بطيء"},
+        {"role": "assistant", "content": "لم أجد إجابة حول بطء البحث في الأرشيف. بإمكاني فتح تذكرة لفريق الدعم الفني بخصوص ذلك، هل ترغب بذلك؟"},
+        {"role": "user", "content": "لا ما ابي"}]}},
+      "expected": {"facts": {"intent": "pending_response", "next_target": "ticket_operator"}}},
+    {"id": "pending-summary-question-about-step", "input": {"state": {"language": "ar",
+      "active_issue": {"id": "issue-1", "description": "البحث في الأرشيف بطيء"},
+      "pending_customer_response": {"kind": "summary", "issue_id": "issue-1"},
+      "messages": [
+        {"role": "user", "content": "نعم"},
+        {"role": "assistant", "content": "ملخص طلب بطء البحث في الأرشيف جاهز. هل تريد إرساله؟"},
+        {"role": "user", "content": "لوين بتروح التذكرة؟"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond"}},
+      "notes": "A question about the pending step, not an answer to it."},
+    {"id": "pending-detail-browser-value", "input": {"state": {"language": "ar",
+      "active_issue": {"id": "issue-1", "description": "المرفقات ما ترفع"},
+      "pending_customer_response": {"kind": "detail", "issue_id": "issue-1", "item": "browser"},
+      "messages": [
+        {"role": "user", "content": "نعم"},
+        {"role": "assistant", "content": "لفتح التذكرة أحتاج بعض التفاصيل: ما المتصفح الذي تستخدمه؟"},
+        {"role": "user", "content": "Chrome"}]}},
+      "expected": {"facts": {"intent": "pending_response", "next_target": "ticket_operator"}}},
+    {"id": "pending-detail-new-question", "input": {"state": {"language": "ar",
+      "active_issue": {"id": "issue-1", "description": "المرفقات ما ترفع"},
+      "pending_customer_response": {"kind": "detail", "issue_id": "issue-1", "item": "browser"},
+      "messages": [
+        {"role": "user", "content": "نعم"},
+        {"role": "assistant", "content": "لفتح التذكرة أحتاج بعض التفاصيل: ما المتصفح الذي تستخدمه؟"},
+        {"role": "user", "content": "كيف أصدّر تقرير؟"}]}},
+      "expected": {"facts": {"intent": "question", "next_target": "search"}},
+      "notes": "A new product question during ticket details, not an answer."},
+    {"id": "nothing-pending-no", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "كيف أحفظ المراسلة كمسودة؟"},
+      {"role": "assistant", "content": "في أسفل شاشة إنشاء المراسلة اضغط زر \"حفظ\" لنقلها إلى المسودات."},
+      {"role": "user", "content": "لا"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond"}}},
+    {"id": "nothing-pending-cancel", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "الغها"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond"}},
+      "notes": "Nothing to cancel."},
+
+    {"id": "account-activate-someone", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "فعّلوا حساب سارة"}]}},
+      "expected": {"facts": {"intent": "needs_ticket", "next_target": "ticket_operator"}},
+      "notes": "Asks support to change an account."},
+    {"id": "account-own-permissions", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "وش صلاحياتي في النظام؟"}]}},
+      "expected": {"facts": {"intent": "needs_ticket", "next_target": "ticket_operator"}},
+      "notes": "The customer's own account data: needs_ticket under today's policy (decided 2026-11-14)."},
+    {"id": "account-change-email", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "غيروا الإيميل حقي في النظام"}]}},
+      "expected": {"facts": {"intent": "needs_ticket", "next_target": "ticket_operator"}}},
+    {"id": "account-disable-departed-employee", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "كيف أعطّل حساب موظف ترك العمل؟"}]}},
+      "expected": {"facts": {"intent": "question", "next_target": "search"}},
+      "notes": "How Ole5 handles accounts in general is documented."},
+    {"id": "account-forgot-password", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "نسيت كلمة السر"}]}},
+      "expected": {"facts": {"intent": "question", "next_target": "search"}}},
+    {"id": "account-cannot-sign-in", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "ليش حسابي ما يدخل؟"}]}},
+      "expected": {"facts": {"intent": "question", "next_target": "search"}},
+      "notes": "A sign-in problem is question even for the customer's own account."},
+
+    {"id": "support-reply-time", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "متى يرد الدعم؟"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond"}}},
+    {"id": "support-other-channel", "input": {"state": {"language": "ar", "messages": [
+      {"role": "user", "content": "كيف أتواصل معكم غير هنا؟"}]}},
+      "expected": {"facts": {"intent": "other", "next_target": "respond"}}}
+  ]
+}

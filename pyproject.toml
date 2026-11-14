@@ -65,6 +65,11 @@ task = "evals.regression_task:conversation_task"
 graders = ["evals.regression_graders:nodes_match", "evals.regression_graders:facts_match", "evals.regression_graders:records_match", "evals.regression_graders:pending_matches", "evals.regression_graders:counts_match", "evals.regression_graders:required_text"]
 timeout = 900
 
+# The Router's first pass alone on a frozen state: intent, target and the explicit-ticket flag. No worker runs.
+[tool.evalkit.suites.reg_router]
+task = "evals.regression_task:router_task"
+graders = ["evals.regression_graders:facts_match"]
+
 [tool.evalkit.suites.reg_guards]
 task = "evals.regression_task:guard_task"
 graders = ["evals.regression_graders:guard_outcome", "evals.regression_graders:required_text"]

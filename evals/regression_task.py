@@ -15,6 +15,7 @@ from ole5_chat.agent.contracts import Grounding, PendingCustomerResponse
 from ole5_chat.agent.guards import language_problem
 from ole5_chat.agent.nodes import search as search_module
 from ole5_chat.agent.nodes.respond import _grounding_input, respond_node
+from ole5_chat.agent.nodes.router import router_node
 from ole5_chat.agent.nodes.validate import validate_node
 from ole5_chat.agent.prompts.guards import grounding_prompt
 from ole5_chat.agent.state import initial_state
@@ -160,6 +161,19 @@ def _respond(state: dict) -> dict:
 def respond_task(input: dict) -> dict:
     """Respond alone on a frozen state, before the guards."""
     return _respond(_state(input["state"]))
+
+
+def router_task(input: dict) -> dict:
+    """The Router's first pass alone on a frozen state: no worker runs, so only its classification is measured."""
+    result = router_node(_state(input["state"]))
+    # router_node answers other when its model call fails; that must not pass the cases that expect other.
+    failed = result.get("route_reason") == "Router could not classify the latest message safely."
+    return {
+        "answer": result.get("route_reason") or "",
+        "intent": "router_failed" if failed else result.get("intent"),
+        "next_target": result.get("next_target"),
+        "explicit_ticket_request": result.get("explicit_ticket_request"),
+    }
 
 
 def direct_chunks_task(input: dict) -> dict:
