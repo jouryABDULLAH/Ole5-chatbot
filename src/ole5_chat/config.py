@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     qdrant_login_email: str | None = None
     qdrant_login_password: SecretStr | None = None
     qdrant_session_cookie: str = "ole5_session"
-    kb_backend: Literal["stub", "ragent2"] = "stub"
+    kb_backend: Literal["stub", "ragent2"] = "ragent2"
     kb_retrieval_mode: Literal["agentic", "agentic_fast", "direct"] = "agentic"
     kb_tenants: dict[str, str] = {"OLE5": "ole5"}
     embedding_service_url: str = "https://ds.t2.sa/text_embed"

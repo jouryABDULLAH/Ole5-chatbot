@@ -6,7 +6,7 @@ A support chat for Ole5 and RiCH customers. It answers questions from the produc
 
 - Python 3.12 or newer
 - A Groq API key (the model runs on Groq)
-- `ragent2` package installed, and access to the T2 Qdrant service. Without them the service runs with a small built-in stub, which is enough to try the chat and the ticket flow.
+- `ragent2` package installed, and access to the T2 Qdrant service. Without them, set `KB_BACKEND=stub` to run with a small built-in stub, which is enough to try the chat and the ticket flow.
 
 ## Install
 
@@ -46,7 +46,7 @@ A support chat for Ole5 and RiCH customers. It answers questions from the produc
    | Setting | What it is |
    |---|---|
    | `GROQ_API_KEY` | Required. The Groq key the model calls use. |
-   | `KB_BACKEND` | `stub` (default) for the built-in passages, `ragent2` for the real knowledge base. |
+   | `KB_BACKEND` | `ragent2` (default) for the real knowledge base, `stub` for the built-in passages. |
    | `QDRANT_URL`, `QDRANT_API_KEY` | The Qdrant service behind RAGent2. Needed with `ragent2`. |
    | `QDRANT_LOGIN_EMAIL`, `QDRANT_LOGIN_PASSWORD` | Set these instead of the API key when Qdrant sits behind the T2 login. |
    | `TICKET_API_URL`, `TICKET_API_USER`, `TICKET_API_PASSWORD` | The T2 Ticket API. Leave the URL empty to use the mock. |
