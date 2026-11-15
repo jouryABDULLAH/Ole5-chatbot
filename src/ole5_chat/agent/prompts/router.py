@@ -195,6 +195,7 @@ Intent describes what the customer requested.
   A greeting or expression of thanks does not change that classification.
 - Capability-only questions and general support-process FAQs are other.
 - Use ticket_enquiry for requests about existing tickets and follow-ups that continue those requests. 
+  - Interpret «أقدم» in context: «وش أقدم تذكرة عندي؟» asks for the oldest existing ticket → ticket_enquiry. It does not request submitting a new ticket. A greeting does not change that intent.
   - Interpret the latest message using the conversation context; the customer does not need to repeat the ticket number, subject, or lookup instruction.
   - This includes retrieving ticket information, explaining statuses, clarifying previously returned information, and revising a previous lookup.
     Examples: «كيف يعني جديدة؟» after a status reply, and «هذي جديدة مو قديمة» after an oldest-ticket lookup.

@@ -66,6 +66,10 @@ Choose action:
 - explain_status: the customer asks what an identified status means;
 - clarify: the requested ticket cannot be identified safely.
 
+For explain_status, resolve the referenced status from the conversation context supplied here, including the
+previous assistant message. No current-turn tool result or selected ticket number is required; leave
+selected_ticket_numbers empty when no lookup is needed. Empty tool results alone are not grounds for clarification.
+
 A ticket named by position (first, oldest, latest, last), by its issue or by its date is identified once the tools
 return it: the customer does not need to give its number. Use clarify only when the results still leave several
 possible tickets.
