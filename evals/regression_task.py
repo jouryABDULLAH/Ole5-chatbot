@@ -2,6 +2,8 @@
 frozen state, so a change to Respond or a guard is measured without Router and Search varying around it."""
 
 import re
+import shutil
+import tempfile
 from datetime import datetime
 from functools import cache
 from pathlib import Path
@@ -133,6 +135,17 @@ def conversation_task(input: dict) -> dict:
     """A logged conversation replayed with the real Search, so a wrong route is not hidden by a stubbed result."""
     sid, _ = sessions.start(_email())
     return {"turns": [_turn(sid, sessions.send(sid, text)) for text in input["turns"]]}
+
+
+def proof_task(input: dict) -> dict:
+    """conversation_task on a fresh copy of the sheets, with the fixed tickets of evals/fixtures/proof_tickets.xlsx,
+    so a ticket one case creates is not there for the next case or the next run."""
+    folder = Path(tempfile.mkdtemp(prefix="proof-sheets-"))
+    for name in ("customers", "values", "attachments"):
+        shutil.copy(Path("sheets") / f"{name}.xlsx", folder)
+    shutil.copy(Path("evals/fixtures/proof_tickets.xlsx"), folder / "tickets.xlsx")
+    get_settings().sheets_dir = folder
+    return conversation_task(input)
 
 
 def _state(fixture: dict) -> dict:

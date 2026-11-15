@@ -70,6 +70,12 @@ timeout = 900
 task = "evals.regression_task:router_task"
 graders = ["evals.regression_graders:facts_match"]
 
+# Proof that the agent works: one conversation per requirement, each on a fresh copy of the sheets.
+[tool.evalkit.suites.proof]
+task = "evals.regression_task:proof_task"
+graders = ["evals.regression_graders:nodes_match", "evals.regression_graders:facts_match", "evals.regression_graders:records_match", "evals.regression_graders:pending_matches", "evals.regression_graders:counts_match", "evals.regression_graders:required_text", "evals.graders:language_matches"]
+timeout = 900
+
 [tool.evalkit.suites.reg_guards]
 task = "evals.regression_task:guard_task"
 graders = ["evals.regression_graders:guard_outcome", "evals.regression_graders:required_text"]

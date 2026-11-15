@@ -1,11 +1,10 @@
 """Graders for the Ole5 chat suites. Each reads the task's output for one turn. Two judges read the reply: correctness, whether every fact in it comes from the passages the agent was shown or from the conversation; completeness, whether it gives all of the expected answer. The rest are code and compare with the case's expected: the step the agent ended on, the language of its reply, the documents it cited, and the ticket draft's state."""
 
-import re
-
 from phoenix.client.resources.experiments.types import ExperimentEvaluation as EvaluationResult
 from phoenix.evals import LLM, create_classifier
 
 from evalkit import graders, llm
+from ole5_chat.agent.guards import language_of
 
 GROUNDED_TEMPLATE = """
 You are given the passages a support assistant was shown, the conversation so far, the customer's
@@ -54,18 +53,6 @@ def completeness(input: dict, output: dict, expected: dict) -> EvaluationResult:
     """The reply gives all of expected["answer"]."""
     return graders.correctness(input, output, expected)
 
-ARABIC = re.compile(r"[؀-ۿ]")
-LATIN = re.compile(r"[A-Za-z]")
-
-
-def script_of(text: str) -> str | None:
-    """The language a text is written in: the script of its first word that has letters. Product and screen names in the other script later on do not count."""
-    words = [w for w in text.split() if ARABIC.search(w) or LATIN.search(w)]
-    if not words:
-        return None
-    return "ar" if ARABIC.search(words[0]) else "en"
-
-
 def _skip(reason: str) -> EvaluationResult:
     return EvaluationResult(label="not checked", explanation=reason)
 
@@ -81,13 +68,14 @@ def phase_matches(input: dict, output: dict, expected: dict) -> EvaluationResult
 
 
 def language_matches(input: dict, output: dict, expected: dict) -> EvaluationResult:
-    """The reply is written in the language of the customer's message (by script), or in
-    expected["language"] when the case sets it."""
-    message = input.get("message") or ""
-    want = expected.get("language") or script_of(message)
-    got = script_of(output.get("answer") or "")
+    """The reply is written in the language of the customer's message, or in expected["language"] when the case
+    sets it. The agent's own language model (ole5_chat.agent.guards.language_of) reads both, so a product name or a
+    ticket number in the other script does not decide it. A text with no language, or a failed model call, is not
+    checked."""
+    want = expected.get("language") or language_of(input.get("message") or "")
+    got = language_of(output.get("answer") or "")
     if want is None or got is None:
-        return _skip("no letters to judge")
+        return _skip("no language to judge")
     return EvaluationResult(score=float(got == want), explanation=f"message {want}, reply {got}")
 
 
