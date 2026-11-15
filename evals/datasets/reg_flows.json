@@ -441,6 +441,17 @@
     {"id": "enquiry-list-tickets",
       "input": {"turns": ["وش التذاكر اللي عندي؟"]},
       "expected": {"turns": [{"pending": null, "created": 0, "language": "ar"}]},
-      "notes": "Asking for their tickets calls list_tickets."}
+      "notes": "Asking for their tickets calls list_tickets."},
+    {"id": "own-email-no-answer-offer", "input": {"turns": ["وش بريدي المسجل", "افتح تذكرة"]},
+     "expected": {"turns": [{"pending": "offer", "language": "ar"}, {"pending": "summary", "created": 0, "language": "ar"}]},
+     "notes": "14 Nov: after a no_answer search the Operator made no tool calls and returned clarify instead of registering and offering."},
+    {"id": "already-submitted-not-registered",
+      "input": {"turns": ["ولا موظف عندنا يقدر يسجل دخول للنظام", "نعم", "ارسلها", "ولا موظف عندنا يقدر يسجل دخول للنظام"]},
+      "expected": {"turns": [
+        {"pending": "offer", "language": "ar"},
+        {"pending": "summary", "language": "ar"},
+        {"pending": null, "created": 1, "language": "ar"},
+        {"pending": null, "created": 1, "queued": 0, "language": "ar"}]},
+      "notes": "The same request after its ticket was submitted: check_submitted_tickets finds it, so nothing is registered or offered."}
   ]
 }

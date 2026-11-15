@@ -1,4 +1,4 @@
-"""The model, behind one small wrapper. Groq today; the model name is a setting. Every call returns a validated pydantic object; an invalid reply, or one a caller's check refuses, is sent back to the model with the reason, up to RETRIES times. Any other Groq error (connection, rate limit, server) is retried by the Groq client itself (twice, with backoff), then raised as ModelFailed."""
+"""The model, behind one small wrapper. Groq today; the model name is a setting. Every call returns a validated pydantic object; an invalid reply, or one a caller's check refuses, is sent back to the model with the reason, up to RETRIES times. Any other Groq error (connection, rate limit, server) is retried by the Groq client itself (four times, with backoff), then raised as ModelFailed."""
 
 import json
 import logging
@@ -37,7 +37,10 @@ def tool_client(temperature: float) -> ChatGroq:
     s = get_settings()
     if not s.groq_api_key:
         raise ModelFailed("GROQ_API_KEY is not set")
-    return ChatGroq(model=s.groq_model, api_key=s.groq_api_key.get_secret_value(), temperature=temperature)
+    # The client retries connection, rate-limit and server errors itself, with backoff. Its default is 2 retries; a
+    # guard whose check fails now withholds the reply, so a short network blip gets more room.
+    return ChatGroq(model=s.groq_model, api_key=s.groq_api_key.get_secret_value(), temperature=temperature,
+                    max_retries=4)
 
 
 # Groq's codes for a generation it rejected: the model's own output is in failed_generation and it can correct itself.

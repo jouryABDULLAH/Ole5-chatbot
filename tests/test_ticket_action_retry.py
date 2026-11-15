@@ -7,7 +7,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from ole5_chat import llm
 from ole5_chat.agent import graph
-from ole5_chat.agent.contracts import Grounding, RouterDecisionWithoutPending, TicketActionCheck, TicketViolation
+from ole5_chat.agent.contracts import RouterDecisionWithoutPending, TicketActionCheck, TicketViolation
 from ole5_chat.agent.nodes import respond
 from ole5_chat.agent.state import initial_state
 from ole5_chat.agent.ticket_action_guard import fallback
@@ -32,7 +32,6 @@ def test_ticket_lie_gets_only_one_response_retry(model, rejected_twice, route):
                               fact="ticket_result is empty and created_tickets has no ticket.")
     model.add(TicketActionCheck(violations=[created]),
               TicketActionCheck(violations=[created] if rejected_twice else []))
-    model.add(Grounding(unsupported=[]), Grounding(unsupported=[]))
     bad = "تم إنشاء التذكرة بنجاح."
     good = "حذف المراسلات يتطلب الصلاحية الموثقة. إذا استمرت المشكلة، أخبرني وسأساعدك ضمن نطاقي."
     evidence = {"search_outcome": "answered", "current_references": [
@@ -53,7 +52,9 @@ def test_ticket_lie_gets_only_one_response_retry(model, rejected_twice, route):
     assert result["validation_note"] is None
     assert len(result["messages"]) == 3  # rejected candidate never entered history
     final = result["messages"][-1]
-    assert final.content == (fallback({**state, "language": "ar"}) if rejected_twice else good)
+    # On an answered turn the fixed reply says the answer was withheld.
+    refused = fallback({**state, "language": "ar", "search_outcome": "answered" if route == "question" else None})
+    assert final.content == (refused if rejected_twice else good)
     if rejected_twice:
         assert final.additional_kwargs["sources"] == []
         assert result["last_answer_evidence"] is None
@@ -93,7 +94,7 @@ def test_fallback_with_nothing_to_say_asks_to_send_again():
     assert "إرسال رسالتك مرة أخرى" in fallback({"identity": IDENTITY, "language": "ar"})
 
 
-def test_checker_receives_authoritative_records_and_a_failed_check_lets_the_reply_pass(model):
+def test_checker_receives_authoritative_records_and_a_failed_check_sends_the_fixed_reply(model):
     identity = Identity(customer_id="test", email="ole5@example.com", name="Test",
                         organization="Test", product="OLE5", language="en")
     state = initial_state(identity)
@@ -106,5 +107,14 @@ def test_checker_receives_authoritative_records_and_a_failed_check_lets_the_repl
     payload = checker.call_args.args[1][0].content
     assert '"submission_succeeded": false' in payload
     assert '"OLD-1"' in payload
+    assert '"required_details"' in payload
+    assert '"explicit_invitation_allowed": false' in payload
+    with patch.object(llm, "structured", return_value=TicketActionCheck(violations=[])) as checker:
+        ticket_action_guard.violations({**state, "explicit_ticket_request": True, "search_outcome": "answered"}, "x")
+    assert '"explicit_invitation_allowed": true' in checker.call_args.args[1][0].content
+    # A failed check is not a passed one: the reply is unverified, so Validate sends the fixed reply.
+    from ole5_chat.agent.nodes.validate import validate_node
     with patch.object(llm, "structured", side_effect=llm.ModelFailed("offline")):
-        assert ticket_action_guard.violations(state, "Ticket created") == []
+        assert ticket_action_guard.violations(state, "Ticket created") is None
+        result = validate_node({**state, "reply": "Ticket created", "language": "en"})
+    assert result["validation_outcome"] == "fallback" and "was not created" in result["reply"]

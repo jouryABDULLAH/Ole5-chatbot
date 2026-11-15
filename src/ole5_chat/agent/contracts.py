@@ -102,26 +102,40 @@ class OperatorCompletion(BaseModel):
     action: Literal[
         "offer", "request_detail", "show_summary", "declined", "cancelled",
         "queued", "submitted", "submission_failed", "clarify", "already_submitted",
+        # An internal fault left no valid next step. clarify is only for a customer reply that cannot be read.
+        "workflow_failed",
     ]
     reason: str
     issue_id: str | None = None
     requested_detail: str | None = None
     existing_ticket: str | None = None  # already_submitted: the number of the ticket that has this problem
+    clarification_question: str | None = None  # clarify: the one question that settles how to read the reply
 
 
-class GroundingIssue(BaseModel):
+class SentenceVerdict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    sentence: str = Field(description="The unsupported sentence, copied exactly as it is written in the reply.")
-    problem: str = Field(description="What in it no passage or company fact says.")
-    passage: str = Field(description="The index of the closest passage, e.g. 2, or none.")
+    number: int = Field(description="The number of the reply sentence this verdict is for.")
+    verdict: Literal["not_product_fact", "supported", "unsupported"]
+    passage: str = Field(default="none", description="The index of the passage that states it, e.g. 2, or the other "
+                                                     "source that does (ticket records, company facts, assistant "
+                                                     "facts); when unsupported, the closest passage's index, or none.")
+    problem: str = Field(default="", description="For unsupported only: what in the sentence no passage says.")
 
 
 class Grounding(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    unsupported: list[GroundingIssue] = Field(description="One entry per unsupported product sentence; empty when "
-                                                          "every product sentence is supported.")
+    verdicts: list[SentenceVerdict] = Field(description="Exactly one verdict for every numbered sentence of the reply.")
+
+
+class GroundingIssue(BaseModel):
+    """One unsupported sentence, built in code from its verdict: the sentence's own text, never the model's quote."""
+    model_config = ConfigDict(extra="forbid")
+
+    sentence: str
+    problem: str
+    passage: str
 
 
 class TicketViolation(BaseModel):

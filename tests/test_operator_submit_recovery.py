@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import pytest
 
 from ole5_chat.agent.contracts import OperatorCompletion, PendingCustomerResponse
-from ole5_chat.agent.nodes.ticket_operator import _apply_completion
+from ole5_chat.agent.nodes.ticket_operator import _apply_completion, _completion_check, _completion_from_tools
 from ole5_chat.agent.prompts.ticket_operator import ticket_operator_tool_prompt
 from ole5_chat.agent.state import initial_state
 from ole5_chat.agent.tools import ticket_operator as tools
@@ -226,11 +226,394 @@ def test_already_submitted_problem_registers_nothing_and_names_the_ticket(monkey
     assert result['ticket_operator_result']['action'] == 'already_submitted'
     assert result['ticket_operator_result']['existing_ticket'] == 'T-1'
     assert result['pending_customer_response'] is None and result['active_issue'] is None
-    # A ticket check_submitted_tickets did not return is not reported as the customer's ticket.
-    result = _apply_completion(state, OperatorCompletion(action='already_submitted', reason='Same problem as T-2',
-                                                         existing_ticket='T-2'), report)
-    assert result['ticket_operator_result']['action'] == 'clarify'
+    # A ticket check_submitted_tickets did not return is not reported as the customer's ticket. It was clarify;
+    # naming a ticket the lookup never returned is an internal fault, not an unclear customer.
+    unlisted = OperatorCompletion(action='already_submitted', reason='Same problem as T-2', existing_ticket='T-2')
+    assert 'T-2' in _completion_check(state, report)(unlisted)  # the interpreter is told first
+    result = _apply_completion(state, unlisted, report)
+    assert result['ticket_operator_result']['action'] == 'workflow_failed'
     assert result['ticket_operator_result']['existing_ticket'] is None
+
+
+def test_search_handoff_with_only_a_requirements_read_runs_the_agent_once_more(monkeypatch):
+    from langchain_core.messages import AIMessage, HumanMessage
+    from ole5_chat.agent.nodes import ticket_operator as node
+    state = ready_state()
+    state.update(active_issue=None, pending_customer_response=None, ticket_draft=None, summary_shown=False,
+                 submission_requested=False, last_worker='search', search_outcome='no_answer',
+                 messages=[HumanMessage(content='وش بريدي المسجل')])
+    monkeypatch.setattr('ole5_chat.agent.nodes.ticket_enquiry.sheets.tickets', lambda: [])
+    runs = []
+
+    class ScriptedAgent:
+        def __init__(self, tools):
+            self.tools = {tool.name: tool for tool in tools}
+
+        def invoke(self, payload):
+            runs.append(payload['messages'])
+            done = []
+            if len(runs) == 1:
+                # Reading the requirements is not a workflow step: it must not stop the second run.
+                call = {'name': 'get_ticket_requirements', 'args': {}, 'id': 'requirements', 'type': 'tool_call'}
+                done = [AIMessage(content='', tool_calls=[call]), self.tools['get_ticket_requirements'].invoke(call)]
+            else:
+                call = {'name': 'manage_issues', 'args': {'operation': 'register', 'description': 'Registered email'},
+                        'id': 'register', 'type': 'tool_call'}
+                done = [AIMessage(content='', tool_calls=[call]), self.tools['manage_issues'].invoke(call)]
+            return {'messages': [*payload['messages'], *done, AIMessage(content='handoff')]}
+
+    # Nothing could match the request, so the first run is not interpreted at all: one completion is enough.
+    completions = iter([OperatorCompletion(action='offer', reason='Registered', issue_id='issue-1')])
+    monkeypatch.setattr(node, 'create_agent', lambda **kwargs: ScriptedAgent(kwargs['tools']))
+    monkeypatch.setattr(node.llm, 'tool_client', lambda temperature: None)
+    monkeypatch.setattr(node.llm, 'structured', lambda *args, **kwargs: next(completions))
+    result = node.ticket_operator_node(state)
+    assert len(runs) == 2
+    assert runs[1][-1].type == 'human' and 'returned no submitted tickets' in runs[1][-1].content
+    assert result['ticket_operator_result']['action'] == 'offer'
+    assert result['active_issue']['description'] == 'Registered email'
+
+
+def test_registration_then_clarify_does_not_run_the_agent_again(monkeypatch):
+    sent, result = _search_handoff_run(monkeypatch, lambda: [], register=True, completion=OperatorCompletion(
+        action='clarify', reason='Interpreter mistake'))
+    assert sum(1 for message in sent if message.type == 'human') == 1  # one run: no system note was added
+    assert result['active_issue']['description'] == 'Registered email'
+
+
+def _search_handoff_run(monkeypatch, tickets, completion, register=False):
+    """Run the Operator node on a Search no_answer handoff with a scripted agent; returns what the agent was sent
+    and the node's result."""
+    from langchain_core.messages import AIMessage, HumanMessage
+    from ole5_chat.agent.nodes import ticket_operator as node
+    state = ready_state()
+    state.update(active_issue=None, pending_customer_response=None, ticket_draft=None, summary_shown=False,
+                 submission_requested=False, last_worker='search', search_outcome='no_answer',
+                 messages=[HumanMessage(content='وش بريدي المسجل')])
+    monkeypatch.setattr('ole5_chat.agent.nodes.ticket_enquiry.sheets.tickets', tickets)
+    sent = []
+
+    class ScriptedAgent:
+        def __init__(self, tools):
+            self.register = next(tool for tool in tools if tool.name == 'manage_issues')
+
+        def invoke(self, payload):
+            sent.extend(payload['messages'])
+            done = []
+            if register:
+                call = {'name': 'manage_issues', 'args': {'operation': 'register', 'description': 'Registered email'},
+                        'id': 'register', 'type': 'tool_call'}
+                done = [AIMessage(content='', tool_calls=[call]), self.register.invoke(call)]
+            return {'messages': [*payload['messages'], *done, AIMessage(content='handoff')]}
+
+    monkeypatch.setattr(node, 'create_agent', lambda **kwargs: ScriptedAgent(kwargs['tools']))
+    monkeypatch.setattr(node.llm, 'tool_client', lambda temperature: None)
+    monkeypatch.setattr(node.llm, 'structured', lambda *args, **kwargs: completion)
+    return sent, node.ticket_operator_node(state)
+
+
+def test_search_handoff_lookup_runs_in_code_and_reaches_agent_and_report(monkeypatch):
+    sent, result = _search_handoff_run(
+        monkeypatch,
+        lambda: [{'customer_email': 'ole5@example.com', 'ticket_number': 'T-1', 'title': 'Registered email'}],
+        OperatorCompletion(action='already_submitted', reason='Same request as T-1', existing_ticket='T-1'))
+    # The agent starts with the lookup already made: the call, then its result.
+    assert sent[-2].tool_calls[0]['name'] == 'check_submitted_tickets'
+    assert sent[-1].type == 'tool' and sent[-1].name == 'check_submitted_tickets'
+    assert [t['ticket_number'] for t in json.loads(sent[-1].content)['tickets']] == ['T-1']
+    # The report holds it too: already_submitted survives only for a ticket the lookup listed.
+    assert result['ticket_operator_result']['action'] == 'already_submitted'
+    assert result['ticket_operator_result']['existing_ticket'] == 'T-1'
+
+
+def test_failed_search_handoff_lookup_still_registers_and_offers(monkeypatch):
+    def unavailable():
+        raise OSError('sheet unavailable')
+
+    sent, result = _search_handoff_run(monkeypatch, unavailable, register=True, completion=OperatorCompletion(
+        action='offer', reason='Registered without the duplicate comparison', issue_id='issue-1'))
+    lookup = json.loads(sent[-1].content)
+    assert lookup['success'] is False and 'tickets' not in lookup  # a failure, not an empty ticket list
+    assert result['ticket_operator_result']['action'] == 'offer'
+    assert result['active_issue']['description'] == 'Registered email'
+    assert result['pending_customer_response'].kind == 'offer'
+
+
+def test_search_handoff_agent_that_registers_nothing_is_run_again(monkeypatch):
+    """Part 2: with no submitted ticket to match, an agent run that ends without registering is retried once."""
+    from langchain_core.messages import AIMessage, HumanMessage
+    from ole5_chat.agent.nodes import ticket_operator as node
+    state = ready_state()
+    state.update(active_issue=None, pending_customer_response=None, ticket_draft=None, summary_shown=False,
+                 submission_requested=False, last_worker='search', search_outcome='no_answer',
+                 messages=[HumanMessage(content='وش بريدي المسجل')])
+    monkeypatch.setattr('ole5_chat.agent.nodes.ticket_enquiry.sheets.tickets', lambda: [])
+    runs = []
+
+    class ScriptedAgent:
+        def __init__(self, tools):
+            self.register = next(tool for tool in tools if tool.name == 'manage_issues')
+
+        def invoke(self, payload):
+            runs.append(payload['messages'])
+            done = []
+            if len(runs) > 1:  # the first run makes no tool call; the retry registers
+                call = {'name': 'manage_issues', 'args': {'operation': 'register', 'description': 'Registered email'},
+                        'id': 'register', 'type': 'tool_call'}
+                done = [AIMessage(content='', tool_calls=[call]), self.register.invoke(call)]
+            return {'messages': [*payload['messages'], *done, AIMessage(content='No ticket is needed.')]}
+
+    monkeypatch.setattr(node, 'create_agent', lambda **kwargs: ScriptedAgent(kwargs['tools']))
+    monkeypatch.setattr(node.llm, 'tool_client', lambda temperature: None)
+    monkeypatch.setattr(node.llm, 'structured', lambda *args, **kwargs: OperatorCompletion(
+        action='offer', reason='Registered on the retry', issue_id='issue-1'))
+    result = node.ticket_operator_node(state)
+    assert len(runs) == 2
+    assert result['active_issue']['description'] == 'Registered email'
+    assert result['ticket_operator_result']['action'] == 'offer'
+    assert result['pending_customer_response'].kind == 'offer'
+
+
+def test_clarify_after_a_successful_register_offers_the_issue():
+    """Part 3: a registered issue is never left active with nothing pending."""
+    from ole5_chat.agent.nodes.ticket_operator import _completion_check
+    state = ready_state()
+    state.update(active_issue=None, pending_customer_response=None, ticket_draft=None,
+                 summary_shown=False, submission_requested=False)
+    bound = {tool.name: tool for tool in tools.build_ticket_operator_tools(state)}
+    registered = bound['manage_issues'].invoke({'operation': 'register', 'description': 'Registered email'})
+    report = json.dumps([{'name': 'manage_issues', 'content': registered}])
+    clarify = OperatorCompletion(action='clarify', reason='Nothing to do')
+    # The model is told that clarify does not fit a registration it made.
+    assert _completion_check(state, report)(clarify) is not None
+    # If it keeps clarify, the registered issue is offered anyway.
+    result = _apply_completion(state, clarify, report)
+    assert result['ticket_operator_result']['action'] == 'offer'
+    assert result['pending_customer_response'].kind == 'offer'
+    assert result['pending_customer_response'].issue_id == 'issue-1'
+
+
+def test_search_handoff_that_never_registers_is_a_workflow_failure(monkeypatch):
+    def unavailable():
+        raise OSError('sheet unavailable')
+
+    for tickets, said in ((lambda: [], 'returned no submitted tickets'), (unavailable, 'The lookup failed')):
+        sent, result = _search_handoff_run(monkeypatch, tickets, completion=None)  # the interpreter is never needed
+        notes = [m.content for m in sent if m.type == 'human' and 'Note from the system' in m.content]
+        assert len(notes) == 1 and said in notes[0]  # one more run, told what the lookup showed
+        assert result['ticket_operator_result']['action'] == 'workflow_failed'
+        assert result['active_issue'] is None and result['pending_customer_response'] is None
+
+
+def test_search_handoff_with_a_ticket_to_match_and_no_valid_match_is_run_again_then_fails(monkeypatch):
+    sent, result = _search_handoff_run(
+        monkeypatch,
+        lambda: [{'customer_email': 'ole5@example.com', 'ticket_number': 'T-1', 'title': 'Printing'}],
+        completion=OperatorCompletion(action='clarify', reason='No match named'))
+    notes = [m.content for m in sent if m.type == 'human' and 'Note from the system' in m.content]
+    assert len(notes) == 1 and 'identify the matching ticket or issue' in notes[0]
+    assert result['ticket_operator_result']['action'] == 'workflow_failed'
+
+
+def test_two_registrations_in_one_turn_offer_the_first_from_the_tool_results():
+    state = ready_state()
+    state.update(active_issue=None, pending_customer_response=None, ticket_draft=None,
+                 summary_shown=False, submission_requested=False)
+    bound = {tool.name: tool for tool in tools.build_ticket_operator_tools(state)}
+    report = json.dumps([
+        {'name': 'manage_issues', 'content': bound['manage_issues'].invoke(
+            {'operation': 'register', 'description': 'Login fails'})},
+        {'name': 'manage_issues', 'content': bound['manage_issues'].invoke(
+            {'operation': 'register', 'description': 'Archive button fails'})}])
+    derived = _completion_from_tools(state, report)
+    assert (derived.action, derived.issue_id) == ('offer', 'issue-1')
+    result = _apply_completion(state, OperatorCompletion(action='clarify', reason='Unsure'), report)
+    assert result['ticket_operator_result']['action'] == 'offer'
+    assert result['ticket_operator_result']['queued_issue'] == 'Archive button fails'  # the second is still noted
+    # A draft saved for the first issue before the second was queued is not sent back to an offer.
+    first, second = json.loads(report)
+    saved = {'name': 'save_ticket_draft', 'content': json.dumps(
+        {'success': True, 'operation': 'save_ticket_draft', 'summary_ready': True, 'missing_customer_details': []})}
+    assert _completion_from_tools(state, json.dumps([first, saved, second])).action == 'show_summary'
+
+
+def test_clarify_after_a_queued_registration_is_queued_and_keeps_the_waiting_summary():
+    state = ready_state()  # issue-1 active, its summary waiting
+    bound = {tool.name: tool for tool in tools.build_ticket_operator_tools(state)}
+    report = json.dumps([{'name': 'manage_issues', 'content': bound['manage_issues'].invoke(
+        {'operation': 'register', 'description': 'Printing fails'})}])
+    clarify = OperatorCompletion(action='clarify', reason='Unsure')
+    assert 'queued' in _completion_check(state, report)(clarify)
+    result = _apply_completion(state, clarify, report)
+    assert result['ticket_operator_result']['action'] == 'queued'
+    assert result['pending_customer_response'].kind == 'summary' and result['summary_shown']
+
+
+def test_clarify_after_a_saved_draft_follows_the_draft_result():
+    state = detail_state()
+    saved = {'success': True, 'operation': 'save_ticket_draft', 'summary_ready': False,
+             'missing_customer_details': ['page']}
+    report = json.dumps([{'name': 'save_ticket_draft', 'content': json.dumps(saved)}])
+    result = _apply_completion(state, OperatorCompletion(action='clarify', reason='Unsure'), report)
+    assert result['ticket_operator_result']['action'] == 'request_detail'
+    assert result['ticket_operator_result']['requested_detail'] == 'page'
+    ready = json.dumps([{'name': 'save_ticket_draft', 'content': json.dumps(
+        {**saved, 'summary_ready': True, 'missing_customer_details': []})}])
+    result = _apply_completion(state, OperatorCompletion(action='workflow_failed', reason='Unsure'), ready)
+    assert result['ticket_operator_result']['action'] == 'show_summary'
+
+
+def test_failed_preparation_is_a_workflow_failure_and_the_offer_still_waits():
+    state = ready_state()
+    state.update(pending_customer_response=PendingCustomerResponse(kind='offer', issue_id='issue-1'),
+                 ticket_draft=None, summary_shown=False, submission_requested=False)
+    report = json.dumps([{'name': 'save_ticket_draft', 'content': json.dumps(
+        {'success': False, 'operation': 'save_ticket_draft', 'classification_succeeded': False, 'error': 'down'})}])
+    failed = _completion_from_tools(state, report)
+    assert failed.action == 'workflow_failed'
+    assert _completion_check(state, report)(failed) is None
+    result = _apply_completion(state, failed, report)
+    assert result['ticket_operator_result']['action'] == 'workflow_failed'
+    assert result['pending_customer_response'].kind == 'offer'  # the customer's yes can be given again
+    assert result['active_issue']['id'] == 'issue-1'
+
+
+def test_registration_then_failed_preparation_stays_a_failure_and_keeps_the_issue_with_its_offer():
+    state = ready_state()
+    state.update(active_issue=None, pending_customer_response=None, ticket_draft=None,
+                 summary_shown=False, submission_requested=False)
+    bound = {tool.name: tool for tool in tools.build_ticket_operator_tools(state)}
+    report = json.dumps([
+        {'name': 'manage_issues', 'content': bound['manage_issues'].invoke(
+            {'operation': 'register', 'description': 'Change the email'})},
+        {'name': 'save_ticket_draft', 'content': json.dumps(
+            {'success': False, 'operation': 'save_ticket_draft', 'classification_succeeded': False, 'error': 'down'})}])
+    assert _completion_from_tools(state, report).action == 'workflow_failed'  # the registration does not cover it
+    check = _completion_check(state, report)
+    assert 'draft step failed' in check(OperatorCompletion(action='offer', reason='Registered', issue_id='issue-1'))
+    assert check(OperatorCompletion(action='workflow_failed', reason='Preparation failed')) is None
+    result = _apply_completion(state, OperatorCompletion(action='offer', reason='Registered'), report)
+    assert result['ticket_operator_result']['action'] == 'workflow_failed'
+    assert result['active_issue']['description'] == 'Change the email'  # the registered issue is kept
+    assert result['pending_customer_response'].kind == 'offer'  # and a yes can prepare it again
+
+
+def test_draft_step_on_the_active_issue_is_not_hidden_by_an_issue_queued_after_it():
+    state = ready_state()
+    state.update(pending_customer_response=PendingCustomerResponse(kind='offer', issue_id='issue-1'),
+                 ticket_draft=None, summary_shown=False, submission_requested=False)
+    bound = {tool.name: tool for tool in tools.build_ticket_operator_tools(state)}
+    report = json.dumps([
+        {'name': 'save_ticket_draft', 'content': json.dumps(
+            {'success': True, 'operation': 'save_ticket_draft', 'summary_ready': False,
+             'missing_customer_details': ['page']})},
+        {'name': 'manage_issues', 'content': bound['manage_issues'].invoke(
+            {'operation': 'register', 'description': 'Printing fails'})}])
+    assert _completion_from_tools(state, report).action == 'request_detail'
+    queued = OperatorCompletion(action='queued', reason='Printing noted')
+    assert 'request_detail' in _completion_check(state, report)(queued)
+    result = _apply_completion(state, queued, report)
+    assert result['ticket_operator_result']['action'] == 'request_detail'
+    assert result['pending_customer_response'].kind == 'detail'  # the accepted offer moved on to its detail
+    assert result['ticket_operator_result']['queued_issue'] == 'Printing fails'  # the queued issue is still a fact
+
+
+def test_a_match_to_an_existing_issue_must_name_an_issue_that_exists():
+    state = ready_state()  # issue-1 active, its summary waiting
+    state['pending_issues'] = [{'id': 'issue-2', 'description': 'Printing fails'}]
+    check = _completion_check(state, '[]', {'queued', 'show_summary'})
+    assert 'issue-2' in check(OperatorCompletion(action='queued', reason='Same', issue_id='does-not-exist'))
+    assert 'issue-2' in check(OperatorCompletion(action='queued', reason='Same'))
+    assert check(OperatorCompletion(action='queued', reason='Same', issue_id='issue-2')) is None
+    assert 'issue-1' in check(OperatorCompletion(action='show_summary', reason='Same', issue_id='issue-9'))
+    assert check(OperatorCompletion(action='show_summary', reason='Same', issue_id='issue-1')) is None
+
+
+def test_interpreter_that_keeps_clarify_after_a_registration_is_overruled_by_the_tool_results(model, operator_model):
+    from langchain_core.messages import HumanMessage
+    from ole5_chat.agent.nodes.ticket_operator import ticket_operator_node
+    state = ready_state()
+    state.update(active_issue=None, pending_customer_response=None, ticket_draft=None, summary_shown=False,
+                 submission_requested=False, messages=[HumanMessage(content='غيروا إيميلي')])
+    operator_model.call('manage_issues', operation='register', description='Change the email')
+    clarify = OperatorCompletion(action='clarify', reason='Unsure')
+    model.add(clarify, clarify, clarify)  # refused every time; the last one is not kept
+    result = ticket_operator_node(state)
+    assert result['ticket_operator_result']['action'] == 'offer'
+    assert result['pending_customer_response'].kind == 'offer'
+
+
+def test_tool_agent_crash_before_any_tool_is_a_workflow_failure_and_keeps_the_pending_step(model, operator_model):
+    from langchain_core.messages import HumanMessage
+    from ole5_chat.agent.nodes.ticket_operator import ticket_operator_node
+    state = detail_state()
+    state['messages'] = [HumanMessage(content='صفحة الأرشيف')]
+    operator_model.fail(RuntimeError('connection lost'))
+    result = ticket_operator_node(state)
+    assert result['ticket_operator_result']['action'] == 'workflow_failed'
+    assert result['pending_customer_response'].kind == 'detail'
+    assert result['pending_customer_response'].item == 'page'
+
+
+def test_submit_button_with_no_submission_attempt_is_a_workflow_failure():
+    state = ready_state()
+    state['input_event'] = 'submit'
+    check = _completion_check(state, '[]')
+    assert 'submit_ticket was not called' in check(OperatorCompletion(action='show_summary', reason='Still waiting'))
+    failed = OperatorCompletion(action='workflow_failed', reason='submit_ticket was not called')
+    assert check(failed) is None
+    result = _apply_completion(state, failed, '[]')
+    assert result['pending_customer_response'].kind == 'summary' and result['summary_shown']
+
+
+def test_workflow_failure_reaches_respond_as_its_own_stage_and_fallback():
+    from ole5_chat.agent import ticket_action_guard
+    from ole5_chat.agent.prompts.respond import STAGE_GUIDANCE
+    from ole5_chat.agent.turn_sheet import build_turn_sheet
+    state = ready_state()
+    state.update(pending_customer_response=PendingCustomerResponse(kind='offer', issue_id='issue-1'),
+                 ticket_operator_result={'action': 'workflow_failed'}, language='en')
+    sheet = build_turn_sheet(state, 'en')
+    assert sheet['stage'] == 'workflow_failed' and sheet['pending_kind'] == 'offer'
+    assert 'internal problem' in sheet['operator']
+    assert 'do not ask them to clarify' in STAGE_GUIDANCE['workflow_failed']
+    from ole5_chat.agent.prompts.respond import turn_note
+    assert 'ticket offer waiting for a yes or no' in turn_note(sheet)  # the waiting step reaches Respond
+    fallback = ticket_action_guard.fallback(state)
+    assert fallback.startswith('Sorry, a problem on my side') and 'Would you like a support ticket' in fallback
+
+
+def test_clarify_carries_its_question_to_respond_and_keeps_the_waiting_step():
+    from ole5_chat.agent.prompts.respond import turn_note
+    from ole5_chat.agent.turn_sheet import build_turn_sheet
+    state = ready_state()  # issue-1 active, its summary waiting
+    check = _completion_check(state, '[]')
+    assert 'clarification_question' in check(OperatorCompletion(action='clarify', reason='Unreadable reply'))
+    assert 'clarification_question' in check(
+        OperatorCompletion(action='clarify', reason='Unreadable reply', clarification_question='  '))
+    question = 'Do you want to change the translation ticket summary, or submit it as it is?'
+    clarify = OperatorCompletion(action='clarify', reason='Unreadable reply', clarification_question=question)
+    assert check(clarify) is None
+    result = _apply_completion(state, clarify, '[]')
+    assert result['ticket_operator_result']['clarification_question'] == question
+    assert result['pending_customer_response'].kind == 'summary' and result['summary_shown']
+    state.update(result)
+    sheet = build_turn_sheet(state, 'en')
+    assert sheet['stage'] == 'clarify' and sheet['clarification_question'] == question
+    assert f'Question the ticket workflow needs answered: {question}' in turn_note(sheet)
+
+
+def test_clarification_question_is_dropped_when_the_tool_results_replace_clarify():
+    state = ready_state()
+    bound = {tool.name: tool for tool in tools.build_ticket_operator_tools(state)}
+    report = json.dumps([{'name': 'manage_issues', 'content': bound['manage_issues'].invoke(
+        {'operation': 'register', 'description': 'Printing fails'})}])
+    clarify = OperatorCompletion(action='clarify', reason='Unsure', clarification_question='Which one?')
+    result = _apply_completion(state, clarify, report)
+    assert result['ticket_operator_result']['action'] == 'queued'
+    assert result['ticket_operator_result']['clarification_question'] is None
+    offer = OperatorCompletion(action='show_summary', reason='Waiting', clarification_question='Which one?')
+    assert _apply_completion(state, offer, '[]')['ticket_operator_result']['clarification_question'] is None
 
 
 def test_cancel_with_nothing_active_is_not_a_success():

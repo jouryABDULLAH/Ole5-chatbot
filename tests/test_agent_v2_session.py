@@ -182,8 +182,9 @@ def test_v2_user_specific_question_goes_to_ticket_offer_without_search(model, op
     assert view["phase"] == "offer_ticket"
     assert "ticket" in view["messages"][-1]["text"].lower()
     # Router classifies the incoming turn, then only routes the completed Ticket Operator result; Search never runs.
-    from ole5_chat.agent.contracts import Language, TicketActionCheck
-    assert all(schema in (RouterDecisionWithoutPending, ReturnDecision, OperatorCompletion, Language, TicketActionCheck)
+    from ole5_chat.agent.contracts import Grounding, Language, TicketActionCheck
+    assert all(schema in (RouterDecisionWithoutPending, ReturnDecision, OperatorCompletion, Language, TicketActionCheck,
+                          Grounding)
                for schema, _ in model.calls)
     from ole5_chat.agent.tools.ticket_operator import build_ticket_operator_tools
     operator_tools = {tool.name for tool in build_ticket_operator_tools({})}

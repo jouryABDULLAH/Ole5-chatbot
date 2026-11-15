@@ -48,6 +48,11 @@ def validate_node(state: AgentState) -> dict:
         log.error("ERROR validate  fallback=empty_reply")
         return {"reply": reply, "validation_outcome": "fallback", "validation_reason": "Reply was empty.",
                 "sources": [], "source_details": []}
+    if state.get("reply_withheld"):
+        # Respond sent the fixed reply built from workflow facts: no answer, so no sources, and nothing to re-check.
+        log.error("ERROR validate  fallback=grounding_withheld")
+        return {"reply": reply, "validation_outcome": "fallback", "validation_reason": "Grounding withheld the answer.",
+                "sources": [], "source_details": []}
     if state.get("search_outcome") == "answered" and not state.get("current_references"):
         log.error("ERROR validate  fallback=answered_without_evidence")
         return {"reply": _safe_fallback(state), "validation_outcome": "fallback", "validation_reason": "Answered search had no retained evidence.",
@@ -63,6 +68,11 @@ def validate_node(state: AgentState) -> dict:
         log.error("ERROR validate  language mismatch expected=%s", expected)
 
     problems = ticket_action_guard.violations(state, reply)
+    if problems is None:
+        # The check failed, so the reply is unverified: send the fixed reply built from the workflow facts.
+        log.error("ERROR validate  fallback=ticket_check_failed")
+        return {"reply": ticket_action_guard.fallback(state), "validation_outcome": "fallback",
+                "validation_reason": "Ticket-action check failed.", "sources": [], "source_details": []}
     if problems:
         log.error("ERROR validate ticket-action violations=%s retry_count=%d", problems, state.get("validation_retries", 0))
         if state.get("validation_retries", 0) < 1:

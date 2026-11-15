@@ -7,13 +7,14 @@ import re
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from ole5_chat import llm, products
-from ole5_chat.agent.contracts import Grounding
+from ole5_chat.agent.contracts import Grounding, GroundingIssue
 from ole5_chat.agent.prompts.guards import grounding_prompt
-from ole5_chat.agent.prompts.respond import _evidence, system_prompt, turn_note
+from ole5_chat.agent import ticket_action_guard
+from ole5_chat.agent.prompts.respond import ACCOUNT_ACCESS, CAPABILITIES, _evidence, _ticket_records, system_prompt, turn_note
 from ole5_chat.agent.turn_sheet import TurnSheet, build_turn_sheet
 
 from ole5_chat.agent.state import AgentState
-from ole5_chat.agent.guards import NAMES, language_of, language_problem, plain
+from ole5_chat.agent.guards import NAMES, language_of, language_problem, plain, sentences
 
 log = logging.getLogger(__name__)
 
@@ -77,8 +78,10 @@ def _seen_passages(state: AgentState, sheet: TurnSheet) -> list[dict]:
 
 
 def _grounding_input(state: AgentState, sheet: TurnSheet, reply: str, passages: list[dict]) -> str:
-    """What the check reads: the reply, the exchange it answers, the passages as Respond saw them, the company
-    facts Respond may also state, and this turn's workflow facts (Respond's turn note)."""
+    """What the check reads: the passages as Respond saw them, the company, assistant and ticket facts Respond may
+    also state, this turn's workflow facts, the exchange, and last the reply as numbered sentences. Facts only:
+    Respond's turn note is not passed, because its guidance and "write the reply" line are instructions, and the
+    check followed them instead of judging."""
     language = sheet["language"]
     customer = next((str(message.content) for message in reversed(state.get("messages", []))
                      if message.type == "human"), "")
@@ -89,54 +92,85 @@ def _grounding_input(state: AgentState, sheet: TurnSheet, reply: str, passages: 
         ("About", config.about.get(language)), ("Support hours", config.support_hours.get(language)),
         ("Support channel", config.support_channel.get(language)), ("Reply channel", config.reply_channel.get(language)),
     ) if value) or "none"
-    return (f"Assistant's previous message:\n{previous}\n\nCustomer's message:\n{customer}\n\nReply:\n{reply}\n\n"
-            f"Passages the reply's author saw (it need not use them all):\n{_evidence(passages)}\n\n"
+    assistant = (f"Identity: {config.persona.identity}\nProduct scope: {config.scope or config.name}\n"
+                 f"Capabilities: {CAPABILITIES}\nAccount access: {ACCOUNT_ACCESS}")
+    workflow = "\n".join(f"{label}: {sheet[key]}" for key, label in (
+        ("operator", "Ticket workflow this turn"), ("search", "Search"), ("issue", "Request acted on"),
+        ("current_issue", "Current request (named by the problem the customer reported)"),
+        ("pending_kind", "Step waiting for the customer"), ("pending_item", "Detail waiting"),
+        ("requested_detail", "Requested detail"), ("skipped", "Skipped detail"),
+        ("cancelled_issue", "Stopped request"), ("queued_issue", "Queued request"),
+        ("next_issue", "Next request, now offered"), ("next_in_queue", "Requests in the queue"),
+        ("ticket_number", "Ticket created, number"), ("existing_ticket", "Ticket already submitted, number"),
+        ("clarification_question", "Question the workflow needs answered"),
+    ) if sheet.get(key))
+    numbered = "\n".join(f"[{number}] {sentence}" for number, sentence in enumerate(sentences(reply), 1))
+    return (f"Passages the reply's author saw (it need not use them all):\n{_evidence(passages)}\n\n"
             f"Company facts the reply may also state:\n{company}\n\n"
-            f"This turn's ticket workflow facts, as the reply's author read them:\n{turn_note(sheet)}")
+            f"What the assistant is and can do, which the reply may also state (\"you\" is the assistant):\n"
+            f"{assistant}\n\n"
+            f"Ticket records the reply may also state:\n{_ticket_records(state)}\n\n"
+            f"This turn's ticket workflow facts:\n{workflow}\n\n"
+            f"Assistant's previous message:\n{previous}\n\nCustomer's message:\n{customer}\n\n"
+            f"<reply>\n{numbered}\n</reply>\n\n"
+            "Return the JSON with one verdict for each numbered sentence of the reply.")
 
 
-def _grounded_reply(state: AgentState, sheet: TurnSheet, reply: str) -> str:
-    """Check the reply's product sentences against the passages Respond saw. With enforcement on, the unsupported
-    sentences are rewritten once; the rewrite is not checked again, so a second failure passes."""
+def _unsupported(state: AgentState, sheet: TurnSheet, text: str, passages: list[dict]) -> list[GroundingIssue]:
+    """One grounding check of text: a verdict for each of its numbered sentences; returns the unsupported ones, with
+    the sentence's own text taken from the reply by number, so nothing depends on the model quoting it. Verdicts that
+    still do not cover the sentences after the correction retries raise GuardrailFailed, a ModelFailed: a failed check
+    is never a passed one, so the caller sends the fixed reply. The guard eval (evals/regression_task.py) runs this
+    same check."""
+    parts = sentences(text)
+
+    def complete(result: Grounding) -> str | None:
+        numbers = sorted(verdict.number for verdict in result.verdicts)
+        if numbers != list(range(1, len(parts) + 1)):
+            return (f"the reply has sentences 1 to {len(parts)}; your verdicts are for {numbers}. Give exactly one "
+                    "verdict for each number.")
+        blank = [v.number for v in result.verdicts if v.verdict == "unsupported" and not v.problem.strip()]
+        return f"unsupported sentences {blank} need a problem: what in each no passage says." if blank else None
+
+    result = llm.structured(grounding_prompt(), [HumanMessage(content=_grounding_input(
+        state, sheet, text, passages))], Grounding, node="ground", check=complete)
+    return [GroundingIssue(sentence=parts[v.number - 1], problem=v.problem, passage=v.passage)
+            for v in result.verdicts if v.verdict == "unsupported" and 1 <= v.number <= len(parts)]
+
+
+def _grounded_reply(state: AgentState, sheet: TurnSheet, reply: str) -> tuple[str, bool]:
+    """Check the reply's product sentences against the passages Respond saw, also when it saw none. With enforcement
+    on, the unsupported sentences are rewritten once and the rewrite is checked again. If unsupported sentences
+    remain, or a check or the rewrite fails, the reply is the fixed one built from this turn's workflow facts.
+    Returns the reply and whether it is that fixed one (withheld), so Validate attaches no sources to it."""
     passages = _seen_passages(state, sheet)
-    if not passages:
-        return reply
-
-    def quoted(result: Grounding) -> str | None:
-        missing = [issue.sentence for issue in result.unsupported if issue.sentence.strip() not in reply]
-        return (f"these sentences are not in the reply: {missing}. Copy each reported sentence exactly from the "
-                "reply." if missing else None)
 
     try:
-        check = llm.structured(grounding_prompt(), [HumanMessage(content=_grounding_input(
-            state, sheet, reply, passages))], Grounding, node="ground", check=quoted)
-    except llm.GuardrailFailed as exc:
-        # The quotes still did not match: keep only the findings whose sentence is in the reply. A misquoted
-        # finding is about a sentence the reply does not have (kb-83: «لا يمكن…» for the reply's «يمكن…»).
-        check = exc.result.model_copy(update={"unsupported": [
-            issue for issue in exc.result.unsupported if issue.sentence.strip() in reply]})
+        issues = _unsupported(state, sheet, reply, passages)
+        if not issues:
+            return reply, False
+        log.warning("grounding unsupported=%s enforcement=%s", issues, GROUNDING_ENFORCE)
+        if not GROUNDING_ENFORCE:
+            return reply, False
+        # The same repair turn note the ticket guard uses: the reply, then each rejected sentence with its problem
+        # and the fact to rewrite it from (the closest passage's text, or that no passage supports it).
+        def fact(issue) -> str:
+            index = int(issue.passage) - 1 if issue.passage.strip().isdigit() else -1
+            return passages[index].get("text", "").strip() if 0 <= index < len(passages) else "no passage supports it."
+        note = "\n".join(f"- «{issue.sentence}»: {issue.problem} Fact: {fact(issue)}" for issue in issues)
+        repair = {**sheet, "correction": note, "rejected_reply": reply}
+        rewritten = _correct_language(state, sheet, llm.invoke(
+            [SystemMessage(content=system_prompt(state, repair)), *_messages(state, repair)]).text.strip())
+        issues = _unsupported(state, sheet, rewritten, passages)
+        if not issues:
+            return rewritten, False
+        log.error("ERROR respond grounding rewrite still unsupported=%s; sending the workflow-facts reply", issues)
     except llm.ModelFailed as exc:
         log.error("ERROR respond grounding check failed: %s", exc)
-        return reply
-    if not check.unsupported:
-        return reply
-    log.warning("grounding unsupported=%s enforcement=%s", check.unsupported, GROUNDING_ENFORCE)
-    if not GROUNDING_ENFORCE:
-        return reply
-    rejected = "\n".join(f"- «{issue.sentence}»: {issue.problem} Closest passage: {issue.passage}"
-                         for issue in check.unsupported)
-    try:
-        rewritten = llm.invoke([
-            SystemMessage(content=system_prompt(state, sheet)), *_messages(state, sheet), AIMessage(content=reply),
-            HumanMessage(content=(
-                "Note from the system, not the customer. Only these sentences of your reply are not supported by "
-                f"the passages:\n{rejected}\nRewrite each from the passage named, or drop it if no passage supports "
-                "it. Keep every other sentence as it was, in the same order. Return only the reply.")),
-        ]).text.strip()
-    except llm.ModelFailed as exc:
-        log.error("ERROR respond grounding rewrite failed, the reply passes as it is: %s", exc)
-        return reply
-    return _correct_language(state, sheet, rewritten)
+        if not GROUNDING_ENFORCE:
+            return reply, False
+    # state["language"] is set only when this node returns; the fixed reply needs this turn's language.
+    return ticket_action_guard.fallback({**state, "language": sheet["language"]}), True
 
 
 def respond_node(state: AgentState) -> dict:
@@ -154,13 +188,13 @@ def respond_node(state: AgentState) -> dict:
     # Language Check (2 rewrites)
     reply = _correct_language(state, sheet, reply)
     # Grounded Check
-    reply = _grounded_reply(state, sheet, reply)
+    reply, withheld = _grounded_reply(state, sheet, reply)
     cleaned = plain(reply)
     if cleaned != reply:
         log.info("respond markdown=stripped")
     reply = cleaned
     log.info("respond  reply=%r", reply)
-    return {"reply": reply, "language": language}
+    return {"reply": reply, "language": language, "reply_withheld": withheld}
 
 
 

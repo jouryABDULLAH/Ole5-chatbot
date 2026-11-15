@@ -8,7 +8,7 @@ from langchain_core.messages import AIMessage
 from openpyxl import Workbook
 
 from ole5_chat import llm, products, sheets
-from ole5_chat.agent.contracts import Language
+from ole5_chat.agent.contracts import Grounding, Language, SentenceVerdict
 from ole5_chat.agent.contracts import TicketActionCheck
 from ole5_chat.tickets import client as ticket_api
 from ole5_chat.config import ROOT, get_settings
@@ -59,6 +59,10 @@ class ScriptedModel:
         self.calls.append((schema, system))
         if schema is TicketActionCheck and not self.queue.get(schema):
             return TicketActionCheck(violations=[])
+        if schema is Grounding and not self.queue.get(schema):
+            # Unscripted: every numbered sentence of the reply states no product fact.
+            numbers = re.findall(r"(?m)^\[(\d+)\] ", messages[-1].text)
+            return Grounding(verdicts=[SentenceVerdict(number=int(n), verdict="not_product_fact") for n in numbers])
         if schema is Language and not self.queue.get(schema):
             text = messages[-1].text
             return Language(language="ar" if re.search(r"[\u0600-\u06FF]", text) else "en" if re.search(r"[A-Za-z]", text) else "none")

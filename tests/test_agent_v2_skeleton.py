@@ -310,12 +310,13 @@ def test_tool_agent_crash_after_cancel_keeps_the_cancel_and_offers_the_next_issu
     assert result["ticket_operator_result"]["cancelled_issue"] == "Archive button fails"
 
 
-def test_interpreter_failure_with_no_tool_step_clarifies_and_keeps_the_pending_step(model, operator_model):
+def test_interpreter_failure_with_no_tool_step_is_a_workflow_failure_and_keeps_the_pending_step(model, operator_model):
+    # Was clarify. The interpreter failing is an internal fault, not an unclear customer reply.
     state = _state([AIMessage(content="Would you like a ticket?"), HumanMessage(content="Hmm")])
     state.update(active_issue={"id": "issue-1", "description": "Archive button fails"},
                  pending_customer_response=PendingCustomerResponse(kind="offer", issue_id="issue-1"))
     result = ticket_operator_node(state)
-    assert result["ticket_operator_result"]["action"] == "clarify"
+    assert result["ticket_operator_result"]["action"] == "workflow_failed"
     assert result["active_issue"]["id"] == "issue-1"
     assert result["pending_customer_response"].kind == "offer"
 

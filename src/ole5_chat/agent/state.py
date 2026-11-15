@@ -61,7 +61,8 @@ class AgentState(MessagesState, total=False):
     
     answered_detail: PendingCustomerResponse | None
     reply: str | None
-    
+    reply_withheld: bool  # Respond sent the fixed reply because grounding refused its answer
+
     validation_outcome: Literal["pass", "repair", "fallback"] | None
     validation_reason: str | None
     validation_note: str | None
@@ -114,6 +115,7 @@ def initial_state(identity: Identity) -> AgentState:
         manager_reason=None,
         answered_detail=None,
         reply=None,
+        reply_withheld=False,
         validation_outcome=None,
         validation_reason=None,
         validation_note=None,

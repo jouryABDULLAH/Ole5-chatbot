@@ -26,6 +26,12 @@ def language_problem(text: str, language: str) -> str | None:
     return f"The reply is in {NAMES[found]}. The customer wrote in {NAMES[language]}. Write the same reply in {NAMES[language]}."
 
 
+def sentences(text: str) -> list[str]:
+    """The reply as the units the grounding check judges by number: one per line, a line split after . ! ? ؟.
+    A list marker such as "1." stays with its line."""
+    return [part.strip() for part in re.split(r"\n+|(?<=[.!?؟])(?<!\d\.)\s+", text) if part.strip()]
+
+
 def plain(text: str) -> str:
     # Non-breaking and narrow spaces become plain spaces; zero-width and direction marks are dropped. The model
     # sometimes writes them inside Arabic phrases (زر «أرشفة»); they are invisible but break matching.

@@ -19,8 +19,8 @@ FACTS = (
 )
 
 # Each {name} must be in FACTS and AgentState, so renaming or deleting a state field stops the import with a KeyError.
-ACTION_RULES = """You are a Ticket Action Guard for a customer support chatbot, you job is to read the agent's responses and make sure it doesn't make up or claim and action that it is not done, you recieve enough evidence to judge the truthness of the agent's words.
- Evaluate the reply in the payload for ticket-action consistency only.
+ACTION_RULES = """You are the Ticket Action Guard for a customer support chatbot. You read the assistant's reply and check that it does not claim or start a ticket action that did not happen or was not authorized. The payload gives the facts that settle it.
+Evaluate the reply in the payload for ticket-action consistency only.
 
 ## 1. Scope & Evidence
 - Evaluate ticket-related actions and claims, not product knowledge or language.
@@ -37,7 +37,8 @@ Flag false or unverified claims of:
 
 Allow statements about support hours, support and reply channels, and when support replies, when they match the
 company facts in the payload (support_hours, support_channel, reply_channel) and do not imply a ticket was submitted.
-Flag any reply time, deadline or channel the company facts do not state.
+Flag any reply time, deadline or channel the company facts do not state. A reply time or deadline is a stated time,
+date or duration; saying the team will reply, with none of these, is not one.
 
 ## 3. Ticket Creation & History
 - Verify new ticket creation ONLY if:
@@ -56,25 +57,33 @@ Allow:
   a ticket number could not be found when it is in {ticket_enquiry_result}.failed_lookups.
 - Saying a ticket was already opened or submitted for the problem as ticket T-1, and that the support team will
   follow it up, when {ticket_operator_result}.action = already_submitted and its existing_ticket is T-1.
+- Saying a problem on the assistant's side stopped the step and asking the customer to try again,
+  when {ticket_operator_result}.action = workflow_failed. A pending offer, detail or summary may be restated.
 
 ## 4. Ticket Operator Authorization
-Definitions:
-- Offer: asks whether to open a ticket now («هل تريد فتح تذكرة؟»).
-- Detail request: asks for one of the ticket's required details (a page, an error text, a start time) that the
-  Operator is collecting.
-- Summary: presents a ticket summary or asks to submit it.
+Decide in two steps, in this order.
 
-An offer, detail request, or summary is allowed only when:
-- {ticket_operator_result}.action = offer, request_detail, or show_summary, OR
-- {pending_customer_response} is that step (a reminder).
+Step 1. Is the sentence one of these three acts? Use the definitions, including what each is not.
+- Offer: a yes-or-no question whether to open or prepare a ticket now («هل تريد فتح تذكرة؟»).
+  Not an offer: saying the assistant can open tickets; asking the customer what their problem is, even "so that I
+  can open a ticket" («ما هي المشكلة التي تواجهك حتى أفتح لك تذكرة؟»); the conditional invitation of the Explicit
+  Ticket Request Exception in section 6, when explicit_invitation_allowed is true.
+- Detail request: asks for one of the product's required ticket details. They are listed in required_details in the
+  payload (such as a page, an error text, a start time).
+  Not a detail request: asking what the problem is or what the customer needs, whatever they said before. That is
+  how a request starts; it is not one of required_details.
+- Summary: presents a ticket summary or asks to submit it.
+A sentence that is none of the three is never flagged under this section.
+
+Step 2. Only for a sentence that is one of the three: is it authorized? It is when:
+- {ticket_operator_result}.action = offer, request_detail, or show_summary for that act, OR
+- {pending_customer_response} is that step (the reply reminds of it or restates it).
 
 Flag:
-- Any of the three without that authorization.
+- An offer, detail request or summary without that authorization.
 - A product answer without a {ticket_operator_result} that ends with a ticket offer.
 
 Allow:
-- Asking the customer to describe their problem is not a ticket action, whatever they said before, as long as it asks
-  for no ticket detail and offers nothing («ما هي المشكلة التي تواجهك حتى أفتح لك تذكرة؟»).
 - Asking the customer to confirm a displayed or pending summary.
 - Reminders about a pending offer, detail, or summary.
 - Saying a new issue will be handled after the current one, when {ticket_operator_result}.queued_issue is set.
@@ -93,14 +102,16 @@ Allow:
 - Conditional future invitations authorized below.
 
 ### Explicit Ticket Request Exception
-When:
-- {explicit_ticket_request} = true
-- {search_outcome} = answered
+The payload's explicit_invitation_allowed is true when the customer asked for a ticket and the product answer was
+found ({explicit_ticket_request} = true and {search_outcome} = answered).
 
-Allow a brief invitation AFTER the product answer asking the customer to report if the issue persists, so ticket
-preparation can proceed.
+When it is true, allow a brief invitation AFTER the product answer that asks the customer to say if the problem
+continues, so that ticket preparation can proceed. The invitation is conditional on the customer's next message: it
+claims no ticket, no preparation under way and no support action, so it is not flagged under any section, and it
+needs no {ticket_operator_result} or {pending_customer_response}.
 
 This exception does NOT authorize an immediate ticket offer or a question asking whether to open a ticket now.
+When explicit_invitation_allowed is false, such an invitation is an unauthorized offer.
 
 ## 7. Examples
 Allowed:
@@ -163,14 +174,17 @@ def _quoted(reply: str):
     return check
 
 
-def violations(state: dict, reply: str) -> list[TicketViolation]:
-    """One semantic check, independently of product-grounding enforcement."""
+def violations(state: dict, reply: str) -> list[TicketViolation] | None:
+    """One semantic check, independently of product-grounding enforcement. None when the check itself failed."""
     config = products.load(state["identity"].product)
     facts = {key: state.get(key) for key in FACTS}
     facts.update(reply=reply, conversation=[{"role": m.type, "text": str(m.content)}
                                            for m in state.get("messages", [])],
                  support_hours=config.support_hours, support_channel=config.support_channel,
-                 reply_channel=config.reply_channel)
+                 reply_channel=config.reply_channel, required_details=config.required_labels,
+                 # Worked out here so the check reads one fact instead of combining two.
+                 explicit_invitation_allowed=bool(state.get("explicit_ticket_request"))
+                 and state.get("search_outcome") == "answered")
     try:
         result = llm.structured(
             ACTION_RULES + llm.schema_text(TicketActionCheck),
@@ -183,14 +197,16 @@ def violations(state: dict, reply: str) -> list[TicketViolation]:
         log.error("ERROR validate ticket-action quotes not found in the reply: %s", exc)
         return exc.result.violations
     except llm.ModelFailed as exc:
-        # A failed check says nothing about the reply, so the reply passes.
+        # A failed check says nothing about the reply. It is never a passed one: None makes Validate send the
+        # fixed reply.
         log.error("ERROR validate ticket-action check failed: %s", exc)
-        return []
+        return None
 
 
 def fallback(state: dict) -> str:
-    """The fixed reply when Respond's reply was refused twice: what the workflow did this turn, then the question the
-    current request is waiting on. Every part comes from the state, so it cannot be refused again."""
+    """The fixed reply when Respond's reply was refused twice, by the ticket guard or the grounding check: what Search
+    and the workflow did this turn, then the question the current request is waiting on. Every part comes from the
+    state, so it cannot be refused again."""
     language = state.get("language") or state["identity"].language
     arabic = language == "ar"
     config = products.load(state["identity"].product)
@@ -200,6 +216,17 @@ def fallback(state: dict) -> str:
     current = ((state.get("ticket_draft") or {}).get("title_customer")
                or (state.get("active_issue") or {}).get("description"))
     parts = []
+    outcome = state.get("search_outcome")
+    direct = any(r.get("relation") == "DIRECT" for r in state.get("current_references") or [])
+    if outcome in {"partial", "no_answer"} and not direct:
+        parts.append("لم أجد إجابة على سؤالك." if arabic else "I could not find an answer to your question.")
+    elif outcome == "answered":
+        # The answer itself was refused, so it is withheld; say so instead of passing over the question.
+        parts.append("عذراً، لم أتمكن من إعداد إجابة موثوقة على سؤالك. يرجى إرسال سؤالك مرة أخرى." if arabic
+                     else "Sorry, I couldn't prepare a reliable answer to your question. Please send it again.")
+    if operator.get("action") == "already_submitted" and operator.get("existing_ticket"):
+        parts.append(f"سبق أن فُتحت تذكرة لهذه المشكلة برقم {operator['existing_ticket']}." if arabic
+                     else f"A ticket was already opened for this problem, number {operator['existing_ticket']}.")
     number = (result.get("ticket") or {}).get("ticket_number")
     if result.get("submission_succeeded") is True and number:
         channel = config.reply_channel.get(language, "")
@@ -207,6 +234,9 @@ def fallback(state: dict) -> str:
     elif result.get("submission_succeeded") is False:
         parts.append("لم يتم إنشاء التذكرة؛ لم تنجح عملية الإرسال. يمكنك المحاولة مرة أخرى." if arabic
                      else "The ticket was not created; the submission did not succeed. You can try again.")
+    if operator.get("action") == "workflow_failed":
+        parts.append("عذراً، حدث خلل من جهتي ولم أتمكن من إكمال هذه الخطوة. يرجى المحاولة مرة أخرى." if arabic
+                     else "Sorry, a problem on my side stopped this step. Please try again.")
     if operator.get("cancelled_issue"):
         parts.append(f"أوقفت تحضير الطلب «{operator['cancelled_issue']}» ولم يُرسل شيء." if arabic
                      else f"I stopped preparing «{operator['cancelled_issue']}»; nothing was sent.")

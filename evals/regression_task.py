@@ -11,13 +11,12 @@ from langchain_core.messages import AIMessage, HumanMessage
 from evals.task import _email
 from ole5_chat import llm, sessions
 from ole5_chat.agent import session as agent_session
-from ole5_chat.agent.contracts import Grounding, PendingCustomerResponse
+from ole5_chat.agent.contracts import PendingCustomerResponse
 from ole5_chat.agent.guards import language_problem
 from ole5_chat.agent.nodes import search as search_module
-from ole5_chat.agent.nodes.respond import _grounding_input, respond_node
+from ole5_chat.agent.nodes.respond import _seen_passages, _unsupported, respond_node
 from ole5_chat.agent.nodes.router import router_node
 from ole5_chat.agent.nodes.validate import validate_node
-from ole5_chat.agent.prompts.guards import grounding_prompt
 from ole5_chat.agent.state import initial_state
 from ole5_chat.agent.turn_sheet import build_turn_sheet
 from ole5_chat.config import get_settings
@@ -197,11 +196,15 @@ def guard_task(input: dict) -> dict:
     if input["guard"] == "language":
         return {"answer": reply, "validation": "repair" if language_problem(reply, state["language"]) else "pass"}
     if input["guard"] == "grounding":
-        check = llm.structured(grounding_prompt(), [HumanMessage(content=_grounding_input(
-            state, build_turn_sheet(state, state["language"]), reply, state.get("current_references", [])))],
-            Grounding, node="ground")
-        return {"answer": reply, "validation": "repair" if check.unsupported else "pass",
-                "note": "; ".join(f"{issue.sentence}: {issue.problem}" for issue in check.unsupported)}
+        sheet = build_turn_sheet(state, state["language"])
+        try:
+            # The same check Respond runs, with its exact-quote check and correction retries.
+            issues = _unsupported(state, sheet, reply, _seen_passages(state, sheet))
+        except llm.ModelFailed as exc:
+            # A check that failed, or still misquoted the reply: Respond sends the fixed reply.
+            return {"answer": reply, "validation": "fallback", "note": f"check failed: {exc}"}
+        return {"answer": reply, "validation": "repair" if issues else "pass",
+                "note": "; ".join(f"{issue.sentence}: {issue.problem}" for issue in issues)}
     result = validate_node(state)
     return {"answer": result.get("reply", reply), "validation": result["validation_outcome"],
             "note": result.get("validation_note")}

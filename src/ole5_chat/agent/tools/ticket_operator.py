@@ -166,9 +166,14 @@ def build_ticket_operator_tools(state: AgentState, sink: list | None = None):
         """Return the tickets this customer already submitted, with ticket number, title and summary (in English) and
         creation time.
 
-        Call before registering any problem, to check whether it was already submitted in one of these tickets."""
+        Run it before manage_issues register: the result shows whether the customer's request is already in one of
+        these tickets."""
 
-        tickets = [{**_summary(row), "summary": str(row.get("summary") or "")} for row in _rows(state)]
+        try:
+            tickets = [{**_summary(row), "summary": str(row.get("summary") or "")} for row in _rows(state)]
+        except Exception as exc:
+            # The Operator goes on without the duplicate comparison; a raise here would end the whole tool agent.
+            return _json({"success": False, "operation": "check_submitted_tickets", "error": str(exc)})
         return _json({"success": True, "operation": "check_submitted_tickets", "tickets": tickets})
 
     @tool("save_ticket_draft")
@@ -317,8 +322,10 @@ def build_ticket_operator_tools(state: AgentState, sink: list | None = None):
         """Register, enqueue, or cancel preparation of a local issue. The next queued issue becomes active on its
         own when the current one is submitted or cancelled.
 
-        Call register only after check_submitted_tickets, and only when the problem is not already in one of those
-        tickets."""
+        A local issue records the customer's request in this chat; it opens no ticket and sends nothing to support.
+        register comes after a check_submitted_tickets result. If that lookup succeeded and a submitted ticket
+        matches the request, do not register it. If it failed, submitted-ticket matches are unknown: register the
+        request unless it matches the active or a queued issue."""
 
         queue = list(state.get("pending_issues", []))
         active = state.get("active_issue")

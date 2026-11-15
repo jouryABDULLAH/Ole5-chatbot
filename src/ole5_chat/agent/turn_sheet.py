@@ -10,7 +10,7 @@ Stage = Literal[
     "answered", "no_answer", "search_failed", "ticket_status", "ticket_lookup_failed",
     "offer", "detail_requested", "summary_shown",
     "submitted", "submission_failed", "preparation_stopped",
-    "queued", "clarify", "already_submitted", "other",
+    "queued", "clarify", "already_submitted", "workflow_failed", "other",
 ]
 
 
@@ -32,6 +32,7 @@ class TurnSheet(TypedDict):
     transition: str | None          # one sentence when one issue stopped and the next one is offered
     ticket_number: str | None       # only when the submission succeeded
     existing_ticket: str | None     # already_submitted: the customer's ticket that has this problem
+    clarification_question: str | None  # clarify: the question the ticket workflow needs answered
     current_issue: str | None       # the active issue and what it is waiting for, stated so the model need not work it out
     urgent: bool                    # the active issue is urgent: its summary is ready as soon as the offer is accepted
     next_in_queue: str | None       # the queued issues, in order
@@ -53,7 +54,9 @@ OPERATOR_FACT = {
     "declined": "stopped preparing the ticket because the customer declined",
     "cancelled": "stopped preparing the ticket because the customer cancelled",
     "queued": "will handle the new request after the current one",
-    "clarify": "needs a clarification before it can act",
+    "clarify": "could not read the customer's reply and needs it clarified",
+    "workflow_failed": "could not complete its step because of an internal problem; nothing was lost, and anything "
+                       "that was waiting still waits",
     "already_submitted": "found that this problem was already submitted in one of the customer's tickets, so no new "
                          "ticket was prepared",
 }
@@ -99,7 +102,7 @@ def build_turn_sheet(state: AgentState, language: str) -> TurnSheet:
         stage = "detail_requested"
     elif action in {"declined", "cancelled"}:
         stage = "preparation_stopped"
-    elif action in {"offer", "queued", "clarify", "already_submitted"}:
+    elif action in {"offer", "queued", "clarify", "already_submitted", "workflow_failed"}:
         stage = action
     elif intent == "other":
         stage = "other"
@@ -135,6 +138,7 @@ def build_turn_sheet(state: AgentState, language: str) -> TurnSheet:
                     "is now offered." if op.get("cancelled_issue") and action == "offer" else None),
         ticket_number=(result.get("ticket") or {}).get("ticket_number") if succeeded else None,
         existing_ticket=op.get("existing_ticket"),
+        clarification_question=op.get("clarification_question"),
         current_issue=_current_issue(state),
         urgent=bool((state.get("active_issue") or {}).get("urgent")),
         next_in_queue=", ".join(f"«{i.get('description')}»" for i in state.get("pending_issues") or []) or None,

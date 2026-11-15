@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from langchain_core.messages import AIMessage, HumanMessage
 
-from ole5_chat.agent.contracts import Language
+from ole5_chat.agent.contracts import Grounding, Language
 from ole5_chat.agent.nodes import respond, validate
 from ole5_chat.identity import Identity
 from ole5_chat.agent.contracts import PendingCustomerResponse
@@ -23,12 +23,12 @@ def test_english_sentence_with_arabic_name_corrects_mixed_reply():
     wrong = "هذه صفحة الأرشفة Archive."
     corrected = "This is the archive screen."
     with patch.object(respond.llm, "structured", side_effect=[
-        Language(language="en"), Language(language="ar"), Language(language="en")
+        Language(language="en"), Language(language="ar"), Language(language="en"), Grounding(verdicts=[])
     ]) as detector, patch.object(respond.llm, "invoke", side_effect=[
         AIMessage(content=wrong), AIMessage(content=corrected)
     ]) as generate:
         result = respond.respond_node(values)
-    assert result == {"reply": corrected, "language": "en"}
+    assert result == {"reply": corrected, "language": "en", "reply_withheld": False}
     correction_messages = generate.call_args_list[1].args[0]
     assert correction_messages[-2].content == wrong
     assert "in English" in correction_messages[-3].content  # the turn note
@@ -39,7 +39,7 @@ def test_english_sentence_with_arabic_name_corrects_mixed_reply():
 def test_arabic_with_english_product_terms_needs_no_rewrite():
     reply = "اختر Open في الشاشة."
     with patch.object(respond.llm, "structured", side_effect=[
-        Language(language="ar"), Language(language="ar")
+        Language(language="ar"), Language(language="ar"), Grounding(verdicts=[])
     ]), patch.object(respond.llm, "invoke", return_value=AIMessage(content=reply)) as generate:
         result = respond.respond_node(state("كيف أستخدم Open؟"))
     assert result["reply"] == reply
@@ -53,7 +53,7 @@ def test_conversation_language_kept_when_semantic_detection_unavailable():
          patch.object(respond, "language_problem", return_value=None), \
          patch.object(respond.llm, "invoke", return_value=AIMessage(content="مرحبا")) as generate:
         result = respond.respond_node(values)
-    assert result == {"reply": "مرحبا", "language": "ar"}
+    assert result == {"reply": "مرحبا", "language": "ar", "reply_withheld": False}
     assert generate.call_count == 1
 
 
@@ -68,7 +68,7 @@ def test_username_detail_keeps_established_arabic_language():
         ),
     })
     # The detector reads the bare username and finds no language; the reply is then checked in Arabic.
-    detections = [Language(language="none"), Language(language="ar")]
+    detections = [Language(language="none"), Language(language="ar"), Grounding(verdicts=[])]
     with patch.object(respond.llm, "structured", side_effect=detections) as detector, \
          patch.object(respond.llm, "invoke", return_value=AIMessage(content="تم تسجيل اسم المستخدم.")):
         result = respond.respond_node(values)
@@ -86,7 +86,7 @@ def test_new_english_question_still_switches_language_during_ticket_prep():
         ),
     })
     with patch.object(respond.llm, "structured", side_effect=[
-        Language(language="en"), Language(language="en")
+        Language(language="en"), Language(language="en"), Grounding(verdicts=[])
     ]), patch.object(respond.llm, "invoke", return_value=AIMessage(content="Follow these steps.")):
         result = respond.respond_node(values)
     assert result["language"] == "en"
