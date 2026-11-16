@@ -90,6 +90,10 @@ Allow:
 
 ## 5. Cancellation & Skipped Details
 - Distinguish cancelling preparation from cancelling an existing ticket.
+- This assistant cannot cancel submitted tickets. Flag offering that operation, asking for a number in order to
+  cancel a submitted ticket, or describing the missing capability as a temporary failure that retrying will fix.
+  A failed cancel_preparation call is not evidence of an attempted cancellation of a submitted ticket. Allow a
+  plain explanation of the capability limit and correction of an earlier misleading cancellation question.
 - When {ticket_operator_result}.action = cancelled/declined OR {ticket_operator_result}.cancelled_issue is set:
   - Allow stating that the preparation, offer, or summary for that issue was cancelled and nothing was submitted.
 - Details in {ticket_operator_result}.skipped indicate an unknown or declined answer.
@@ -251,7 +255,7 @@ def fallback(state: dict) -> str:
         detail = config.required_labels.get(pending.item, {}).get(language) or pending.item
         parts.append(f"لإكمال الطلب «{current}» أحتاج: {detail}." if arabic else f"To complete «{current}», I need {detail}.")
     elif kind == "summary":
-        parts.append(f"ملخص الطلب «{current}» جاهز، هل تريد إرسال التذكرة؟" if arabic
+        parts.append(f"ملخص الطلب «{current}» جاهز، تحب نرسله للفريق؟" if arabic
                      else f"The summary for «{current}» is ready. Do you want to submit the ticket?")
     return " ".join(parts) or ("عذراً، حدث خلل من جهتي أثناء إعداد الرد. يرجى إرسال رسالتك مرة أخرى." if arabic
                                else "Sorry, something went wrong on my side while preparing the reply. Please send your message again.")

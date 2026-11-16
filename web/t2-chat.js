@@ -337,20 +337,29 @@
       // The information the ticket needs from the customer, one row per item: the value, or "not given" when it is
       // null, unknown or declined.
       const required = el("dl");
+      const detailLabel = (key) => (this.view.detail_labels || {})[key] || key;
+      const detailValue = (key, value) => (fields.required_customer || {})[key] || value;
       for (const [item, value] of Object.entries(fields.required || {})) {
         const given = value && value !== "unknown" && value !== "declined";
-        required.append(el("dt", { dir: "auto" }, item),
-                        el("dd", { class: given ? null : "missing", dir: "auto" }, given ? value : this.t.notGiven));
+        required.append(el("dt", { dir: "auto" }, detailLabel(item)),
+                        el("dd", { class: given ? null : "missing", dir: "auto" }, given ? detailValue(item, value) : this.t.notGiven));
       }
       // What the customer gave for the ticket, one line each, and what they said they don't have. (missing is empty
       // on the card: when the customer is done, what was still missing becomes unknown.)
-      const items = Object.entries(Object.keys(fields.collected_customer || {}).length ? fields.collected_customer
-                                                                                       : (fields.collected || {}));
+      // Fall back per field, not for the entire dictionary. Required rows use the same saved source in both sections.
+      const collected = { ...(fields.collected || {}), ...(fields.collected_customer || {}) };
+      for (const [key, value] of Object.entries(fields.required || {})) {
+        if (value && value !== "unknown" && value !== "declined") collected[key] = detailValue(key, value);
+        else delete collected[key];
+      }
+      const items = Object.entries(collected);
       if (items.length) rows.append(el("dt", {}, this.t.fields.collected),
-                                    el("dd", { dir: "auto" }, items.map(([k, v]) => `${k}: ${v}`).join("\n")));
-      const unknown = (fields.unknown_customer || []).length ? fields.unknown_customer : (fields.unknown || []);
+                                    el("dd", { dir: "auto" }, items.map(([k, v]) => `${detailLabel(k)}: ${v}`).join("\n")));
+      const requiredUnknown = Object.entries(fields.required || {}).filter(([, v]) => v === "unknown" || v === "declined").map(([k]) => k);
+      const otherUnknown = (fields.unknown_customer || []).length ? fields.unknown_customer : (fields.unknown || []);
+      const unknown = [...new Set([...otherUnknown, ...requiredUnknown])];
       if (unknown.length) rows.append(el("dt", {}, this.t.fields.unknown),
-                                      el("dd", { class: "missing", dir: "auto" }, unknown.join("\n")));
+                                      el("dd", { class: "missing", dir: "auto" }, unknown.map(detailLabel).join("\n")));
       const sections = [el("h4", {}, this.t.ticketData), rows];
       if (required.childElementCount) sections.push(el("h4", {}, this.t.requiredInfo), required);
       if (submitted) {

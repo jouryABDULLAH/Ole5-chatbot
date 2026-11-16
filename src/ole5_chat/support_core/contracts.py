@@ -33,6 +33,9 @@ class Classification(BaseModel):
     # The product's required items for this kind of problem: the value given, "unknown", "declined", or None when
     # not given yet. missing is not a model field: code derives it from the None entries.
     required: dict[str, str | None] = {}
+    # Same canonical keys; supplied values in the customer's wording. A null, written as in required for a detail
+    # not given, is accepted here and dropped by classify.
+    required_customer: dict[str, str | None] = {}
     # collected and unknown again in the customer's language, for the card.
     collected_customer: dict[str, str] = {}
     unknown_customer: list[str] = []

@@ -85,7 +85,8 @@ def _apply_completion(state: AgentState, completion: OperatorCompletion, report:
     draft_failed = derived.action == "workflow_failed" and bool(draft_steps) and not draft_steps[-1].get("success")
     # Tool results that give the active issue's next step win over clarify, workflow_failed and a bare queued. A draft
     # step that failed last is a workflow failure whatever the interpreter chose.
-    if (completion.action in {"clarify", "workflow_failed", "queued"}
+    if (completion.action == "offer" and derived.action in {"request_detail", "show_summary"}) \
+            or (completion.action in {"clarify", "workflow_failed", "queued"}
             and derived.action not in {"workflow_failed", completion.action}) \
             or (draft_failed and completion.action != "workflow_failed"):
         log.warning("ticket_operator  %s replaced with %s from the tool results", completion.action, derived.action)
@@ -200,6 +201,7 @@ def _apply_completion(state: AgentState, completion: OperatorCompletion, report:
             "requested_detail": completion.requested_detail,
             "existing_ticket": completion.existing_ticket,
             "clarification_question": completion.clarification_question,
+            "confirmed_changes": _saved_changes(tool_results, issue_id) if issue else [],
             # What the customer settled this turn without giving it, and an issue they stopped, whatever comes next.
             "skipped": [{"item": item["result"].get("item"), "value": item["result"].get("value")}
                         for item in tool_results if item["name"] == "skip_detail" and item["result"].get("success")],
@@ -210,6 +212,24 @@ def _apply_completion(state: AgentState, completion: OperatorCompletion, report:
         },
     })
     return update
+
+
+def _saved_changes(tool_results: list[dict], issue_id: str | None) -> list[dict]:
+    """Net successful edits for the active issue this turn, excluding failed saves and reverted edits."""
+    changes = {}
+    for item in tool_results:
+        result = item["result"]
+        if (item["name"] == "skip_detail" and result.get("success")
+                and result.get("issue_id") == issue_id):
+            # The separate skipped fact now describes this detail; do not report its superseded saved value.
+            changes.pop(f"required.{result.get('item')}", None)
+        if (item["name"] != "save_ticket_draft" or not result.get("success")
+                or result.get("unchanged") or result.get("issue_id") != issue_id):
+            continue
+        for change in result.get("confirmed_changes") or []:
+            field = change["field"]
+            changes[field] = {**change, "before": changes.get(field, change)["before"]}
+    return [change for change in changes.values() if change["before"] != change["after"]]
 
 
 def _completion_from_tools(state: AgentState, report: str) -> OperatorCompletion:
@@ -274,6 +294,9 @@ def _completion_check(working: AgentState, report: str, matches: set[str] | None
     queue_ids = [issue.get("id") for issue in working.get("pending_issues") or []]
 
     def check(completion: OperatorCompletion) -> str | None:
+        if completion.action == "offer" and expected.action in {"request_detail", "show_summary"}:
+            return (f"The draft tool result already gives {expected.action}. Return that action; offer means "
+                    "asking whether to begin preparation, not asking to submit a prepared summary.")
         if completion.action == "request_detail" and completion.requested_detail not in missing:
             if not working.get("ticket_draft"):
                 return ("request_detail is not possible: no draft exists yet. Return offer before the customer "

@@ -28,6 +28,7 @@ class TicketDraft(BaseModel):
     missing: list[str] = []  # the required items still None, kept for the internal note
     unknown: list[str] = []
     required: dict[str, str | None] = {}
+    required_customer: dict[str, str] = {}
     collected_customer: dict[str, str] = {}
     unknown_customer: list[str] = []
     classified: bool = False

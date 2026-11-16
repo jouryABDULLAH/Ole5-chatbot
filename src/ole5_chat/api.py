@@ -14,6 +14,7 @@ from ole5_chat.attachments import AttachmentRefused
 from ole5_chat.config import get_settings, search_settings, set_search_settings
 from ole5_chat.agent.state import AgentState
 from ole5_chat.support_core.state import TicketDraft
+from ole5_chat.support_core.detail_display import align_details
 from ole5_chat.identity import NotRegistered
 from ole5_chat.tickets import client as ticket_api
 from ole5_chat.tickets import status as ticket_api_status
@@ -113,6 +114,7 @@ class CreatedTicket(BaseModel):
     subtype: str | None = None
     priority: str | None = None
     required: dict[str, str | None] = {}
+    required_customer: dict[str, str] = {}
     collected: dict[str, str] = {}
     unknown: list[str] = []
     collected_customer: dict[str, str] = {}
@@ -128,6 +130,7 @@ class SessionView(BaseModel):
     product: str
     product_name: str
     language: str
+    detail_labels: dict[str, str] = {}
     phase: Phase
     messages: list[Line]
     ticket_draft: TicketDraft | None = None
@@ -172,6 +175,8 @@ def _phase(state: dict) -> str:
 
 def _view(session_id: str, state: AgentState) -> SessionView:
     phase = _phase(state)
+    config = products.load(state["identity"].product)
+    language = state["identity"].language
     raw_draft = state.get("ticket_draft")
     draft = None
     if raw_draft:
@@ -179,7 +184,7 @@ def _view(session_id: str, state: AgentState) -> SessionView:
         values = {key: value for key, value in raw_draft.items() if key in fields}
         values.setdefault("product", state["identity"].product)
         values.setdefault("missing", [])
-        draft = TicketDraft(**values)
+        draft = align_details(TicketDraft(**values), labels=config.required_labels)
 
     who = state["identity"]
     created = []
@@ -188,10 +193,17 @@ def _view(session_id: str, state: AgentState) -> SessionView:
         # Only expose the stable customer card contract; older checkpoints get a safe message index.
         fields = {key: value for key, value in ticket.items() if key in CreatedTicket.model_fields}
         fields.setdefault("message_index", max(len(state.get("messages", [])) - 1, 0))
+        display = align_details(TicketDraft(product=who.product, **{
+            key: value for key, value in fields.items() if key in TicketDraft.model_fields}),
+            labels=config.required_labels)
+        fields.update(display.model_dump(include={"required_customer", "collected", "collected_customer",
+                                                   "unknown", "unknown_customer"}))
         created.append(CreatedTicket(**fields))
     numbers = [t.ticket_number for t in created]
     return SessionView(session_id=session_id, product=who.product, product_name=products.load(who.product).name,
                        language=who.language,
+                       detail_labels={key: translations.get(language) or key
+                                      for key, translations in config.required_labels.items()},
                        phase=phase, messages=[_line(m) for m in state["messages"]],
                        ticket_draft=draft, draft_ready=phase == "confirm",
                        ticket_number=numbers[-1] if numbers else None, ticket_numbers=numbers, created_tickets=created,

@@ -50,6 +50,7 @@ def classify(state: ChatState) -> dict:
     missing = [k for k, v in result.required.items() if v is None]
     draft = state["ticket_draft"].model_copy(update={**fields, "collected": result.collected, "missing": missing,
                                                      "required": result.required,
+                                                     "required_customer": {k: v for k, v in result.required_customer.items() if v},
                                                      "unknown": result.unknown, "classified": True,
                                                      "collected_customer": result.collected_customer,
                                                      "unknown_customer": result.unknown_customer})

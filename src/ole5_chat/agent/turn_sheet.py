@@ -26,6 +26,7 @@ class TurnSheet(TypedDict):
     requested_detail: str | None
     first_detail: bool              # the first detail asked since the offer was accepted: nothing answered or skipped yet
     skipped: str | None             # e.g. "page (unknown)"
+    confirmed_changes: list[dict]   # successful edits to an existing draft this turn
     cancelled_issue: str | None
     queued_issue: str | None
     next_issue: str | None          # the queued issue offered after a submit
@@ -131,6 +132,7 @@ def build_turn_sheet(state: AgentState, language: str) -> TurnSheet:
         first_detail=action == "request_detail" and all(
             value is None for value in (draft.get("required") or {}).values()),
         skipped=", ".join(f"{s.get('item')} ({s.get('value')})" for s in op.get("skipped") or []) or None,
+        confirmed_changes=op.get("confirmed_changes") or [],
         cancelled_issue=op.get("cancelled_issue"),
         queued_issue=op.get("queued_issue"),
         next_issue=op.get("next_issue"),

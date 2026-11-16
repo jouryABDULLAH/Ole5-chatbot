@@ -170,6 +170,12 @@ Intent describes what the customer requested.
 - A question about the pending interaction, without an answer or edit,
   is other: Respond answers it and preserves the pending step.
 
+- Distinguish approving submission of the current displayed summary from requesting ticket preparation
+  or a different ticket. Read the whole message in context; a pending summary and explicit_ticket_request=true
+  do not establish submission approval. Do not describe an ambiguous or different-ticket request as confirmation
+  of the current summary. Preserve the existing routing rules for new requests and pending replies; when the
+  message ambiguously refers to the pending summary, the Operator must clarify rather than assume approval.
+
 - Use needs_ticket when the customer requests a separate in-scope account
   intervention. An unrelated pending interaction does not change that
   classification.
@@ -240,6 +246,13 @@ Never rewrite worker outputs or invent results. Return only the Router decision 
 
 ### ADDITIONAL ROUTING RULES
 
+- Cancelling an already submitted ticket is not supported by this assistant. Route that request to other/respond,
+  explicit_ticket_request=false, so Respond explains the limitation. It is not a ticket lookup or a request to
+  cancel local preparation. Do not ask for a ticket number for this unsupported action. A number supplied after
+  an earlier cancellation question still belongs to that cancellation request; do not reinterpret it as a lookup
+  or a new support issue unless the customer asks for that. Resolve the target from the conversation: an unrelated
+  pending draft does not authorize cancelling it instead. Cancelling a clearly identified pending preparation
+  remains pending_response/ticket_operator.
 - A pending response is valid only when pending customer response is present. If absent, do not return `pending_response`.
 - With nothing pending, interpret short replies using the previous
   assistant message. A reply indicating that suggested steps failed

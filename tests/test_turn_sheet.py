@@ -75,7 +75,7 @@ def test_side_question_reminds_of_the_pending_summary_and_shows_the_draft():
     sheet = build_turn_sheet(current, "ar")
     assert sheet["stage"] == "answered" and sheet["remind_pending"]
     assert sheet["draft"]["queue"] == "Ole5 Support"
-    assert "is still waiting" in turn_note(sheet)
+    assert "briefly remind the customer what the current request needs" in turn_note(sheet)
 
 
 def test_pending_step_without_an_active_issue_reaches_the_note():

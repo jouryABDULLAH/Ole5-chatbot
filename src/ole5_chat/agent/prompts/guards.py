@@ -36,6 +36,16 @@ value, limit, permission, cause or fix. Every other kind is not_product_fact, an
   status means, a queued or stopped request, a problem on the assistant's side that stopped a step. A request is
   named by the problem the customer reported; that name repeats their report and does not say the product behaves
   that way;
+- purpose of a requested support detail: a general explanation that the page name helps locate where the reported
+  problem occurs, an error message helps understand the symptom, or a screenshot helps show what the customer sees.
+  When the conversation or workflow facts establish that detail request, this is not_product_fact even with no
+  passages. Saying it helps the team investigate more quickly or accurately is a general purpose, not a promised
+  response time or a diagnosis. For example, «اسم الصفحة يساعد فريق الدعم يحدد مكان الزر غير الشغال بسرعة ويستكشف
+  السبب بدقة.» is not_product_fact in that context: it explains why the requested page is useful, without asserting
+  the actual cause. Do not require a document describing why support asks for that detail.
+  This exception does not cover product instructions, an asserted cause or fix, a claim about special diagnostic
+  access or tools, a guarantee of resolution, or a response deadline. A product claim mixed into the explanation
+  still needs support under Step 2;
 - company and support facts: support hours, channels, how the reply arrives;
 - the assistant about itself: who it is, what it can help with, what is outside its scope, what it cannot see or do
   on the customer's account.

@@ -99,6 +99,7 @@ def _grounding_input(state: AgentState, sheet: TurnSheet, reply: str, passages: 
         ("current_issue", "Current request (named by the problem the customer reported)"),
         ("pending_kind", "Step waiting for the customer"), ("pending_item", "Detail waiting"),
         ("requested_detail", "Requested detail"), ("skipped", "Skipped detail"),
+        ("confirmed_changes", "Confirmed draft changes this turn"),
         ("cancelled_issue", "Stopped request"), ("queued_issue", "Queued request"),
         ("next_issue", "Next request, now offered"), ("next_in_queue", "Requests in the queue"),
         ("ticket_number", "Ticket created, number"), ("existing_ticket", "Ticket already submitted, number"),

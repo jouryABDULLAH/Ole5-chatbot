@@ -14,6 +14,7 @@ from ole5_chat.agent.nodes.ticket_enquiry import _rows, _summary
 from ole5_chat.agent.state import AgentState
 from ole5_chat.support_core import classify as ticket_classifier
 from ole5_chat.support_core.contracts import PendingIssue
+from ole5_chat.support_core.detail_display import align_details
 from ole5_chat.support_core.state import ChatState, TicketDraft
 from ole5_chat.tickets import client as ticket_api
 from ole5_chat.tickets import submit as ticket_submit
@@ -21,6 +22,21 @@ from ole5_chat.tickets import submit as ticket_submit
 log = logging.getLogger(__name__)
 
 SKIPPED = ("unknown", "declined")  # values of a required detail the customer answered without giving it
+
+
+def _confirmed_changes(before: TicketDraft, after: TicketDraft) -> list[dict]:
+    """Customer-visible saved values, not requested tool arguments or classification metadata."""
+    def visible(draft):
+        return {
+            "title": draft.title_customer or draft.title,
+            "summary": draft.summary_customer or draft.summary,
+            **{f"required.{key}": (draft.required_customer.get(key) or value)
+               if value is not None and value not in SKIPPED else value
+               for key, value in draft.required.items()},
+        }
+    old, new = visible(before), visible(after)
+    return [{"field": key, "before": old.get(key), "after": new.get(key)}
+            for key in sorted(old.keys() | new.keys()) if old.get(key) != new.get(key)]
 
 
 def _logged_tool(sink: list):
@@ -179,7 +195,11 @@ def build_ticket_operator_tools(state: AgentState, sink: list | None = None):
     @tool("save_ticket_draft")
     @_logged_tool(sink)
     def save_ticket_draft(fields: dict, issue_id: str | None = None) -> str:
-        """Merge draft updates, classify them, and report whether a summary is safe."""
+        """Merge draft updates, classify them, and report whether a summary is safe.
+
+        Send only changed fields. Required-detail edits may be top-level detail names or a partial required map.
+        Omitted details are preserved; an explicit null clears a detail. Use skip_detail for unknown/declined.
+        """
 
         active = state.get("active_issue")
         if active is None:
@@ -187,11 +207,21 @@ def build_ticket_operator_tools(state: AgentState, sink: list | None = None):
         if issue_id and issue_id != active.get("id"):
             return _json({"success": False, "operation": "save_ticket_draft", "error": "issue is not active"})
         try:
+            had_draft = bool(state.get("ticket_draft"))
             current = _draft(state)
+            # Tool callers use both {page: value} and {required: {page: value}}. Normalize both into a
+            # partial update of the required map instead of silently adding an unused model attribute.
+            detail_names = set(current.required) | {
+                name for names in products.load(state["identity"].product).required.values() for name in names}
+            detail_edits = dict(fields.get("required") or {})
+            detail_edits.update({key: value for key, value in fields.items() if key in detail_names})
+            updates = {key: value for key, value in fields.items() if key not in detail_names and key != "required"}
+            if detail_edits:
+                updates["required"] = {**current.required, **detail_edits}
             # An empty save of a ready draft is a read, not a new revision.
             if (current.classified and not current.missing
                     and all(getattr(current, key, None) for key in ticket_submit.REQUIRED)
-                    and all(current.model_dump().get(key) == value for key, value in fields.items())):
+                    and all(current.model_dump().get(key) == value for key, value in updates.items())):
                 return _json({
                     "success": True, "operation": "save_ticket_draft", "unchanged": True,
                     "issue_id": active.get("id"), "draft_version": state.get("draft_version"),
@@ -199,7 +229,7 @@ def build_ticket_operator_tools(state: AgentState, sink: list | None = None):
                     "missing_customer_details": [], "missing_fields": [],
                     "mandatory_fields_missing": [], "draft": current.model_dump(),
                 })
-            draft = current.model_copy(update=fields)
+            draft = current.model_copy(update=updates)
         except Exception as exc:
             return _json({"success": False, "operation": "save_ticket_draft", "error": str(exc)})
 
@@ -219,10 +249,17 @@ def build_ticket_operator_tools(state: AgentState, sink: list | None = None):
                 "error": error,
             })
 
-        # A detail the customer already said they don't have or won't give stays settled when classify runs again.
-        required = {**classified.required, **{key: value for key, value in current.required.items()
-                                              if value in SKIPPED and classified.required.get(key) is None
-                                              and key in classified.required}}
+        # Classification determines which details apply to the resulting type. Within that set, an edit to
+        # one detail must not erase or rewrite another settled value. Explicit clearing is different from
+        # a classifier forgetting the value; an explicit supplied value also survives a null classification.
+        required = dict(classified.required)
+        for key in required:
+            if key in detail_edits:
+                value = detail_edits[key]
+                if value is None or value in SKIPPED or required[key] is None:
+                    required[key] = value
+            elif current.required.get(key) is not None:
+                required[key] = current.required[key]
         classified = classified.model_copy(update={"required": required})
         mandatory_missing = [
             key for key in ticket_submit.REQUIRED
@@ -236,6 +273,9 @@ def build_ticket_operator_tools(state: AgentState, sink: list | None = None):
             and (not missing_customer_details or active.get("urgent"))
         )
         classified = classified.model_copy(update={"missing": missing_customer_details})
+        classified = align_details(classified, current, detail_edits,
+                                   products.load(state["identity"].product).required_labels)
+        changes = _confirmed_changes(current, classified) if had_draft else []
         state["ticket_draft"] = classified.model_dump()
         state["draft_version"] = int(state.get("draft_version") or 0) + 1
         state["summary_shown"] = False
@@ -253,6 +293,7 @@ def build_ticket_operator_tools(state: AgentState, sink: list | None = None):
             "mandatory_fields_missing": mandatory_missing,
             "summary_ready": summary_ready,
             "unknown_fields": classified.unknown,
+            "confirmed_changes": changes,
             "draft": classified.model_dump(),
         })
 
@@ -289,6 +330,7 @@ def build_ticket_operator_tools(state: AgentState, sink: list | None = None):
         mandatory_missing = [key for key in ticket_submit.REQUIRED if not getattr(draft, key, None)]
         draft = draft.model_copy(update={"required": required, "missing": missing,
                                          "unknown": list(dict.fromkeys([*draft.unknown, item]))})
+        draft = align_details(draft, labels=products.load(state["identity"].product).required_labels)
         summary_ready = bool(draft.classified and not mandatory_missing and not missing)
         state["ticket_draft"] = draft.model_dump()
         state["draft_version"] = int(state.get("draft_version") or 0) + 1
@@ -420,7 +462,7 @@ def build_ticket_operator_tools(state: AgentState, sink: list | None = None):
         record = {
             **created,
             **draft.model_dump(include={"title", "summary", "title_customer", "summary_customer", "queue", "type",
-                                        "subtype", "priority", "required", "collected", "unknown",
+                                        "subtype", "priority", "required", "required_customer", "collected", "unknown",
                                         "collected_customer", "unknown_customer"}),
             "attachments": [f["file_name"] for f in state.get("attachments", [])],
             "message_index": len(state.get("messages", [])),  # the reply announcing it goes here

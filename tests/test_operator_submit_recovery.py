@@ -25,6 +25,51 @@ def ready_state():
     return state
 
 
+@pytest.mark.parametrize("mode", ["edit", "failed", "initial", "unchanged"])
+def test_confirmed_edits_reach_respond_only_after_existing_draft_is_saved(monkeypatch, mode):
+    from ole5_chat.agent.turn_sheet import build_turn_sheet
+    from ole5_chat.agent.prompts.respond import turn_note
+
+    state = ready_state()
+    state["ticket_draft"]["required"] = {"error text or screenshot": "unknown"}
+    before = TicketDraft(**state["ticket_draft"])
+    after = before.model_copy(update={"required": {"error text or screenshot": "ERORORO"}})
+    if mode == "initial":
+        state["ticket_draft"] = None
+    monkeypatch.setattr(tools.ticket_classifier, "classify", lambda _: (
+        {"note": "classification failed"} if mode == "failed" else {"ticket_draft": after}))
+    bound = {tool.name: tool for tool in tools.build_ticket_operator_tools(state)}
+    fields = {} if mode == "unchanged" else {"required": after.required}
+    payload = bound["save_ticket_draft"].invoke({"fields": fields, "issue_id": "issue-1"})
+    saved = json.loads(payload)
+    expected = ([{"field": "required.error text or screenshot", "before": "unknown", "after": "ERORORO"}]
+                if mode == "edit" else [])
+    assert saved.get("confirmed_changes", []) == expected
+    completion = _completion_from_tools(state, json.dumps([{"name": "save_ticket_draft", "content": payload}]))
+    update = _apply_completion(state, completion, json.dumps([{"name": "save_ticket_draft", "content": payload}]))
+    sheet = build_turn_sheet({**state, **update}, "ar")
+    assert sheet["confirmed_changes"] == expected
+    assert ("Confirmed draft changes this turn:" in turn_note(sheet)) == bool(expected)
+
+
+def test_saved_changes_exclude_other_issues_failures_and_reverted_edits():
+    from ole5_chat.agent.nodes.ticket_operator import _saved_changes
+
+    def save(before, after, issue="issue-1", success=True):
+        return {"name": "save_ticket_draft", "result": {
+            "success": success, "issue_id": issue,
+            "confirmed_changes": [{"field": "title", "before": before, "after": after}],
+        }}
+    assert _saved_changes([save("A", "B"), save("B", "C", success=False),
+                           save("X", "Y", issue="issue-2")], "issue-1") == [
+        {"field": "title", "before": "A", "after": "B"}]
+    assert _saved_changes([save("A", "B"), save("B", "A")], "issue-1") == []
+    detail = save(None, "Inbox")
+    detail["result"]["confirmed_changes"][0]["field"] = "required.page"
+    skip = {"name": "skip_detail", "result": {"success": True, "issue_id": "issue-1", "item": "page"}}
+    assert _saved_changes([detail, skip], "issue-1") == []
+
+
 def test_wrong_version_empty_save_and_successful_retry(monkeypatch):
     state = ready_state()
     classifier = Mock(side_effect=AssertionError('An empty save must not reclassify'))
@@ -92,6 +137,8 @@ def test_skip_detail_settles_the_item_and_readies_the_summary():
 @pytest.mark.parametrize('urgent', [True, False])
 def test_urgent_issue_summary_is_ready_without_customer_details(monkeypatch, urgent):
     state = detail_state()
+    # Both details are genuinely unanswered; reclassification must not erase a saved browser.
+    state['ticket_draft']['required']['browser'] = None
     state['active_issue'] = {**state['active_issue'], 'urgent': urgent}
     reclassified = TicketDraft(**{**state['ticket_draft'], 'required': {'page': None, 'browser': None},
                                   'missing': ['page', 'browser'], 'classified': True})
@@ -123,6 +170,20 @@ def test_required_details_come_from_the_ticket_type(model, ticket_type, subtype,
     assert result['ticket_draft'].missing == [key for key, value in asked.items() if value is None]
 
 
+def test_null_customer_wording_for_an_unanswered_detail_is_dropped_not_refused(model):
+    from ole5_chat.support_core.classify import classify
+    from ole5_chat.support_core.contracts import Classification
+    # The model writes null for the detail not given, as it does in required; the classification still stands.
+    model.add(Classification.model_validate({
+        'queue': 'Ole5 Technical', 'type': 'Bug', 'subtype': 'Software malfunction',
+        'reason': 'Issue - archive button', 'priority': 'Medium', 'title': 'Archive button fails',
+        'summary': 'The archive button fails.', 'confidence': 'high', 'queue_reason': 'Product behaviour',
+        'required': {'page': None, 'error text or screenshot': 'Access denied'},
+        'required_customer': {'page': None, 'error text or screenshot': 'Access denied'}}))
+    result = classify(tools._classification_state(detail_state(), TicketDraft(product='Ole5')))
+    assert result['ticket_draft'].required_customer == {'error text or screenshot': 'Access denied'}
+
+
 def test_reclassifying_keeps_a_skipped_detail(monkeypatch):
     state = detail_state()
     state['ticket_draft']['required']['page'] = 'declined'
@@ -133,6 +194,75 @@ def test_reclassifying_keeps_a_skipped_detail(monkeypatch):
     result = json.loads(bound['save_ticket_draft'].invoke({'fields': {'summary': 'Changed'}, 'issue_id': 'issue-1'}))
     assert result['missing_customer_details'] == [] and result['summary_ready']
     assert state['ticket_draft']['required']['page'] == 'declined'
+
+
+@pytest.mark.parametrize('nested', [False, True])
+@pytest.mark.parametrize('lost_error', [None, 'different invented error'])
+def test_page_edit_preserves_saved_error_and_merges_classifier_input(monkeypatch, nested, lost_error):
+    state = ready_state()
+    state['ticket_draft']['required'] = {'page': 'Wall page', 'error text or screenshot': 'ERROR_load'}
+    seen = []
+
+    def classify(value):
+        draft = value['ticket_draft']
+        seen.append(draft)
+        return {'ticket_draft': draft.model_copy(update={
+            'required': {'page': 'Inbox page', 'error text or screenshot': lost_error}})}
+
+    monkeypatch.setattr(tools.ticket_classifier, 'classify', classify)
+    bound = {tool.name: tool for tool in tools.build_ticket_operator_tools(state)}
+    edits = {'page': 'صفحة الوارد'}
+    saved = json.loads(bound['save_ticket_draft'].invoke({'fields': {'required': edits} if nested else edits}))
+    assert seen[0].required == {'page': 'صفحة الوارد', 'error text or screenshot': 'ERROR_load'}
+    assert saved['draft']['required'] == {'page': 'Inbox page', 'error text or screenshot': 'ERROR_load'}
+    assert saved['summary_ready'] and saved['missing_customer_details'] == []
+    assert saved['confirmed_changes'] == [{'field': 'required.page', 'before': 'Wall page', 'after': 'صفحة الوارد'}]
+
+
+@pytest.mark.parametrize('new_value', ['ERROR_new', None])
+def test_explicit_error_edit_or_clear_is_not_restored_from_old_draft(monkeypatch, new_value):
+    state = ready_state()
+    state['ticket_draft']['required'] = {'page': 'Inbox', 'error text or screenshot': 'ERROR_old'}
+    def classify(value):
+        return {'ticket_draft': value['ticket_draft'].model_copy(update={
+            'required': {'page': None, 'error text or screenshot': None}})}
+    monkeypatch.setattr(tools.ticket_classifier, 'classify', classify)
+    bound = {tool.name: tool for tool in tools.build_ticket_operator_tools(state)}
+    saved = json.loads(bound['save_ticket_draft'].invoke({'fields': {
+        'required': {'error text or screenshot': new_value}}}))
+    assert saved['draft']['required'] == {'page': 'Inbox', 'error text or screenshot': new_value}
+    assert saved['missing_customer_details'] == ([] if new_value else ['error text or screenshot'])
+
+
+def test_type_change_does_not_restore_details_no_longer_required(monkeypatch):
+    state = ready_state()
+    state['ticket_draft']['required'] = {'page': 'Inbox', 'error text or screenshot': 'ERROR_old'}
+    monkeypatch.setattr(tools.ticket_classifier, 'classify', lambda value: {
+        'ticket_draft': value['ticket_draft'].model_copy(update={'required': {'username': None}})})
+    bound = {tool.name: tool for tool in tools.build_ticket_operator_tools(state)}
+    saved = json.loads(bound['save_ticket_draft'].invoke({'fields': {'summary': 'Password issue'}}))
+    assert saved['draft']['required'] == {'username': None}
+    assert saved['missing_customer_details'] == ['username']
+
+
+@pytest.mark.parametrize('ready', [True, False])
+def test_offer_cannot_replace_the_next_step_from_a_successful_draft_save(ready):
+    state = ready_state()
+    state['summary_shown'] = False  # saving a revision hides the old summary until it is presented again
+    state['ticket_draft']['required'] = {'page': 'Inbox' if ready else None}
+    state['ticket_draft']['missing'] = [] if ready else ['page']
+    report = json.dumps([{'name': 'save_ticket_draft', 'content': json.dumps({
+        'success': True, 'issue_id': 'issue-1', 'summary_ready': ready,
+        'classification_succeeded': True, 'missing_customer_details': [] if ready else ['page'],
+    })}])
+    mistaken = OperatorCompletion(action='offer', reason='Ask whether to send', issue_id='issue-1')
+    assert _completion_check(state, report)(mistaken)
+    update = _apply_completion(state, mistaken, report)
+    assert update['ticket_operator_result']['action'] == ('show_summary' if ready else 'request_detail')
+    assert update['pending_customer_response'].kind == ('summary' if ready else 'detail')
+    assert update['ticket_draft'] == state['ticket_draft']
+    if ready:
+        assert update['summary_shown']
 
 
 def test_cancel_ends_the_issue_activates_the_next_and_is_not_offered_again():
