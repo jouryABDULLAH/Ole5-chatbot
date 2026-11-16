@@ -59,11 +59,12 @@ def _correction(exc: BadRequestError) -> list[BaseMessage]:
                                  "tool call requires.")]
 
 
-def invoke(convo: list[BaseMessage], tool=None, tool_choice: str | None = None) -> AIMessage:
-    """One plain model call. If Groq rejects the generation, it is retried warmer with the rejection sent back to the
-    model; any other Groq error, already retried by the client, ends the call. Only the search node binds a tool."""
+def invoke(convo: list[BaseMessage], tool=None, tool_choice: str | None = None, temperature: float = 0) -> AIMessage:
+    """One plain model call at temperature. If Groq rejects the generation, it is retried at 0.3 with the rejection
+    sent back to the model; any other Groq error, already retried by the client, ends the call. Only the search node
+    binds a tool."""
     error, correction = "no attempt made", []
-    for temperature in (0, 0.3):
+    for temperature in (temperature, 0.3):
         try:
             client = tool_client(temperature)
             return (client.bind_tools([tool], tool_choice=tool_choice) if tool else client).invoke([*convo, *correction])

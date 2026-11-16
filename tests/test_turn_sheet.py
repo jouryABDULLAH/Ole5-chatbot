@@ -32,18 +32,31 @@ def test_submit_button_is_submitted_with_the_ticket_number_and_the_button_named(
     assert not sheet["remind_pending"]
 
 
+def test_requested_and_waiting_details_carry_their_customer_label():
+    # The name the customer sees for a detail comes from products/ole5/chat.yaml required_labels, in the turn's language.
+    pending = PendingCustomerResponse(kind="detail", issue_id="issue-1", item="error text or screenshot")
+    current = state(intent="pending_response", pending_customer_response=pending,
+                    active_issue={"id": "issue-1", "description": "زر الأرشفة لا يعمل"},
+                    ticket_operator_result=operator("request_detail", requested_detail="error text or screenshot"))
+    note = turn_note(build_turn_sheet(current, "ar"))
+    assert "Requested detail: error text or screenshot («نص الخطأ أو لقطة شاشة»)" in note
+    assert "waiting for the detail: error text or screenshot («نص الخطأ أو لقطة شاشة»)" in note
+    assert "Requested detail: page («the page name»)" in turn_note(build_turn_sheet(
+        state(ticket_operator_result=operator("request_detail", requested_detail="page")), "en"))
+
+
 def test_only_the_first_detail_explains_why_details_are_needed():
     pending = PendingCustomerResponse(kind="detail", issue_id="issue-1", item="page")
     first = state(intent="pending_response", pending_customer_response=pending,
                   ticket_operator_result=operator("request_detail", requested_detail="page"),
                   ticket_draft={"required": {"page": None, "error text or screenshot": None}})
     sheet = build_turn_sheet(first, "ar")
-    assert sheet["first_detail"] and "first detail since the customer accepted" in turn_note(sheet)
+    assert sheet["first_detail"] and "Detail note: This is the first detail since the customer accepted" in turn_note(sheet)
     later = state(intent="pending_response", pending_customer_response=pending,
                   ticket_operator_result=operator("request_detail", requested_detail="error text or screenshot"),
                   ticket_draft={"required": {"page": "الصفحة الرئيسية", "error text or screenshot": None}})
     sheet = build_turn_sheet(later, "ar")
-    assert not sheet["first_detail"] and "already knows why details are needed" in turn_note(sheet)
+    assert not sheet["first_detail"] and "Detail note: This is not the first detail" in turn_note(sheet)
 
 
 def test_failed_submit_is_not_reported_as_created():
@@ -75,7 +88,7 @@ def test_side_question_reminds_of_the_pending_summary_and_shows_the_draft():
     sheet = build_turn_sheet(current, "ar")
     assert sheet["stage"] == "answered" and sheet["remind_pending"]
     assert sheet["draft"]["queue"] == "Ole5 Support"
-    assert "briefly remind the customer what the current request needs" in turn_note(sheet)
+    assert "Reminder due: the current request is still waiting on its step" in turn_note(sheet)
 
 
 def test_pending_step_without_an_active_issue_reaches_the_note():

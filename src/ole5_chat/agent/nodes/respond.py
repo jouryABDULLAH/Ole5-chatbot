@@ -19,8 +19,7 @@ from ole5_chat.agent.guards import NAMES, language_of, language_problem, plain, 
 log = logging.getLogger(__name__)
 
 LANGUAGE_RETRIES = 2
-# Temporary diagnostic mode: run the grounding check once, log unsupported
-# claims, and keep the generated reply. Set to True to restore retries/fallbacks.
+
 GROUNDING_ENFORCE = True 
 
 
@@ -181,7 +180,7 @@ def respond_node(state: AgentState) -> dict:
              state.get("search_outcome"), sheet["stage"], sheet["button"])
     try:
         reply = llm.invoke(
-            [SystemMessage(content=system_prompt(state, sheet)), *_messages(state, sheet)]
+            [SystemMessage(content=system_prompt(state, sheet)), *_messages(state, sheet)], temperature=0.1
         ).text.strip()
     except llm.ModelFailed as exc:
         log.error("ERROR respond model call failed; sending safe fallback: %s", exc)

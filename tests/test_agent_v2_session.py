@@ -1,4 +1,4 @@
-﻿from unittest.mock import patch
+from unittest.mock import patch
 import re
 
 from fastapi.testclient import TestClient
@@ -78,7 +78,7 @@ def test_api_switch_and_v2_state_view(monkeypatch):
     get_settings.cache_clear()
 
 
-def _writer(messages):
+def _writer(messages, temperature=0):
     """Respond: names the ticket number when the turn note gives one."""
     match = re.search(r"Ticket created, number: (\S+)", messages[-1].content)
     return AIMessage(content=f"Your ticket number is {match.group(1)}." if match else "Here is your ticket summary.")

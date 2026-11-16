@@ -43,7 +43,7 @@ def test_queue_handoff(model, operator_model, kind, action, next_kind):
                         required={"browser": None})
     captured = []
 
-    def writer(messages):
+    def writer(messages, temperature=0):
         prompt = messages[0].content
         captured.append(prompt)
         if next_kind == "empty":
@@ -129,7 +129,7 @@ def test_queue_moves_on_after_operator(model, operator_model, kind, action, next
     model.add(ReturnDecision(next_target="respond", reason="Ticket Operator completed this turn."))
     notes = []
 
-    def writer(messages):
+    def writer(messages, temperature=0):
         notes.append(messages[-1].content)
         return AIMessage(content="The previous step is done.")
 

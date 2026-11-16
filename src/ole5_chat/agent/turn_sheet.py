@@ -4,6 +4,7 @@ The model never infers the workflow from flags; it reads the sheet as a note aft
 
 from typing import Literal, TypedDict
 
+from ole5_chat import products
 from ole5_chat.agent.state import AgentState
 
 Stage = Literal[
@@ -49,7 +50,8 @@ class TurnSheet(TypedDict):
 OPERATOR_FACT = {
     "offer": "offered to prepare a support ticket for the request",
     "request_detail": "needs one more detail before the ticket is complete",
-    "show_summary": "prepared the ticket summary; it is shown on a card and waits for the customer's confirmation",
+    # Was (2026-11-16): "…; it is shown on a card and waits for the customer's confirmation".
+    "show_summary": "prepared the ticket summary; it is shown to the customer and waits for their confirmation",
     "submitted": "submitted the ticket",
     "submission_failed": "tried to submit the ticket; the ticket was not created",
     "declined": "stopped preparing the ticket because the customer declined",
@@ -63,13 +65,21 @@ OPERATOR_FACT = {
 }
 
 
-def _current_issue(state: AgentState) -> str | None:
+def _detail(state: AgentState, item: str | None, language: str) -> str | None:
+    """A required detail with the name the customer sees for it (products' required_labels), so every reply uses it."""
+    if not item:
+        return item
+    label = products.load(state["identity"].product).required_labels.get(item, {}).get(language)
+    return f"{item} («{label}»)" if label else item
+
+
+def _current_issue(state: AgentState, language: str) -> str | None:
     active = state.get("active_issue")
     if not active:
         return None
     pending = state.get("pending_customer_response")
     waiting = {"offer": "ticket offer waiting for a yes or no",
-               "detail": f"waiting for the detail: {getattr(pending, 'item', None)}",
+               "detail": f"waiting for the detail: {_detail(state, getattr(pending, 'item', None), language)}",
                "summary": "summary waiting for confirmation"}.get(getattr(pending, "kind", None))
     return f"«{active.get('description')}»" + (f" ({waiting})" if waiting else "")
 
@@ -131,7 +141,7 @@ def build_turn_sheet(state: AgentState, language: str) -> TurnSheet:
                   if result.get("nothing_to_submit") else OPERATOR_FACT.get(action, "not run")),
         # Only the request the workflow acted on this turn; a request merely waiting is on the current-request line.
         issue=op.get("issue"),
-        requested_detail=op.get("requested_detail"),
+        requested_detail=_detail(state, op.get("requested_detail"), language),
         first_detail=action == "request_detail" and all(
             value is None for value in (draft.get("required") or {}).values()),
         skipped=", ".join(f"{s.get('item')} ({s.get('value')})" for s in op.get("skipped") or []) or None,
@@ -144,7 +154,7 @@ def build_turn_sheet(state: AgentState, language: str) -> TurnSheet:
         ticket_number=(result.get("ticket") or {}).get("ticket_number") if succeeded else None,
         existing_ticket=op.get("existing_ticket"),
         clarification_question=op.get("clarification_question"),
-        current_issue=_current_issue(state),
+        current_issue=_current_issue(state, language),
         urgent=bool((state.get("active_issue") or {}).get("urgent")),
         next_in_queue=", ".join(f"«{i.get('description')}»" for i in state.get("pending_issues") or []) or None,
         pending_kind=getattr(pending, "kind", None),
