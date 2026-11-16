@@ -102,7 +102,8 @@ Identify the request from the conversation and follow these rules:
   explicit-preparation rule below. With a draft, report its validated missing customer
   detail or ready summary; do not treat failed classification as customer ambiguity.
 - New issue: call manage_issues with operation="register", even when another issue is
-  active. If the result is queued=true, report queued and preserve the active interaction.
+  active. Its description names the request in a few words, in the language the customer writes in, because the
+  customer may see it. If the result is queued=true, report queued and preserve the active interaction.
   Otherwise the issue is active: offer preparation or build its draft under the
   explicit-preparation rule below.
 

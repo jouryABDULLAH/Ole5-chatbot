@@ -147,6 +147,19 @@ def test_send_request_with_nothing_waiting_is_not_reported_as_a_failed_submissio
     assert 'لم يتم إنشاء التذكرة' not in reply
 
 
+@pytest.mark.parametrize('description,expected', [
+    ('Login using facial or fingerprint biometrics', 'هل ترغب في فتح تذكرة دعم لهذا الطلب؟'),
+    ('تسجيل الدخول بالبصمة', 'هل ترغب في فتح تذكرة دعم للطلب «تسجيل الدخول بالبصمة»؟'),
+])
+def test_fallback_never_quotes_a_request_name_in_the_other_language(description, expected):
+    from ole5_chat.agent import ticket_action_guard
+    state = ready_state()
+    state.update(language='ar', search_outcome='no_answer', ticket_draft=None,
+                 active_issue={'id': 'issue-1', 'description': description},
+                 pending_customer_response=PendingCustomerResponse(kind='offer', issue_id='issue-1'))
+    assert ticket_action_guard.fallback(state) == f'لم أجد إجابة على سؤالك. {expected}'
+
+
 def test_skip_detail_settles_the_item_and_readies_the_summary():
     state = detail_state()
     bound = {tool.name: tool for tool in tools.build_ticket_operator_tools(state)}

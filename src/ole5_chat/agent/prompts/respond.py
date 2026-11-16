@@ -132,6 +132,11 @@ Customer: ما زبطت، نفس المشكلة في الطباعة
 Reply: فاهم عليك. تبي أرفع لك تذكرة للفريق الفني يشيكون على مشكلة الطباعة؟
 </example>
 
+<example stage="offer" search="no answer">
+Customer: هل فيه وضع ليلي للنظام؟
+Reply: ما لقيت معلومات عن الوضع الليلي في Ole5. تبي أرفع لك تذكرة للفريق الفني يتأكدون لك منه؟
+</example>
+
 <example stage="detail_requested" requested_detail="page («اسم الصفحة»)" detail_note="This is the first detail since the customer accepted">
 Customer: ايه
 Reply: عشان أوضح المشكلة للفريق، في أي صفحة ما تظهر الاجتماعات؟ وإذا ما تعرف اسمها، عادي نكمل بدونها.

@@ -364,6 +364,7 @@ def build_ticket_operator_tools(state: AgentState, sink: list | None = None):
         """Register, enqueue, or cancel preparation of a local issue. The next queued issue becomes active on its
         own when the current one is submitted or cancelled.
 
+        description: the request in a few words, in the language the customer writes in; the customer may see it.
         A local issue records the customer's request in this chat; it opens no ticket and sends nothing to support.
         register comes after a check_submitted_tickets result. If that lookup succeeded and a submitted ticket
         matches the request, do not register it. If it failed, submitted-ticket matches are unknown: register the
