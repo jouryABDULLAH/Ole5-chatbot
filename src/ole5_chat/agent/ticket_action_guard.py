@@ -232,7 +232,15 @@ def fallback(state: dict) -> str:
         parts.append(f"سبق أن فُتحت تذكرة لهذه المشكلة برقم {operator['existing_ticket']}." if arabic
                      else f"A ticket was already opened for this problem, number {operator['existing_ticket']}.")
     number = (result.get("ticket") or {}).get("ticket_number")
-    if result.get("submission_succeeded") is True and number:
+    if result.get("nothing_to_submit"):
+        created = (state.get("created_tickets") or [{}])[-1].get("ticket_number")
+        if created:
+            parts.append(f"التذكرة مرفوعة من قبل، ورقمها {created}. ما فيه شي ثاني ينتظر الإرسال." if arabic
+                         else f"The ticket was already raised, number {created}. Nothing else is waiting to be sent.")
+        else:
+            parts.append("ما عندي تذكرة جاهزة للإرسال الحين. وش المشكلة اللي تبي ترفع عنها تذكرة؟" if arabic
+                         else "I don't have a ticket ready to send right now. What problem would you like a ticket for?")
+    elif result.get("submission_succeeded") is True and number:
         channel = config.reply_channel.get(language, "")
         parts.append(f"تم إنشاء التذكرة رقم {number}. {channel}." if arabic else f"Ticket {number} was created. {channel}.")
     elif result.get("submission_succeeded") is False:

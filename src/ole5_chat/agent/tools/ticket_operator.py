@@ -439,7 +439,9 @@ def build_ticket_operator_tools(state: AgentState, sink: list | None = None):
         # Operator model is responsible for recognizing an affirmative reply;
         # this tool only verifies that the current summary is eligible.
         if not state.get("summary_shown") or not state.get("submission_requested"):
-            return _json({"success": False, "operation": "submit_ticket", "error": "no displayed summary is awaiting confirmation"})
+            # Nothing was waiting to be sent: not a failed submission, so it is never reported as "not created".
+            return _json({"success": False, "operation": "submit_ticket", "nothing_to_submit": True,
+                          "error": "no displayed summary is awaiting confirmation"})
         if getattr(pending, "kind", None) != "summary":
             return _json({"success": False, "operation": "submit_ticket", "error": "submission requires a pending summary confirmation"})
         if not state.get("active_issue") or state["active_issue"].get("id") != issue_id:

@@ -95,6 +95,8 @@ def build_turn_sheet(state: AgentState, language: str) -> TurnSheet:
         stage = "ticket_lookup_failed" if failed else "ticket_status"
     elif action == "submitted" and succeeded:
         stage = "submitted"
+    elif action in {"submission_failed", "submitted"} and result.get("nothing_to_submit"):
+        stage = "other"  # a send request with nothing waiting: Respond's other guidance answers it
     elif action in {"submission_failed", "submitted"}:
         stage = "submission_failed"
     elif action == "show_summary":
@@ -125,7 +127,8 @@ def build_turn_sheet(state: AgentState, language: str) -> TurnSheet:
                       'This is not "no answer".') if outcome == "failed"
                 else "no answer" if outcome in {"partial", "no_answer"} else "not run"),
         search_no_answer=outcome in {"partial", "no_answer"} and not direct,
-        operator=OPERATOR_FACT.get(action, "not run"),
+        operator=("found no ticket summary waiting to be sent; nothing was submitted"
+                  if result.get("nothing_to_submit") else OPERATOR_FACT.get(action, "not run")),
         # Only the request the workflow acted on this turn; a request merely waiting is on the current-request line.
         issue=op.get("issue"),
         requested_detail=op.get("requested_detail"),

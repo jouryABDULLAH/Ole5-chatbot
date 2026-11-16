@@ -169,7 +169,10 @@ def _apply_completion(state: AgentState, completion: OperatorCompletion, report:
 
     submission = next((item["result"] for item in reversed(tool_results) if item["name"] == "submit_ticket"), None)
     ticket_result = {}
-    if submission is not None:
+    if submission is not None and submission.get("nothing_to_submit"):
+        # No summary was waiting: nothing was attempted, so there is no failed submission to report.
+        ticket_result["nothing_to_submit"] = True
+    elif submission is not None:
         ticket_result.update({
             "submission_requested": True,
             "submission_succeeded": bool(submission.get("success")),

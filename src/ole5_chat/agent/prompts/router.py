@@ -45,12 +45,15 @@ ROUTER_EXAMPLES = {
         '"What happened to the ticket I opened earlier?"'
     ),
     "needs_ticket": (
-        '"نبي ننقل بياناتنا من النظام القديم"; '
-        '"ولا موظف عندنا يقدر يسجل دخول"; '
-        '"بعد المطر ما عاد يفتح نظام Ole5 عند الموظفين" (a product failure; the rain is only when it started); '
-        '"لا زال لا يعمل" after suggested steps; '
-        '"افتحوا تذكرة لنقل البيانات" → needs_ticket, '
-        'explicit_ticket_request=true (data migration is an always-ticket topic)'
+        '"نبي ننقل بياناتنا من النظام القديم" → needs_ticket, explicit_ticket_request=false (an always-ticket '
+        'topic, but no ticket was asked for); '
+        '"ولا موظف عندنا يقدر يسجل دخول" → needs_ticket, explicit_ticket_request=false (an urgent situation is '
+        'reported, but no ticket was asked for); '
+        '"بعد المطر ما عاد يفتح نظام Ole5 عند الموظفين" → needs_ticket, explicit_ticket_request=false (a product '
+        'failure; the rain is only when it started); '
+        '"لا زال لا يعمل" after suggested steps → needs_ticket, explicit_ticket_request=false; '
+        '"افتحوا تذكرة لنقل البيانات" → needs_ticket, explicit_ticket_request=true (a ticket is asked for, and '
+        'data migration is an always-ticket topic)'
     ),
     "other": (
         '"مرحبا"; "شكراً"; "What can you do?"; "ايش تقدم"; "Who developed {product}?"; '
@@ -61,6 +64,8 @@ ROUTER_EXAMPLES = {
         '"افتح لي تذكرة عن الأيام الممطرة" → other, explicit_ticket_request=false (the subject is outside the '
         'product scope; asking for a ticket does not change that: no Search and no ticket); '
         '"الغها" with nothing pending and no active issue (there is nothing to cancel); '
+        '"ارسلها" with no summary pending, explicit_ticket_request=false (there is nothing to send; it is not a '
+        'new ticket request); '
         'an unrelated/off-topic question; '
         'an ambiguous reference such as "الثانية" when no clear referent exists'
     ),
@@ -183,7 +188,8 @@ Intent describes what the customer requested.
 - A ticket request is classified by what it names, not by the word "ticket". Requesting a ticket does not establish that the subject is about the product: check the subject against the product scope first.
   - It names something outside the product scope: `other`, like any off-topic message, with explicit_ticket_request=false. No Search and no ticket.
   - The in-scope request meets the needs_ticket rules:
-    needs_ticket with explicit_ticket_request=true.
+    needs_ticket with explicit_ticket_request=true, because the customer asked for a ticket. The same subject
+    reported without asking for a ticket is needs_ticket with explicit_ticket_request=false.
   - Otherwise, it identifies an in-scope product question or problem:
     question with explicit_ticket_request=true, and Search runs first.
   - When the customer requests a ticket without naming its subject, first
@@ -257,6 +263,8 @@ Never rewrite worker outputs or invent results. Return only the Router decision 
 - With nothing pending, interpret short replies using the previous
   assistant message. A reply indicating that suggested steps failed
   is needs_ticket. If its meaning is unclear, use other.
+- A request to send or submit a ticket with no summary pending is other, with explicit_ticket_request=false:
+  there is nothing to send, and it does not ask for a new ticket. Respond answers from the tickets in this chat.
 - A short value such as a browser name can be `pending_response` when the previous assistant asked for it; the same word with no pending question and no problem it adds to is `other`.
 - Added information: a message that adds a fact to a problem already in the conversation (a page, a box number, an error text, a device) is never `other`.
   - With a summary or detail pending for that problem, it is `pending_response`: the Operator adds it to the ticket. «Invalid credentials» after an urgent summary about signing in.

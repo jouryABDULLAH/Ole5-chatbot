@@ -125,6 +125,28 @@ def detail_state():
     return state
 
 
+@pytest.mark.parametrize('earlier_ticket', [True, False])
+def test_send_request_with_nothing_waiting_is_not_reported_as_a_failed_submission(earlier_ticket):
+    from ole5_chat.agent import ticket_action_guard
+    from ole5_chat.agent.turn_sheet import build_turn_sheet
+    state = ready_state()
+    # The ticket was already submitted (or none was ever prepared): no summary waits for confirmation.
+    state.update(summary_shown=False, submission_requested=False, pending_customer_response=None,
+                 created_tickets=[{'ticket_number': 'T-1'}] if earlier_ticket else [])
+    bound = {tool.name: tool for tool in tools.build_ticket_operator_tools(state)}
+    refused = bound['submit_ticket'].invoke({'issue_id': 'issue-1', 'draft_version': 1})
+    assert json.loads(refused)['nothing_to_submit']
+    report = json.dumps([{'type': 'tool', 'name': 'submit_ticket', 'content': refused}])
+    update = _apply_completion(state, OperatorCompletion(action='submission_failed', reason='nothing waiting'), report)
+    assert update['ticket_result'] == {'nothing_to_submit': True}
+    state.update(update)
+    sheet = build_turn_sheet(state, 'ar')
+    assert sheet['stage'] == 'other' and 'nothing was submitted' in sheet['operator']
+    reply = ticket_action_guard.fallback(state)
+    assert ('التذكرة مرفوعة من قبل، ورقمها T-1' in reply) if earlier_ticket else ('ما عندي تذكرة جاهزة للإرسال' in reply)
+    assert 'لم يتم إنشاء التذكرة' not in reply
+
+
 def test_skip_detail_settles_the_item_and_readies_the_summary():
     state = detail_state()
     bound = {tool.name: tool for tool in tools.build_ticket_operator_tools(state)}
