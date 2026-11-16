@@ -2,7 +2,7 @@
 (() => {
   const TEXT = {
     en: {
-      open: "Chat", close: "Close chat", title: "Support",
+      open: "Chat", close: "Close chat", title: "Support", expand: "Expand chat", shrink: "Restore chat size",
       signinTitle: "Chat with support", signinBody: "Enter the email you use for support.",
       email: "Email", cont: "Continue", checking: "Checking",
       placeholder: "Write a message", send: "Send", writing: "Writing a reply",
@@ -21,7 +21,7 @@
     },
     ar: {
       progress: { understanding: "أفهم طلبك…", searching: "أفكر…", ticket_enquiry: "أراجع سياسة ومعلومات التذاكر…", ticket: "أجهز تفاصيل طلب الدعم…", answering: "أجهز الإجابة…", checking: "أتحقق من الإجابة…", done: "اكتمل الطلب", error: "تعذر إكمال الطلب." },
-      open: "محادثة", close: "إغلاق المحادثة", title: "الدعم",
+      open: "محادثة", close: "إغلاق المحادثة", title: "الدعم", expand: "تكبير المحادثة", shrink: "تصغير المحادثة",
       signinTitle: "تحدث مع الدعم", signinBody: "أدخل البريد الإلكتروني الذي تستخدمه للدعم.",
       email: "البريد الإلكتروني", cont: "متابعة", checking: "جارٍ التحقق",
       placeholder: "اكتب رسالتك", send: "إرسال", writing: "جارٍ كتابة الرد",
@@ -126,15 +126,24 @@
     .chip button:hover:not(:disabled) { background:var(--soft); color:var(--ink); }
     .restart { align-self:center; border:0; background:none; color:var(--accent); font-size:14px; cursor:pointer;
                text-decoration:underline; text-underline-offset:3px; }
+    .head .tools { display:flex; gap:4px; }
+    /* Expanded: the panel fills the window, the conversation stays in a readable centred column. */
+    .panel.wide { inset:16px; width:auto; height:auto; }
+    .panel.wide .log, .panel.wide .compose, .panel.wide .files { padding-inline:max(20px, calc((100% - 760px) / 2)); }
+    .panel.wide .card dl { grid-template-columns:fit-content(25%) 1fr fit-content(25%) 1fr; }
     @media (prefers-reduced-motion: reduce) { .panel { animation:none; } .dots i { animation:none; opacity:.6; } }
     /* On a phone the panel is a bottom sheet, so the top of the page (a document, say) stays readable above it. */
     @media (max-width: 480px) { .panel { inset:auto 0 0 0; width:100%; height:60vh; height:60dvh;
                                          border-radius:16px 16px 0 0; border-bottom:0; }
+                                .panel.wide { inset:auto 0 0 0; width:100%; height:60dvh; }
+                                .expand { display:none; }
                                 .launcher { bottom:16px; right:16px; } }
   `;
 
   const ICON_CHAT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>';
-  const ICON_CLOSE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  const ICON_EXPAND = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg>';
+  const ICON_SHRINK = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10h-6V4M4 14h6v6M14 10l7-7M10 14l-7 7"/></svg>';
+  const ICON_CLOSE ='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
   const ICON_SEND = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>';
 
   const ICON_CLIP = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.5l-7.8 7.8a5 5 0 01-7.1-7.1l8.5-8.5a3.3 3.3 0 014.7 4.7l-8.5 8.5a1.7 1.7 0 01-2.4-2.4L15 6.9"/></svg>';
@@ -186,6 +195,8 @@
       this.root = this.attachShadow({ mode: "open" });
       this.view = null;
       this.open = false;
+      /* Expanded or not is remembered in this browser, so a reload keeps the size the person chose. */
+      try { this.wide = localStorage.getItem("t2-chat-wide") === "1"; } catch { this.wide = false; }
       this.busy = false;
       this.error = "";
       this.pending = [];
@@ -239,10 +250,21 @@
     panel() {
       const head = el("div", { class: "head" },
         el("strong", {}, this.view ? this.view.product_name : this.t.title),
-        el("button", { class: "icon", type: "button", "aria-label": this.t.close, html: ICON_CLOSE,
-                       onclick: () => { this.open = false; this.render(); } }));
-      return el("section", { class: "panel", role: "dialog", "aria-label": this.t.title },
+        el("span", { class: "tools" },
+          el("button", { class: "icon expand", type: "button", "aria-label": this.wide ? this.t.shrink : this.t.expand,
+                         title: this.wide ? this.t.shrink : this.t.expand, html: this.wide ? ICON_SHRINK : ICON_EXPAND,
+                         onclick: () => this.setWide(!this.wide) }),
+          el("button", { class: "icon", type: "button", "aria-label": this.t.close, html: ICON_CLOSE,
+                         onclick: () => { this.open = false; this.render(); } })));
+      return el("section", { class: this.wide ? "panel wide" : "panel", role: "dialog", "aria-label": this.t.title,
+                             onkeydown: (e) => { if (e.key === "Escape" && this.wide) this.setWide(false); } },
                 head, ...(this.view ? this.chat() : [this.signin()]));
+    }
+
+    setWide(wide) {
+      this.wide = wide;
+      try { localStorage.setItem("t2-chat-wide", wide ? "1" : "0"); } catch {}
+      this.render();
     }
 
     signin() {
