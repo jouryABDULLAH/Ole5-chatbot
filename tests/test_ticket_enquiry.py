@@ -60,6 +60,43 @@ def _run(text="What is the status of my tickets?"):
     return ticket_enquiry_node(_state(text))["ticket_enquiry_result"]
 
 
+@pytest.mark.parametrize("order,limit,numbers", [
+    ("oldest_first", 1, ["T-2"]),
+    ("newest_first", 1, ["T-1"]),
+    ("oldest_first", None, ["T-2", "T-1"]),
+])
+def test_lookup_basis_reaches_respond_and_followup(order, limit, numbers):
+    from ole5_chat.agent.nodes.finalize import finalize_node
+    from ole5_chat.agent.prompts.respond import _ticket_records
+
+    state = _state("Show my oldest ticket")
+    sink = [{"name": "list_tickets", "args": {"order": order, "limit": limit},
+             "result": {"outcome": "success", "tickets": [{"ticket_number": n} for n in numbers]}}]
+    result = ticket_enquiry._result(state, _selected(numbers[0]), sink, None)
+    basis = [{"tool": "list_tickets", "arguments": {"order": order, "limit": limit},
+              "returned_ticket_numbers": numbers}]
+    assert result["lookup_basis"] == basis
+    state.update(ticket_enquiry_result=result, reply="Ticket details")
+    assert str(basis) in _ticket_records(state)
+    finalized = finalize_node(state)
+    assert finalized["last_lookup"]["lookup_basis"] == basis
+    state.update(finalized)
+    assert str(basis) in _ticket_records(state)
+
+
+def test_failed_or_unrelated_lookup_does_not_supply_selection_basis():
+    sink = [
+        {"name": "list_tickets", "args": {"order": "oldest_first", "limit": 1}, "error": "failed"},
+        {"name": "find_tickets_by_title", "args": {"text": "archive"},
+         "result": {"outcome": "success", "tickets": [{"ticket_number": "T-2"}]}},
+        {"name": "get_ticket", "args": {"ticket_number": "T-1"},
+         "result": {"outcome": "found", "ticket": {"ticket_number": "T-1"}, "status_available": True}},
+    ]
+    result = ticket_enquiry._result(_state(), _selected("T-1"), sink, "list failed")
+    assert result["lookup_basis"] == []
+    assert result["outcome"] == "partial"
+
+
 def test_tool_agent_failing_before_any_result_is_lookup_failed(model, operator_model, rows, api):
     operator_model.fail(RuntimeError("model unavailable"))
     result = _run()
@@ -348,7 +385,7 @@ def test_finalize_keeps_the_last_lookup_for_follow_ups():
     state.update(ticket_enquiry_result={"action": "lookup_status", "outcome": "found", "tickets": [ticket],
                                         "failed_lookups": []}, validation_outcome="pass", reply="T-1")
     state.update(finalize_node(state))
-    assert state["last_lookup"] == {"tickets": [ticket], "failed_lookups": []}
+    assert state["last_lookup"] == {"tickets": [ticket], "failed_lookups": [], "lookup_basis": []}
     assert state["ticket_enquiry_result"] is None
     # The next turn has no lookup of its own: Respond still has the record of what was shown.
     assert "Shown to the customer in an earlier lookup" in _ticket_records(state) and "T-1" in _ticket_records(state)

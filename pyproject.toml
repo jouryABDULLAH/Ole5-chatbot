@@ -76,6 +76,12 @@ task = "evals.regression_task:proof_task"
 graders = ["evals.regression_graders:nodes_match", "evals.regression_graders:facts_match", "evals.regression_graders:records_match", "evals.regression_graders:pending_matches", "evals.regression_graders:counts_match", "evals.regression_graders:required_text", "evals.graders:language_matches"]
 timeout = 900
 
+# Cases moved out of proof on 2026-11-16: each proves what a kept proof case already proves.
+[tool.evalkit.suites.proof_extra]
+task = "evals.regression_task:proof_task"
+graders = ["evals.regression_graders:nodes_match", "evals.regression_graders:facts_match", "evals.regression_graders:records_match", "evals.regression_graders:pending_matches", "evals.regression_graders:counts_match", "evals.regression_graders:required_text", "evals.graders:language_matches"]
+timeout = 900
+
 # Good conversations of 2026-11-16 kept as a regression, each on a fresh copy of the sheets. To be merged into proof.
 [tool.evalkit.suites.reg_chats]
 task = "evals.regression_task:proof_task"

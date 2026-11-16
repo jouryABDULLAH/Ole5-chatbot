@@ -329,6 +329,16 @@ def _result(state: AgentState, completion: TicketEnquiryCompletion, sink: list, 
 
     result = {"action": completion.action, "outcome": outcome, "tickets": tickets, "failed_lookups": failed_lookups,
               "error": error, "clarification_question": None}
+    if completion.action == "lookup_status":
+        # Preserve the actual selection operations, not an inferred label based on the customer's words.
+        # Keep each operation's full returned set: sorted lists are not necessarily single-ticket lookups.
+        result["lookup_basis"] = [
+            {"tool": call["name"], "arguments": dict(call["args"]),
+             "returned_ticket_numbers": [t["ticket_number"] for t in call["result"]["tickets"]]}
+            for call in sink
+            if call["name"] in LIST_TOOLS and "error" not in call
+            and any(_key(t["ticket_number"]) in selected for t in call["result"]["tickets"])
+        ]
     if completion.action == "explain_status":
         result["definitions"] = _definitions(state)
     return result

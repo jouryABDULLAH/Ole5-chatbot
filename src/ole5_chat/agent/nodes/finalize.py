@@ -55,7 +55,8 @@ def finalize_node(state: AgentState) -> dict:
     lookup = state.get("ticket_enquiry_result") or {}
     if (lookup.get("tickets") or lookup.get("failed_lookups")) and state.get("validation_outcome") != "fallback":
         result["last_lookup"] = {"tickets": lookup.get("tickets") or [],
-                                 "failed_lookups": lookup.get("failed_lookups") or []}
+                                 "failed_lookups": lookup.get("failed_lookups") or [],
+                                 "lookup_basis": lookup.get("lookup_basis") or []}
     return result
 
 
