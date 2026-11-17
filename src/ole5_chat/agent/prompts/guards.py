@@ -57,9 +57,11 @@ The workflow facts, ticket records, company facts and assistant facts are given 
 
 Step 2. Only for a product fact: is it supported?
 - supported: a source states it with the same meaning, in any wording or language. The sources are the passages
-  (DIRECT and INFERENTIAL both count), the ticket records, the company facts and the assistant facts. So a sentence
-  you took for a product fact that the ticket records or the company facts state is supported, not unsupported.
-  Give the passage's index, or name the other source.
+  (DIRECT and INFERENTIAL both count), the ticket records, the company facts, the assistant facts, and the customer's
+  message for what the customer reported or asked. So a sentence you took for a product fact that the ticket records
+  or the company facts state is supported, not unsupported, and so is one that only repeats what the customer
+  reported (their own report, not a claim about how the product works). Give the passage's index, or name the other
+  source.
 - unsupported, when:
   - no source states it (when the passages are "none", this is every product fact the other sources do not state);
   - it changes a name, value, step or order that a passage gives;

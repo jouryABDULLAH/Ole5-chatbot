@@ -97,7 +97,9 @@ def _grounding_input(state: AgentState, sheet: TurnSheet, reply: str, passages: 
             f"{assistant}\n\n"
             f"Ticket records the reply may also state:\n{_ticket_records(state)}\n\n"
             f"This turn's ticket workflow facts:\n{workflow}\n\n"
-            f"Assistant's previous message:\n{previous}\n\nCustomer's message:\n{customer}\n\n"
+            f"Assistant's previous message:\n{previous}\n\n"
+            f"Customer's message (a source for what the customer reported or asked, which the reply may repeat):\n"
+            f"{customer}\n\n"
             f"<reply>\n{numbered}\n</reply>\n\n"
             "Return the JSON with one verdict for each numbered sentence of the reply.")
 
@@ -187,15 +189,16 @@ def validate_node(state: AgentState) -> dict:
     if problems:
         log.error("ERROR validate ticket-action violations=%s retry_count=%d", problems, state.get("validation_retries", 0))
 
-    def fact(issue) -> str:
-        """The closest passage's text, or that no passage supports the sentence."""
-        index = int(issue.passage) - 1 if issue.passage.strip().isdigit() else -1
-        return passages[index].get("text", "").strip() if 0 <= index < len(passages) else "no passage supports it."
+    # An unsupported sentence has no source by definition, so no passage text goes with it: the closest passage's text
+    # led a rewrite to swap the sentence for an unrelated procedure from that passage. The passages are in Respond's
+    # <evidence> for correcting a changed name, value, step or order.
+    unsourced = ("no source states it. Drop it, or keep only what the customer reported, as their report. Correct a "
+                 "changed name, value, step or order only from <evidence>; add nothing else from it.")
 
     # One line per rejected sentence: the sentence, what is wrong, and the fact to rewrite it from. A wrong language
     # rejects the whole reply.
     rejected = ([f"- «{reply}»: {wrong} Fact: the customer writes in {NAMES[sheet['language']]}."] if wrong else [])
-    rejected += [f"- «{i.sentence}»: {i.problem} Fact: {fact(i)}" for i in (issues or []) if GROUNDING_ENFORCE]
+    rejected += [f"- «{i.sentence}»: {i.problem} Fact: {unsourced}" for i in (issues or []) if GROUNDING_ENFORCE]
     rejected += [f"- «{v.sentence}»: {v.problem} Fact: {v.fact}" for v in problems]
     rewrites = state.get("validation_retries", 0)
     if rejected and wrong and len(rejected) == 1 and rewrites >= REWRITES:

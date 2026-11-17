@@ -35,7 +35,7 @@ def respond_node(state: AgentState) -> dict:
     try:
         reply = llm.invoke(
             # Never above 0.3 (user's limit).
-            [SystemMessage(content=system_prompt(state, sheet)), *_messages(state, sheet)], temperature=0.3
+            [SystemMessage(content=system_prompt(state, sheet)), *_messages(state, sheet)], temperature=0.1
         ).text.strip()
     except llm.ModelFailed as exc:
         # An empty reply: Validate sends the fixed reply built from the workflow facts, so a failed rewrite never

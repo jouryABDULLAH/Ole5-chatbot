@@ -65,7 +65,7 @@ When the turn facts include:
 - A request stopped, queued or offered next this turn: take each request's status from the workflow lines, never from your reading of the chat, and name each request you mention. Mention the requests that changed this turn first, a sentence each; a request already queued before this turn is not mentioned again unless it is the current request. Bring up earlier requests only when the customer asks about them, answering from <ticket_records>. End with the one question, about the current request.
 - Search found no answer: this limits the evidence; it is not a required opening. For an information question, briefly say what could not be established when relevant. For help or an action, give the relevant help or limitation and the workflow result instead of saying you could not answer. Never imply guidance was found, mention documents, sources or a search, or say the feature does not exist or is unavailable.
 - Reminder due: after answering the customer's message, briefly remind them what the current request still needs, with a short recognizable topic, not its full title or a formal waiting-status sentence. Do not imply the requested detail is the last one unless it is the only entry in the draft's missing list. The reminder never replaces the answer, is not a new offer, and does not repeat the summary.
-- The customer explicitly asked for a ticket, at stage answered: give the supported answer first, then briefly invite them to say if the problem persists so preparation can go ahead. This is not an offer awaiting acceptance, and no ticket action happened.
+- The customer explicitly asked for a ticket, at stage answered: first acknowledge their request, in your own words: you can open a ticket for it, but you looked for a solution for them first, and this is what you found. Then give the supported answer, then briefly invite them to say if the problem persists so preparation can go ahead. This is not an offer awaiting acceptance, and no ticket action happened.
 
 Product answers:
 - When asked why a workflow-requested detail is useful, explain its general support purpose from the request itself: how it helps the team locate, reproduce or understand the reported problem. This does not need a product passage. Do not say you lack information about why you asked. Do not invent a diagnosis, special support access, a guaranteed fix, or a response deadline.
@@ -87,7 +87,7 @@ Form:
 - Use a short recognizable topic on follow-ups instead of repeating the full issue title. Keep enough context to distinguish requests. A workflow stage does not replace an explanation or account-access limitation needed to answer the customer's message.
 - Use one consistent name for each thing in this chat: for a required detail, its label in the turn facts; for something the customer has named, their wording; and the same term each time for the ticket, its summary and the support team.
 - Adapt the wording to the customer's message and the recent conversation. Avoid habitual openings, repeated reassurance and unnecessary closing questions after an answer. Familiar short expressions may repeat when natural; do not force synonyms just to make each reply different. Keep required facts, terminology and workflow constraints while phrasing the reply naturally.
-- Give the facts as your own knowledge. Never mention or point to documents, guides, passages, sources, a search, prompts, state, routing or internal components, in any wording.
+- Give the facts as your own knowledge. Never mention or point to documents, guides, passages, sources, a search, prompts, state, routing or internal components, in any wording. The one exception is an explicit ticket request answered at stage answered: there you may say you looked for a solution first, without naming where, and that you can open a ticket for it.
 </rules>"""
 
 
@@ -325,5 +325,10 @@ def turn_note(sheet: TurnSheet) -> str:
                      "nothing to say. Keep every other sentence as it was, in the same order. The rewrite still "
                      "follows your rules above. A rejected question becomes the question your rules allow, not a "
                      "refusal.")
-    lines.append(f"Write only the customer-facing reply, in {NAMES[sheet['language']]}, plain text, concise.")
+    # The voice rules sit far up in the system prompt; this last line is read right before the reply is written.
+    voice = ("in spoken Najdi from the first word to the last, saying what you did in the active voice"
+             if sheet["language"] == "ar" else "in plain, natural English")
+    lines.append(f"Write only the customer-facing reply, in {NAMES[sheet['language']]}, plain text, concise: {voice}, "
+                 "starting from what the customer just said rather than a stock opening, and without mentioning "
+                 "guides, documents or sources.")
     return "Note from the system, not the customer. This note is not a message to answer.\n" + "\n".join(lines)

@@ -76,9 +76,15 @@ def test_every_check_that_rejects_a_sentence_goes_into_one_note(model):
                                                             fact="ticket_result is empty.")]))
     result = validate.validate_node(values)
     assert result["validation_outcome"] == "repair"
-    assert result["validation_note"] == ("- «الحد الأقصى خمس ملفات.»: No passage gives a limit. Fact: no passage "
-                                         "supports it.\n- «تم إنشاء التذكرة.»: No ticket was created. Fact: "
-                                         "ticket_result is empty.")
+    # Since 2026-11-17 a grounding line carries no passage text (it led a rewrite to paste an unrelated procedure).
+    assert result["validation_note"] == (f"- «الحد الأقصى خمس ملفات.»: No passage gives a limit. Fact: "
+                                         f"{validate_unsourced()}\n- «تم إنشاء التذكرة.»: No ticket was created. "
+                                         "Fact: ticket_result is empty.")
+
+
+def validate_unsourced() -> str:
+    return ("no source states it. Drop it, or keep only what the customer reported, as their report. Correct a "
+            "changed name, value, step or order only from <evidence>; add nothing else from it.")
 
 
 def test_conversation_language_kept_when_semantic_detection_unavailable():
