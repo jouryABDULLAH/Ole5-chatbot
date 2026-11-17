@@ -13,12 +13,6 @@ from ole5_chat.agent.guards import language_of, plain
 
 log = logging.getLogger(__name__)
 
-# Was (2026-11-17), before the language and grounding checks moved to Validate (nodes/validate.py), where they run at
-# the same time as the ticket-action check and share its one rewrite: _correct_language (up to 2 rewrites of a reply
-# in the wrong language, each "Rewrite the previous reply in {language}. Preserve its meaning and workflow result.
-# Return only the customer-facing plain-text reply.") and _grounded_reply (one grounding rewrite, checked again).
-# _seen_passages, _grounding_input, _unsupported and GROUNDING_ENFORCE moved to Validate unchanged.
-
 
 def _expected_language(state: AgentState) -> str:
     """The language of the customer's latest message. A message that names no language (a bare value such as a
@@ -40,12 +34,12 @@ def respond_node(state: AgentState) -> dict:
              state.get("search_outcome"), sheet["stage"], sheet["button"])
     try:
         reply = llm.invoke(
-            [SystemMessage(content=system_prompt(state, sheet)), *_messages(state, sheet)], temperature=0.1
+            # Never above 0.3 (user's limit).
+            [SystemMessage(content=system_prompt(state, sheet)), *_messages(state, sheet)], temperature=0.3
         ).text.strip()
     except llm.ModelFailed as exc:
         # An empty reply: Validate sends the fixed reply built from the workflow facts, so a failed rewrite never
-        # ships a generic error with the answer's sources. Was (2026-11-17): a fixed text here, «السموحة، صار خلل
-        # عندي. حاول مرة ثانية لو سمحت.» / "Sorry, something went wrong on my side. Please try again."
+        # ships a generic error with the answer's sources.
         log.error("ERROR respond model call failed; Validate sends the fixed reply: %s", exc)
         reply = ""
     cleaned = plain(reply)

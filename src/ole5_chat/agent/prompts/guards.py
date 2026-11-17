@@ -30,7 +30,9 @@ Step 1. What kind of sentence is it? A product fact says how the product works: 
 value, limit, permission, cause or fix. Every other kind is not_product_fact, and the passages are not used for it:
 - conversation: a greeting, thanks, an acknowledgement, a question to the customer, a lead-in to a list, or a
   restatement of what the customer asked or reported. A paraphrase of what the customer said about themselves or their
-  situation stays conversation even when it uses product words such as a role or a permission;
+  situation stays conversation even when it uses product words such as a role or a permission. So does a restated
+  problem report («أفهم إن زر الأرشفة ما يشتغل» after the customer said the archive button does not work): it
+  repeats their report and does not claim the product behaves that way;
 - no answer: saying an answer, or part of it, could not be found. (Only if a passage does give what the sentence says
   is missing, the sentence is unsupported.)
 - ticket workflow: an offer, a reminder, a detail request, a summary, a ticket number, title, date or status, what a

@@ -232,7 +232,6 @@ def fallback(state: dict) -> str:
     parts = []
     outcome = state.get("search_outcome")
     direct = any(r.get("relation") == "DIRECT" for r in state.get("current_references") or [])
-    # Was (2026-11-17): the Arabic sentences below in formal Arabic (لم أجد…، هل ترغب…، يرجى…، تم إنشاء…); git has them.
     if outcome in {"partial", "no_answer"} and not direct:
         parts.append("ما لقيت جواب لسؤالك." if arabic else "I could not find an answer to your question.")
     elif outcome == "answered":

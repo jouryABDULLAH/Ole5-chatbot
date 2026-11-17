@@ -50,7 +50,6 @@ class TurnSheet(TypedDict):
 OPERATOR_FACT = {
     "offer": "offered to prepare a support ticket for the request",
     "request_detail": "needs one more detail before the ticket is complete",
-    # Was (2026-11-16): "…; it is shown on a card and waits for the customer's confirmation".
     "show_summary": "prepared the ticket summary; it is shown to the customer and waits for their confirmation",
     "submitted": "submitted the ticket",
     "submission_failed": "tried to submit the ticket; the ticket was not created",

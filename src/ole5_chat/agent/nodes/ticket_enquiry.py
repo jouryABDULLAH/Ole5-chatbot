@@ -264,19 +264,6 @@ def _failed(error: str, failed_lookups: list | None = None) -> dict:
             "error": error, "clarification_question": None}
 
 
-# Not used: when the interpreter fails, the selection could be rebuilt from the tool results (the get_ticket results,
-# or else the listed tickets). Kept off because it can show more tickets than the customer asked for; an interpreter
-# failure is lookup_failed instead.
-#
-# def _selection_from_tools(sink: list) -> TicketEnquiryCompletion:
-#     fetched = [call["result"]["ticket"]["ticket_number"] for call in sink
-#                if call["name"] == "get_ticket" and (call.get("result") or {}).get("ticket")]
-#     listed = [ticket["ticket_number"] for call in sink if call["name"] in LIST_TOOLS
-#               for ticket in (call.get("result") or {}).get("tickets") or []]
-#     return TicketEnquiryCompletion(action="lookup_status", reason="Selection taken from the tool results.",
-#                                    selected_ticket_numbers=list(dict.fromkeys(fetched or listed)))
-
-
 def _result(state: AgentState, completion: TicketEnquiryCompletion, sink: list, error: str | None) -> dict:
     """The lookup result, from the recorded tool results and the interpreter's selection."""
     listed, fetched, failed = {}, {}, {}
@@ -342,8 +329,7 @@ def _result(state: AgentState, completion: TicketEnquiryCompletion, sink: list, 
             if call["name"] in LIST_TOOLS and "error" not in call
             and any(_key(t["ticket_number"]) in selected for t in call["result"]["tickets"])
         ]
-    # A lookup gets them too, so the reply explains each status instead of naming it. Was (2026-11-17): only
-    # explain_status.
+    # A lookup gets them too, so the reply explains each status instead of naming it.
     result["definitions"] = _definitions(state)
     return result
 

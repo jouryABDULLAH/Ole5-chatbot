@@ -22,12 +22,10 @@ from ole5_chat.agent.turn_sheet import TurnSheet, build_turn_sheet
 log = logging.getLogger(__name__)
 
 GROUNDING_ENFORCE = True
-# Rewrites of a rejected reply before the fixed reply is sent. Each is checked by all three checks again. Was 1
-# (2026-11-17, first version of the shared repair); 2 matches the old total of one grounding plus one ticket rewrite.
+# Rewrites of a rejected reply before the fixed reply is sent. Each is checked by all three checks again.
 REWRITES = 2
 
 SAFE_FALLBACK = {
-    # Was (2026-11-17): "عذراً، حدث خلل من جهتي أثناء إعداد الرد. يرجى إرسال رسالتك مرة أخرى."
     "ar": "السموحة، صار خلل عندي وأنا أجهز الرد. أرسل رسالتك مرة ثانية لو سمحت.",
     "en": "Sorry, something went wrong on my side while preparing the reply. Please send your message again.",
 }
@@ -160,8 +158,8 @@ def _fallback(state: AgentState, reason: str) -> dict:
 def validate_node(state: AgentState) -> dict:
     reply = (state.get("reply") or "").strip()
     if not reply:
-        # Respond's model call failed (or wrote nothing). Was (2026-11-17): _safe_fallback, which drops the workflow
-        # facts; the fixed reply keeps them (a created ticket's number, the question still waiting).
+        # Respond's model call failed (or wrote nothing). The fixed reply keeps the workflow facts (a created ticket's
+        # number, the question still waiting).
         log.error("ERROR validate  fallback=empty_reply")
         return _fallback(state, "Reply was empty.")
     if state.get("search_outcome") == "answered" and not state.get("current_references"):
