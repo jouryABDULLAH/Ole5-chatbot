@@ -15,7 +15,7 @@ from langchain.agents import create_agent
 from langchain_core.tools import tool
 from pydantic import Field
 
-from ole5_chat import llm, sheets, values
+from ole5_chat import llm, products, sheets, values
 from ole5_chat.agent.contracts import TicketEnquiryCompletion
 from ole5_chat.agent.prompts.ticket_enquiry import (
     ticket_enquiry_structured_prompt,
@@ -33,8 +33,11 @@ TOOL_AGENT_STEPS = 16
 
 
 def _definitions(state: AgentState) -> list[dict]:
+    """Each status with open or closed (values.xlsx) and, when chat.yaml gives one, what it means for the customer."""
+    meanings = products.load(state["identity"].product).status_meanings
     return [
-        {"value": option.value, "description": option.description}
+        {"value": option.value, "description": option.description,
+         **({"meaning": meanings[option.value]} if option.value in meanings else {})}
         for option in values.catalog(state["identity"].product).statuses
     ]
 
@@ -339,8 +342,9 @@ def _result(state: AgentState, completion: TicketEnquiryCompletion, sink: list, 
             if call["name"] in LIST_TOOLS and "error" not in call
             and any(_key(t["ticket_number"]) in selected for t in call["result"]["tickets"])
         ]
-    if completion.action == "explain_status":
-        result["definitions"] = _definitions(state)
+    # A lookup gets them too, so the reply explains each status instead of naming it. Was (2026-11-17): only
+    # explain_status.
+    result["definitions"] = _definitions(state)
     return result
 
 

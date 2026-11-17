@@ -144,12 +144,12 @@ def test_send_request_with_nothing_waiting_is_not_reported_as_a_failed_submissio
     assert sheet['stage'] == 'other' and 'nothing was submitted' in sheet['operator']
     reply = ticket_action_guard.fallback(state)
     assert ('التذكرة مرفوعة من قبل، ورقمها T-1' in reply) if earlier_ticket else ('ما عندي تذكرة جاهزة للإرسال' in reply)
-    assert 'لم يتم إنشاء التذكرة' not in reply
+    assert 'التذكرة ما انرفعت' not in reply
 
 
 @pytest.mark.parametrize('description,expected', [
-    ('Login using facial or fingerprint biometrics', 'هل ترغب في فتح تذكرة دعم لهذا الطلب؟'),
-    ('تسجيل الدخول بالبصمة', 'هل ترغب في فتح تذكرة دعم للطلب «تسجيل الدخول بالبصمة»؟'),
+    ('Login using facial or fingerprint biometrics', 'ودك أرفع لك تذكرة دعم لهالطلب؟'),
+    ('تسجيل الدخول بالبصمة', 'ودك أرفع لك تذكرة دعم بخصوص «تسجيل الدخول بالبصمة»؟'),
 ])
 def test_fallback_never_quotes_a_request_name_in_the_other_language(description, expected):
     from ole5_chat.agent import ticket_action_guard
@@ -157,7 +157,7 @@ def test_fallback_never_quotes_a_request_name_in_the_other_language(description,
     state.update(language='ar', search_outcome='no_answer', ticket_draft=None,
                  active_issue={'id': 'issue-1', 'description': description},
                  pending_customer_response=PendingCustomerResponse(kind='offer', issue_id='issue-1'))
-    assert ticket_action_guard.fallback(state) == f'لم أجد إجابة على سؤالك. {expected}'
+    assert ticket_action_guard.fallback(state) == f'ما لقيت جواب لسؤالك. {expected}'
 
 
 def test_skip_detail_settles_the_item_and_readies_the_summary():
@@ -185,8 +185,10 @@ def test_urgent_issue_summary_is_ready_without_customer_details(monkeypatch, urg
     assert result['missing_customer_details'] == ['page', 'browser']  # still reported, only not asked
 
 
+# Requirement changed 2026-11-17: Bug asks no details; Mobile App Issue asks only the phone's operating system.
 @pytest.mark.parametrize('ticket_type,subtype,asked', [
-    ('Bug', 'Software malfunction', {'page': None, 'error text or screenshot': 'Access denied'}),
+    ('Mobile App Issue', 'Application crash', {'phone os': 'iOS 17'}),
+    ('Bug', 'Software malfunction', {}),
     ('Inquiry', 'General questions', {}),
 ])
 def test_required_details_come_from_the_ticket_type(model, ticket_type, subtype, asked):
@@ -199,7 +201,7 @@ def test_required_details_come_from_the_ticket_type(model, ticket_type, subtype,
         priority='Medium', title='Archive button fails', summary='The archive button fails.',
         title_customer='Archive button fails', summary_customer='The archive button fails.',
         confidence='high', queue_reason='Product behaviour', collected={},
-        required={'error text or screenshot': 'Access denied'} if ticket_type == 'Bug' else {'colour': None}))
+        required={'phone os': 'iOS 17'} if ticket_type != 'Inquiry' else {'colour': None}))
     result = classify(tools._classification_state(state, TicketDraft(product='Ole5')))
     assert result['ticket_draft'].required == asked
     assert result['ticket_draft'].missing == [key for key, value in asked.items() if value is None]

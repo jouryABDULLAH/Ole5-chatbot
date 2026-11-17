@@ -203,6 +203,12 @@ def _apply_completion(state: AgentState, completion: OperatorCompletion, report:
                       or {}).get("description"),
             "requested_detail": completion.requested_detail,
             "existing_ticket": completion.existing_ticket,
+            # Its title, so the reply can name the topic of the ticket that already covers the problem.
+            "existing_ticket_title": next((ticket.get("title_customer") or ticket.get("title")
+                                           for item in tool_results if item["name"] == "check_submitted_tickets"
+                                           for ticket in item["result"].get("tickets") or []
+                                           if completion.existing_ticket
+                                           and ticket.get("ticket_number") == completion.existing_ticket), None),
             "clarification_question": completion.clarification_question,
             "confirmed_changes": _saved_changes(tool_results, issue_id) if issue else [],
             # What the customer settled this turn without giving it, and an issue they stopped, whatever comes next.

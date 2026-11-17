@@ -37,7 +37,6 @@ def finalize_node(state: AgentState) -> dict:
         "manager_reason": None,
         "answered_detail": None,
         "reply": None,
-        "reply_withheld": False,
         "validation_outcome": None,
         "validation_reason": None,
         "validation_note": None,

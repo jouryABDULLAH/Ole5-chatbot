@@ -11,7 +11,7 @@ from evals.graders import _skip, correctness
 NO_ANSWER = re.compile(r"لا (?:تتوفر|يتوفر|توجد|يوجد)[^.؟\n]{0,20}(?:معلومات|إرشاد)|لم أجد|لم أعثر|"
                        r"no information|couldn't find|could not find|don't have information", re.IGNORECASE)
 TICKET_QUESTION = re.compile(r"[^.؟?\n]*(?:تذكرة|ticket)[^.؟?\n]*[؟?]", re.IGNORECASE)
-FALLBACKS = ("لا أستطيع تأكيد", "لم أتمكن من إعداد إجابة", "I cannot confirm", "couldn't prepare a reliable answer")
+FALLBACKS = ("لا أستطيع تأكيد", "ما قدرت أطلع لك جواب أكيد", "I cannot confirm", "couldn't prepare a reliable answer")
 
 
 def _result(passed: bool, explanation: str) -> EvaluationResult:

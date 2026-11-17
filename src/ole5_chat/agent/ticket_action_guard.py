@@ -52,6 +52,8 @@ date or duration; saying the team will reply, with none of these, is not one.
 
 Allow:
 - Reporting a ticket or its status from {ticket_enquiry_result}.
+- Explaining a reported status with what its meaning in {ticket_enquiry_result}.definitions says, for example that
+  the support team has the ticket in its queue to work on. That is the status explained, not invented progress.
 - Referring to a ticket in {last_lookup}: it was shown to the customer in an earlier lookup. Its status is as it
   was then. It does not prove the ticket was created in this chat.
 - Saying the ticket information could not be retrieved when {ticket_enquiry_result}.action = lookup_failed, or that
@@ -230,14 +232,15 @@ def fallback(state: dict) -> str:
     parts = []
     outcome = state.get("search_outcome")
     direct = any(r.get("relation") == "DIRECT" for r in state.get("current_references") or [])
+    # Was (2026-11-17): the Arabic sentences below in formal Arabic (لم أجد…، هل ترغب…، يرجى…، تم إنشاء…); git has them.
     if outcome in {"partial", "no_answer"} and not direct:
-        parts.append("لم أجد إجابة على سؤالك." if arabic else "I could not find an answer to your question.")
+        parts.append("ما لقيت جواب لسؤالك." if arabic else "I could not find an answer to your question.")
     elif outcome == "answered":
         # The answer itself was refused, so it is withheld; say so instead of passing over the question.
-        parts.append("عذراً، لم أتمكن من إعداد إجابة موثوقة على سؤالك. يرجى إرسال سؤالك مرة أخرى." if arabic
+        parts.append("السموحة، ما قدرت أطلع لك جواب أكيد على سؤالك. أرسله لي مرة ثانية لو سمحت." if arabic
                      else "Sorry, I couldn't prepare a reliable answer to your question. Please send it again.")
     if operator.get("action") == "already_submitted" and operator.get("existing_ticket"):
-        parts.append(f"سبق أن فُتحت تذكرة لهذه المشكلة برقم {operator['existing_ticket']}." if arabic
+        parts.append(f"هالمشكلة لها تذكرة مفتوحة من قبل، رقمها {operator['existing_ticket']}." if arabic
                      else f"A ticket was already opened for this problem, number {operator['existing_ticket']}.")
     number = (result.get("ticket") or {}).get("ticket_number")
     if result.get("nothing_to_submit"):
@@ -250,37 +253,39 @@ def fallback(state: dict) -> str:
                          else "I don't have a ticket ready to send right now. What problem would you like a ticket for?")
     elif result.get("submission_succeeded") is True and number:
         channel = config.reply_channel.get(language, "")
-        parts.append(f"تم إنشاء التذكرة رقم {number}. {channel}." if arabic else f"Ticket {number} was created. {channel}.")
+        parts.append(f"رفعت التذكرة، ورقمها {number}. {channel}." if arabic else f"Ticket {number} was created. {channel}.")
     elif result.get("submission_succeeded") is False:
-        parts.append("لم يتم إنشاء التذكرة؛ لم تنجح عملية الإرسال. يمكنك المحاولة مرة أخرى." if arabic
+        parts.append("التذكرة ما انرفعت، الإرسال ما نجح. تقدر تحاول مرة ثانية." if arabic
                      else "The ticket was not created; the submission did not succeed. You can try again.")
     if operator.get("action") == "workflow_failed":
-        parts.append("عذراً، حدث خلل من جهتي ولم أتمكن من إكمال هذه الخطوة. يرجى المحاولة مرة أخرى." if arabic
+        parts.append("السموحة، صار خلل عندي ووقفت هالخطوة. حاول مرة ثانية لو سمحت." if arabic
                      else "Sorry, a problem on my side stopped this step. Please try again.")
     # A name in the other language is dropped (see named()); the sentence then refers to "the request".
     if operator.get("cancelled_issue"):
-        parts.append((f"أوقفت تحضير الطلب «{cancelled}» ولم يُرسل شيء." if cancelled else "أوقفت تحضير الطلب ولم يُرسل شيء.")
+        parts.append((f"وقفت تجهيز طلبك بخصوص «{cancelled}»، وما أرسلت شي." if cancelled
+                      else "وقفت تجهيز الطلب، وما أرسلت شي.")
                      if arabic else (f"I stopped preparing «{cancelled}»; nothing was sent." if cancelled
                                      else "I stopped preparing the request; nothing was sent."))
     if operator.get("queued_issue"):
-        parts.append((f"سجلت الطلب «{queued}» وسأتابعه بعد الطلب الحالي." if queued
-                      else "سجلت طلبك الجديد وسأتابعه بعد الطلب الحالي.")
+        parts.append((f"سجلت طلبك بخصوص «{queued}»، وأرجع له بعد ما نخلص الطلب الحالي." if queued
+                      else "سجلت طلبك الجديد، وأرجع له بعد ما نخلص الطلب الحالي.")
                      if arabic else (f"I noted «{queued}» and will handle it after the current request." if queued
                                      else "I noted your new request and will handle it after the current one."))
     kind = getattr(pending, "kind", None)
     if kind == "offer":
-        parts.append((f"هل ترغب في فتح تذكرة دعم للطلب «{current}»؟" if current else "هل ترغب في فتح تذكرة دعم لهذا الطلب؟")
+        parts.append((f"ودك أرفع لك تذكرة دعم بخصوص «{current}»؟" if current else "ودك أرفع لك تذكرة دعم لهالطلب؟")
                      if arabic else (f"Would you like a support ticket for «{current}»?" if current
                                      else "Would you like a support ticket for this request?"))
     elif kind == "detail":
         detail = config.required_labels.get(pending.item, {}).get(language) or pending.item
-        parts.append((f"لإكمال الطلب «{current}» أحتاج: {detail}." if current else f"لإكمال الطلب أحتاج: {detail}.")
+        parts.append((f"عشان أكمل طلبك بخصوص «{current}»، باقي {detail}." if current
+                      else f"عشان أكمل الطلب، باقي {detail}.")
                      if arabic else (f"To complete «{current}», I need {detail}." if current
                                      else f"To complete the request, I need {detail}."))
     elif kind == "summary":
-        parts.append((f"ملخص الطلب «{current}» جاهز، تحب نرسله للفريق؟" if current
-                      else "ملخص الطلب جاهز، تحب نرسله للفريق؟")
+        parts.append((f"ملخص طلبك بخصوص «{current}» جاهز، ودك أرسله للفريق؟" if current
+                      else "ملخص الطلب جاهز، ودك أرسله للفريق؟")
                      if arabic else (f"The summary for «{current}» is ready. Do you want to submit the ticket?" if current
                                      else "The summary is ready. Do you want to submit the ticket?"))
-    return " ".join(parts) or ("عذراً، حدث خلل من جهتي أثناء إعداد الرد. يرجى إرسال رسالتك مرة أخرى." if arabic
+    return " ".join(parts) or ("السموحة، صار خلل عندي وأنا أجهز الرد. أرسل رسالتك مرة ثانية لو سمحت." if arabic
                                else "Sorry, something went wrong on my side while preparing the reply. Please send your message again.")

@@ -8,16 +8,18 @@ from langchain_core.messages import AIMessage, HumanMessage
 from ole5_chat import llm
 from ole5_chat.agent import graph
 from ole5_chat.agent.contracts import RouterDecisionWithoutPending, TicketActionCheck, TicketViolation
-from ole5_chat.agent.nodes import respond
+from ole5_chat.agent.nodes import validate
 from ole5_chat.agent.state import initial_state
 from ole5_chat.agent.ticket_action_guard import fallback
 from ole5_chat.agent import ticket_action_guard
 from ole5_chat.identity import Identity
 
 
+# Requirement changed 2026-11-17: a rejected reply gets two rewrites (validate.REWRITES), no longer one. rejected_twice
+# now means the reply and both rewrites are rejected.
 @pytest.mark.parametrize("rejected_twice", [False, True])
 @pytest.mark.parametrize("route", ["question", "other"])
-def test_ticket_lie_gets_only_one_response_retry(model, rejected_twice, route):
+def test_ticket_lie_gets_only_two_response_retries(model, rejected_twice, route):
     state = initial_state(Identity(customer_id="test", email="ole5@example.com", name="Test",
                                    organization="Test", product="OLE5", language="ar"))
     state["messages"] = [AIMessage(content="تم فتح تذكرة."), HumanMessage(content=(
@@ -31,17 +33,19 @@ def test_ticket_lie_gets_only_one_response_retry(model, rejected_twice, route):
     created = TicketViolation(sentence="تم إنشاء التذكرة بنجاح.", problem="No actual ticket was created.",
                               fact="ticket_result is empty and created_tickets has no ticket.")
     model.add(TicketActionCheck(violations=[created]),
-              TicketActionCheck(violations=[created] if rejected_twice else []))
+              *([TicketActionCheck(violations=[created])] * 2 if rejected_twice else [TicketActionCheck(violations=[])]))
     bad = "تم إنشاء التذكرة بنجاح."
     good = "حذف المراسلات يتطلب الصلاحية الموثقة. إذا استمرت المشكلة، أخبرني وسأساعدك ضمن نطاقي."
     evidence = {"search_outcome": "answered", "current_references": [
         {"document": "Guide", "text": "حذف المراسلات يتطلب الصلاحية الموثقة.", "relation": "DIRECT"}]}
-    with patch.object(respond, "GROUNDING_ENFORCE", False), \
+    # GROUNDING_ENFORCE moved from Respond to Validate on 2026-11-17, with the grounding check.
+    with patch.object(validate, "GROUNDING_ENFORCE", False), \
          patch.object(graph, "search_node", return_value=evidence) as search, \
-         patch.object(llm, "invoke", side_effect=[AIMessage(content=bad), AIMessage(content=bad if rejected_twice else good)]) as writer, \
+         patch.object(llm, "invoke", side_effect=[AIMessage(content=bad)] * 3 if rejected_twice
+                      else [AIMessage(content=bad), AIMessage(content=good)]) as writer, \
          patch("ole5_chat.tickets.submit.submit") as submit:
         result = graph.build().invoke(state)
-    assert writer.call_count == 2
+    assert writer.call_count == (3 if rejected_twice else 2)
     assert search.call_count == (1 if route == "question" else 0)
     submit.assert_not_called()
     note = writer.call_args.args[0][-1].content  # the turn note of the repair
@@ -82,16 +86,16 @@ def test_fallback_says_what_happened_then_asks_what_the_current_request_waits_on
              "ticket_operator_result": {"cancelled_issue": "الترجمة", "queued_issue": None},
              "active_issue": {"id": "issue-2", "description": "زر الأرشفة لا يعمل"},
              "pending_customer_response": PendingCustomerResponse(kind="offer", issue_id="issue-2")}
-    assert fallback(state) == ("أوقفت تحضير الطلب «الترجمة» ولم يُرسل شيء. "
-                               "هل ترغب في فتح تذكرة دعم للطلب «زر الأرشفة لا يعمل»؟")
+    assert fallback(state) == ("وقفت تجهيز طلبك بخصوص «الترجمة»، وما أرسلت شي. "
+                               "ودك أرفع لك تذكرة دعم بخصوص «زر الأرشفة لا يعمل»؟")
     state.update(ticket_operator_result={"queued_issue": "الطباعة"},
                  pending_customer_response=PendingCustomerResponse(kind="detail", issue_id="issue-2", item="page"))
-    assert fallback(state) == ("سجلت الطلب «الطباعة» وسأتابعه بعد الطلب الحالي. "
-                               "لإكمال الطلب «زر الأرشفة لا يعمل» أحتاج: اسم الصفحة.")
+    assert fallback(state) == ("سجلت طلبك بخصوص «الطباعة»، وأرجع له بعد ما نخلص الطلب الحالي. "
+                               "عشان أكمل طلبك بخصوص «زر الأرشفة لا يعمل»، باقي اسم الصفحة.")
 
 
 def test_fallback_with_nothing_to_say_asks_to_send_again():
-    assert "إرسال رسالتك مرة أخرى" in fallback({"identity": IDENTITY, "language": "ar"})
+    assert "أرسل رسالتك مرة ثانية" in fallback({"identity": IDENTITY, "language": "ar"})
 
 
 def test_checker_receives_authoritative_records_and_a_failed_check_sends_the_fixed_reply(model):

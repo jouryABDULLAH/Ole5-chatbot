@@ -177,7 +177,9 @@ def test_explaining_the_status_of_a_ticket_shown_earlier(model, operator_model, 
     result = _run("كيف يعني حالتها جديدة قريتوها يعني ولا لا")
     assert model.problems == []
     assert result["action"] == "explain_status" and result["outcome"] is None
-    assert {"value": "New", "description": "open"} in result["definitions"]
+    # Since 2026-11-17 a status listed in chat.yaml status_meanings also carries what it means for the customer.
+    new = next(d for d in result["definitions"] if d["value"] == "New")
+    assert new["description"] == "open" and "support team has received the ticket" in new["meaning"]
 
 
 def test_an_explanation_after_the_lookup_stopped_keeps_the_failure_visible(model, operator_model, rows, api):

@@ -29,15 +29,17 @@ The reply is given as numbered sentences. Give exactly one verdict for every num
 Step 1. What kind of sentence is it? A product fact says how the product works: a step, screen, field, button, name,
 value, limit, permission, cause or fix. Every other kind is not_product_fact, and the passages are not used for it:
 - conversation: a greeting, thanks, an acknowledgement, a question to the customer, a lead-in to a list, or a
-  restatement of what the customer asked or reported;
+  restatement of what the customer asked or reported. A paraphrase of what the customer said about themselves or their
+  situation stays conversation even when it uses product words such as a role or a permission;
 - no answer: saying an answer, or part of it, could not be found. (Only if a passage does give what the sentence says
   is missing, the sentence is unsupported.)
 - ticket workflow: an offer, a reminder, a detail request, a summary, a ticket number, title, date or status, what a
   status means, a queued or stopped request, a problem on the assistant's side that stopped a step. A request is
   named by the problem the customer reported; that name repeats their report and does not say the product behaves
   that way;
-- purpose of a requested support detail: a general explanation that the page name helps locate where the reported
-  problem occurs, an error message helps understand the symptom, or a screenshot helps show what the customer sees.
+- purpose of a requested support detail: a general explanation of how the requested detail helps the team locate,
+  reproduce or understand the reported problem, such as a page name locating it, an error message showing the
+  symptom, or a browser or phone system letting them try the same setup.
   When the conversation or workflow facts establish that detail request, this is not_product_fact even with no
   passages. Saying it helps the team investigate more quickly or accurately is a general purpose, not a promised
   response time or a diagnosis. For example, «اسم الصفحة يساعد فريق الدعم يحدد مكان الزر غير الشغال بسرعة ويستكشف

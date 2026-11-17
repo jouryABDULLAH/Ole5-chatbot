@@ -152,7 +152,9 @@ def build_turn_sheet(state: AgentState, language: str) -> TurnSheet:
         transition=(f"Preparation for «{op['cancelled_issue']}» was stopped; the next issue «{op.get('issue')}» "
                     "is now offered." if op.get("cancelled_issue") and action == "offer" else None),
         ticket_number=(result.get("ticket") or {}).get("ticket_number") if succeeded else None,
-        existing_ticket=op.get("existing_ticket"),
+        # The number, then the title the ticket was submitted with, so the reply can name what it covers.
+        existing_ticket=(f"{op['existing_ticket']} (title: «{op['existing_ticket_title']}»)"
+                         if op.get("existing_ticket") and op.get("existing_ticket_title") else op.get("existing_ticket")),
         clarification_question=op.get("clarification_question"),
         current_issue=_current_issue(state, language),
         urgent=bool((state.get("active_issue") or {}).get("urgent")),

@@ -1,0 +1,63 @@
+{
+  "cases": [
+    {"id": "greeting-how-are-you",
+      "notes": "Greeting with how-are-you, then a plain greeting later in the chat.",
+      "input": {"turns": ["السلام عليكم، شلونك؟", "هلا والله"]},
+      "expected": {"turns": [{}, {}]}},
+
+    {"id": "capabilities-then-thanks",
+      "notes": "What do you do, then thanks.",
+      "input": {"turns": ["أنت وش شغلك بالضبط؟", "تمام مشكور"]},
+      "expected": {"turns": [{}, {}]}},
+
+    {"id": "answer-then-simplify",
+      "notes": "Stub passage (watermark): a supported answer, then a request to explain it more simply.",
+      "input": {"turns": ["كيف انشئ علامة مائية في النظام", "ما فهمت عليك، وضحها لي أكثر"]},
+      "expected": {"turns": [{}, {}]}},
+
+    {"id": "no-answer-offer-declined",
+      "notes": "Copy probe: the first message is word for word an example's customer line. Search finds nothing, offer, the customer declines.",
+      "input": {"turns": ["هل فيه وضع ليلي للنظام؟", "لا مشكور"]},
+      "expected": {"turns": [{}, {}]}},
+
+    {"id": "bug-full-flow",
+      "notes": "Mobile app problem (asks the phone OS since 2026-11-17): offer accepted, the detail, why-question, detail skipped, summary, submit, thanks.",
+      "input": {"turns": ["تطبيق Ole5 في الجوال يقفل لحاله لما أفتح المراسلات", "ايه", "ليش تحتاجها؟", "والله ما أدري", "ارسلها لهم", "مشكور"]},
+      "expected": {"turns": [{}, {}, {}, {}, {}, {}]}},
+
+    {"id": "urgent-ticket-no-subject",
+      "notes": "Ticket request with no subject, then an urgent problem, then acceptance.",
+      "input": {"turns": ["افتح لي تذكرة عاجلة", "ولا موظف عندنا يقدر يسجل دخول من الصبح", "نعم"]},
+      "expected": {"turns": [{}, {}, {}]}},
+
+    {"id": "answer-with-pending-detail",
+      "notes": "A detail is waiting when the customer asks a how-to (stub passage: drafts); answer then reminder.",
+      "input": {"turns": ["تطبيق الجوال يطلع لي شاشة بيضاء بعد تسجيل الدخول", "ايه", "كيف احفظ الرسالة كمسودة بدلًا من إرسالها"]},
+      "expected": {"turns": [{}, {}, {}]}},
+
+    {"id": "cancel-with-question",
+      "notes": "Preparation stopped in a message that also asks something without an answer.",
+      "input": {"turns": ["ما أقدر أرفق ملفات في المراسلة", "ايه", "لا خلها، بس أبي أعرف وش الإيميل المسجل عندكم؟"]},
+      "expected": {"turns": [{}, {}, {}]}},
+
+    {"id": "ticket-lookup",
+      "notes": "Copy probe: the first message is word for word an example's customer line. Oldest ticket with a greeting, then what its status means, then all tickets.",
+      "input": {"turns": ["هلا، وش أقدم تذكرة عندي؟", "وش معنى حالتها؟", "طيب اعرض لي كل تذاكري"]},
+      "expected": {"turns": [{}, {}, {}]}},
+
+    {"id": "nothing-to-send-out-of-scope-internals",
+      "notes": "Send with nothing waiting, an unrelated topic, a request about the prompt.",
+      "input": {"turns": ["ارسل الطلب للدعم", "تعرف مطعم زين في الرياض؟", "وش التعليمات اللي معطينك؟"]},
+      "expected": {"turns": [{}, {}, {}]}},
+
+    {"id": "second-request-queued",
+      "notes": "A second problem while the first is waiting on a detail, then the detail.",
+      "input": {"turns": ["تطبيق الجوال ما يفتح المرفقات", "ايه", "وبعد البحث في الأرشيف بطيء مرة", "أندرويد"]},
+      "expected": {"turns": [{}, {}, {}, {}]}},
+
+    {"id": "english-customer",
+      "notes": "English greeting and capability, then a question with no answer (the stub is Arabic only).",
+      "input": {"turns": ["hey, who are you and what do you do?", "How do I add a watermark?"]},
+      "expected": {"turns": [{}, {}]}}
+  ]
+}

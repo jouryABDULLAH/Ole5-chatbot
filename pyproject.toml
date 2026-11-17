@@ -88,6 +88,13 @@ task = "evals.regression_task:proof_task"
 graders = ["evals.regression_graders:nodes_match", "evals.regression_graders:facts_match", "evals.regression_graders:records_match", "evals.regression_graders:pending_matches", "evals.regression_graders:counts_match", "evals.regression_graders:required_text", "evals.graders:language_matches"]
 timeout = 900
 
+# Main scenarios on the stub knowledge base, to read the range of replies. no_fallback is a code check (no judge); with
+# no graders listed evalkit would run its LLM judges.
+[tool.evalkit.suites.mini_replies]
+task = "evals.regression_task:stub_task"
+graders = ["evals.regression_graders:no_fallback"]
+timeout = 900
+
 [tool.evalkit.suites.reg_guards]
 task = "evals.regression_task:guard_task"
 graders = ["evals.regression_graders:guard_outcome", "evals.regression_graders:required_text"]

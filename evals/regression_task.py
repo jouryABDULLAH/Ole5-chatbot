@@ -16,7 +16,8 @@ from ole5_chat.agent import session as agent_session
 from ole5_chat.agent.contracts import PendingCustomerResponse
 from ole5_chat.agent.guards import language_problem
 from ole5_chat.agent.nodes import search as search_module
-from ole5_chat.agent.nodes.respond import _seen_passages, _unsupported, respond_node
+from ole5_chat.agent.nodes.respond import respond_node
+from ole5_chat.agent.nodes.validate import _seen_passages, _unsupported
 from ole5_chat.agent.nodes.router import router_node
 from ole5_chat.agent.nodes.validate import validate_node
 from ole5_chat.agent.state import initial_state
@@ -146,6 +147,13 @@ def proof_task(input: dict) -> dict:
     shutil.copy(Path("evals/fixtures/proof_tickets.xlsx"), folder / "tickets.xlsx")
     get_settings().sheets_dir = folder
     return conversation_task(input)
+
+
+def stub_task(input: dict) -> dict:
+    """proof_task with the stub knowledge base in direct mode: four fixed passages, no RAGent2, so it is fast."""
+    get_settings().kb_backend = "stub"
+    get_settings().kb_retrieval_mode = "direct"
+    return proof_task(input)
 
 
 def _state(fixture: dict) -> dict:

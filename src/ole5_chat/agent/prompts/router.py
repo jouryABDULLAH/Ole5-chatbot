@@ -34,6 +34,7 @@ ROUTER_EXAMPLES = {
         '"ارسلها" after a submission summary; '
         '"ما أعرف" after a required-detail question; '
         '"ما أبي أعطيك" after a required-detail question; '
+        '"كمل" or "تجاوز" after a required-detail question (go on without that detail); '
         '"نعم، بس لوين ترسل؟" after a summary (an answer with a question: still pending_response); '
         '"غير الصفحة الى: صفحة المراسلات" or "الخطأ مو كذا، هو …" after a summary (a change to a ticket value)'
     ),

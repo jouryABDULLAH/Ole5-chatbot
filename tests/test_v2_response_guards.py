@@ -12,7 +12,7 @@ from ole5_chat.agent.contracts import Language
 from ole5_chat.agent import graph
 from ole5_chat.agent.contracts import (OperatorCompletion, PendingCustomerResponse, ReturnDecision, RouterDecision,
                                       RouterDecisionWithoutPending, manager_schema)
-from ole5_chat.agent.nodes import respond
+from ole5_chat.agent.nodes import respond, validate
 from ole5_chat.agent.state import initial_state
 from ole5_chat.identity import Identity
 
@@ -105,9 +105,9 @@ def test_grounding_rewrites_once_checks_the_rewrite_and_withholds_what_stays_uns
     first = "Select Archive. There is an invented limit of 5 files."
     model.add(verdicts(2, {2: "No passage gives a limit."}))
     rewritten = "Select Archive."
-    if failure == "still_unsupported":  # the rewrite brings in a new unsupported instruction
+    if failure == "still_unsupported":  # both rewrites (two since 2026-11-17) bring in a new unsupported instruction
         rewritten = "Select Archive. Then open Settings."
-        model.add(verdicts(2, {2: "No passage gives this step."}))
+        model.add(verdicts(2, {2: "No passage gives this step."}), verdicts(2, {2: "No passage gives this step."}))
     rewrite = llm.ModelFailed("rewrite failed") if failure == "rewrite_error" else AIMessage(content=rewritten)
 
     def structured(system, messages, schema, node=None, check=None):
@@ -118,10 +118,11 @@ def test_grounding_rewrites_once_checks_the_rewrite_and_withholds_what_stays_uns
     retrieval = {"search_outcome": "answered", "current_references": [
         {"document": "Archive guide", "text": "Select Archive.", "relation": "DIRECT"}
     ]}
-    with patch.object(respond, "GROUNDING_ENFORCE", True), \
+    # Since 2026-11-17 the grounding check runs in Validate and its rewrite is the shared Validate -> Respond repair.
+    with patch.object(validate, "GROUNDING_ENFORCE", True), \
          patch.object(llm, "structured", structured), \
          patch.object(graph, "search_node", return_value=retrieval), \
-         patch.object(llm, "invoke", side_effect=[AIMessage(content=first), rewrite]) as writer:
+         patch.object(llm, "invoke", side_effect=[AIMessage(content=first), rewrite, rewrite]) as writer:
         result = graph.build().invoke(state)
     message = result["messages"][-1]
     # The rewrite is checked again. When it is still unsupported, or a check or the rewrite fails, the answer is
@@ -135,10 +136,18 @@ def test_grounding_rewrites_once_checks_the_rewrite_and_withholds_what_stays_uns
     if failure == "check_error":
         assert writer.call_count == 1 and "grounding check failed" in caplog.text
     else:
-        assert sum(schema is Grounding for schema, _ in model.calls) == (1 if failure == "rewrite_error" else 2)
+        assert sum(schema is Grounding for schema, _ in model.calls) == {
+            "rewrite_error": 1, "rewritten": 2, "still_unsupported": 3}[failure]
         note = writer.call_args_list[1].args[0][-1].content
         assert "«There is an invented limit of 5 files.»: No passage gives a limit." in note
         assert "Keep every other sentence as it was" in note
+
+
+def respond_then_validate(state):
+    """Respond writes, Validate checks; the state carries both results, as in the graph."""
+    state.update(respond.respond_node(state))
+    state.update(validate.validate_node(state))
+    return state
 
 
 def test_grounding_verdicts_that_never_cover_the_reply_send_the_fixed_reply_not_the_unchecked_one(model):
@@ -149,8 +158,9 @@ def test_grounding_verdicts_that_never_cover_the_reply_send_the_fixed_reply_not_
     wrong = Grounding(verdicts=[SentenceVerdict(number=7, verdict="unsupported", problem="No passage gives it.")])
     model.add(wrong, wrong)
     with patch.object(llm, "invoke", return_value=AIMessage(content=invented)) as writer:
-        result = respond.respond_node(state)
-    assert result["reply"] == "I could not find an answer to your question." and result["reply_withheld"]
+        result = respond_then_validate(state)
+    assert result["reply"] == "I could not find an answer to your question."
+    assert result["validation_outcome"] == "fallback" and result["sources"] == []
     assert writer.call_count == 1  # no rewrite was attempted from an unusable check
     assert sum(schema is Grounding for schema, _ in model.calls) == 2  # the check and its correction retry
 
@@ -163,12 +173,15 @@ def test_grounding_runs_with_zero_passages_and_invented_steps_do_not_reach_the_c
                  pending_customer_response=PendingCustomerResponse(kind="offer", issue_id="issue-1"),
                  ticket_operator_result={"action": "offer", "issue": "Registered email"})
     invented = "Open Settings, then My Profile, to see your email."
-    model.add(verdicts(1, {1: "No passage gives these steps."}), verdicts(1, {1: "No passage gives these steps."}))
+    model.add(*[verdicts(1, {1: "No passage gives these steps."})] * 3)
     with patch.object(llm, "invoke", return_value=AIMessage(content=invented)):
-        reply = respond.respond_node(state)["reply"]
+        # Two shared rewrites (since 2026-11-17), each checked again; the third rejection sends the fixed reply.
+        assert respond_then_validate(state)["validation_outcome"] == "repair"
+        assert respond_then_validate(state)["validation_outcome"] == "repair"
+        reply = respond_then_validate(state)["reply"]
     assert reply == ("I could not find an answer to your question. "
                      "Would you like a support ticket for «Registered email»?")
-    checked = respond._grounding_input(state, build_turn_sheet(state, "en"), invented, [])
+    checked = validate._grounding_input(state, build_turn_sheet(state, "en"), invented, [])
     assert "Passages the reply's author saw (it need not use them all):\nnone" in checked
     assert "Account access: you cannot inspect customer account records" in checked
     # The reply goes in as numbered sentences, with the workflow facts and none of Respond's instructions.
@@ -176,9 +189,9 @@ def test_grounding_runs_with_zero_passages_and_invented_steps_do_not_reach_the_c
     assert "Current request (named by the problem the customer reported): «Registered email»" in checked
     assert "Guidance:" not in checked and "Write only the customer-facing reply" not in checked
     state["ticket_enquiry_result"] = {"action": "lookup_status", "tickets": [{"ticket_number": "T-1001"}]}
-    assert "Ticket records the reply may also state:\nLookup result this turn:" in respond._grounding_input(
+    assert "Ticket records the reply may also state:\nLookup result this turn:" in validate._grounding_input(
         state, build_turn_sheet(state, "en"), invented, [])
-    assert "T-1001" in respond._grounding_input(state, build_turn_sheet(state, "en"), invented, [])
+    assert "T-1001" in validate._grounding_input(state, build_turn_sheet(state, "en"), invented, [])
 
 
 @pytest.mark.parametrize("reply", [
@@ -190,7 +203,8 @@ def test_zero_passage_reply_the_check_accepts_is_sent_as_written(model, reply):
     state = conversation("Hello", "en")
     state.update(intent="other", current_references=[])
     with patch.object(llm, "invoke", return_value=AIMessage(content=reply)) as writer:
-        assert respond.respond_node(state)["reply"] == reply
+        result = respond_then_validate(state)
+    assert result["reply"] == reply and result["validation_outcome"] == "pass"
     assert writer.call_count == 1 and sum(schema is Grounding for schema, _ in model.calls) == 1
 
 

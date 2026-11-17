@@ -35,6 +35,8 @@ class ProductConfig(BaseModel):
     required_labels: dict[str, dict[str, str]] = {}
     # The ticket type whose tickets ask each kind's details; the classifier's type decides, not the model's list.
     required_for_type: dict[str, str] = {}
+    # What a ticket status means for the customer, by status value, as facts Respond explains in its own words.
+    status_meanings: dict[str, str] = {}
     # When and how support works, by language like the introduction; stated from here, never by the model.
     support_hours: dict[str, str] = {}
     about: dict[str, str] = {}
