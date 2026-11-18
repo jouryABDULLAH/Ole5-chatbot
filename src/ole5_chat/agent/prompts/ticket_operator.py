@@ -89,6 +89,9 @@ support request and its ticket-workflow step is due in this turn.
 The check_submitted_tickets lookup for it has already run: its result is the last tool
 result in the conversation. Do not call it again.
 Identify the request from the conversation and follow these rules:
+- Identify the subject of the latest message before matching the active issue. A pending phone detail belongs
+  to the app problem; a new report that archive search is slow is a different issue, not an unanswered phone
+  question. When Search hands off that distinct unresolved issue, register it and preserve the phone question.
 - Matching submitted ticket: report already_submitted with its returned ticket number;
   do not register another issue.
 - Matching active issue with a pending offer, detail or summary: preserve that pending

@@ -122,11 +122,20 @@
         "must_have": [
           [
             "أقرب",
-            "أسرع"
+            "أسرع",
+            "يقدرون"
+          ],
+          [
+            "البريد",
+            "بريدك",
+            "الإيميل",
+            "إيميلك",
+            "ايميلك"
           ]
         ],
         "must_not": [
-          "لا يوجد وقت"
+          "لا يوجد وقت",
+          "قناة الرد"
         ]
       }
     },
@@ -194,7 +203,7 @@
     {
       "id": "reminder-summary",
       "input": {
-      "state": {
+        "state": {
           "messages": [
             {
               "role": "user",
@@ -267,7 +276,10 @@
             "لم أعثر",
             "راجعت",
             "بحثت",
-            "تحققت"
+            "تحققت",
+            "ما لقيت",
+            "ما عندي جواب",
+            "ما عندي إجابة"
           ]
         ],
         "must_not": [
@@ -300,7 +312,9 @@
             "أعد",
             "إعادة",
             "أرسل",
-            "مرة أخرى"
+            "مرة أخرى",
+            "تعيد",
+            "ترسل"
           ]
         ],
         "must_not": [
@@ -342,7 +356,9 @@
             "أعد",
             "إعادة",
             "أرسل",
-            "مرة أخرى"
+            "مرة أخرى",
+            "تعيد",
+            "ترسل"
           ],
           [
             "الأرشفة",
@@ -391,11 +407,7 @@
         "language": "ar",
         "must_have": [
           [
-            "لم أجد",
-            "لم أعثر",
-            "راجعت",
-            "بحثت",
-            "تحققت"
+            "تذكرة"
           ],
           [
             "الأرشفة",
@@ -404,7 +416,8 @@
         ],
         "max_questions": 1,
         "offer_allowed": true
-      }
+      },
+      "notes": "The authorized offer can be direct; a search preamble is not mandatory."
     },
     {
       "id": "offer-after-cancel",
@@ -500,13 +513,13 @@
         "language": "ar",
         "must_have": [
           [
-            "لفتح",
-            "تفاصيل"
+            "الصفحة"
           ]
         ],
         "max_questions": 1,
         "offer_allowed": true
-      }
+      },
+      "notes": "Ask the requested page once; a repeated explanation of ticket preparation is not mandatory."
     },
     {
       "id": "summary",
@@ -580,7 +593,14 @@
           "ticket_operator_result": {
             "action": "show_summary",
             "issue_id": "issue-1",
-            "issue": "زر الأرشفة لا يعمل"
+            "issue": "زر الأرشفة لا يعمل",
+            "confirmed_changes": [
+              {
+                "field": "priority",
+                "before": "Normal",
+                "after": "High"
+              }
+            ]
           },
           "pending_customer_response": {
             "kind": "summary",
@@ -593,12 +613,17 @@
         "language": "ar",
         "must_have": [
           [
-            "الأولوية"
+            "الأولوية",
+            "أولوية"
+          ],
+          [
+            "عالية"
           ]
         ],
         "max_questions": 1,
         "offer_allowed": true
-      }
+      },
+      "notes": "An edit acknowledgement requires a confirmed change from the workflow, not just an edited-looking draft."
     },
     {
       "id": "submitted",
@@ -651,15 +676,16 @@
             "T-1001"
           ],
           [
-            "البريد"
-          ],
-          [
-            "أقرب",
-            "أسرع"
+            "البريد",
+            "بريدك",
+            "الإيميل",
+            "إيميلك",
+            "ايميلك"
           ]
         ],
         "max_questions": 0
-      }
+      },
+      "notes": "Keep the identifier and actual reply channel. Do not require an unasked timing promise."
     },
     {
       "id": "submitted-next-issue",
@@ -902,35 +928,153 @@
         "max_questions": 0
       }
     },
-    {"id": "bare-ticket-request", "input": {"state": {
-      "messages": [{"role": "user", "content": "ابغى تفتح لي تذكرة عاجلا"}], "language": "ar", "intent": "other"}},
-      "expected": {"language": "ar", "must_have": [["المشكلة", "مشكلتك"]], "max_questions": 1, "offer_allowed": true},
-      "notes": "A ticket request with no problem stated: Respond asks what the problem is, once."},
-    {"id": "earlier-ticket-not-queued", "input": {"state": {
-      "messages": [{"role": "user", "content": "زر الارشفة ما يشتغل"},
-                   {"role": "assistant", "content": "تم إنشاء التذكرة رقم T-1001 بخصوص «زر الأرشفة لا يعمل»، وسيصلك رد فريق الدعم على بريدك."},
-                   {"role": "user", "content": "ولا موظف عندنا يقدر يسجل دخول من الصباح"},
-                   {"role": "assistant", "content": "هذا طلب عاجل. هل ترغب في فتح تذكرة دعم لعدم قدرة الموظفين على تسجيل الدخول؟"},
-                   {"role": "user", "content": "نعم"}],
-      "language": "ar", "intent": "pending_response",
-      "created_tickets": [{"ticket_number": "T-1001", "title_customer": "زر الأرشفة لا يعمل", "created_at": "2026-11-09"}],
-      "active_issue": {"id": "issue-2", "description": "عدم قدرة جميع الموظفين على تسجيل الدخول"},
-      "ticket_draft": {"title_customer": "عدم قدرة جميع الموظفين على تسجيل الدخول", "queue": "Ole5 Technical", "type": "Bug",
-                       "subtype": "خلل برمجي", "priority": "High", "missing": []},
-      "ticket_operator_result": {"action": "show_summary", "issue_id": "issue-2", "issue": "عدم قدرة جميع الموظفين على تسجيل الدخول"},
-      "pending_customer_response": {"kind": "summary", "issue_id": "issue-2", "item": null}}},
-      "expected": {"language": "ar", "must_not": ["قائمة الانتظار", "Ole5 Technical"], "max_questions": 1, "offer_allowed": true},
-      "notes": "9 Nov, two-ticket check run 3: Respond said the already-created archive ticket was queued."},
-    {"id": "follow-up-on-a-shown-ticket", "input": {"state": {
-      "messages": [{"role": "user", "content": "وش اقدم تذكرة عندي"},
-                   {"role": "assistant", "content": "أقدم تذكرة لديك هي T-MOCK-20261110103732-0001 بعنوان Automatic translation of message text، أُنشئت في 2026-11-10، وحالتها New."},
-                   {"role": "user", "content": "متى انشئت هذي التذكرة؟"}],
-      "language": "ar", "intent": "other",
-      "last_lookup": {"tickets": [{"ticket_number": "T-MOCK-20261110103732-0001", "title": "Automatic translation of message text",
-                                   "product": "OLE5", "created_at": "2026-11-10", "state": "New", "status_available": true}],
-                      "failed_lookups": []}}},
-      "expected": {"language": "ar", "must_have": [["2026-11-10", "10 نوفمبر"]],
-                   "must_not": ["لا يوجد لدي سجل", "تم إنشاء التذكرة حديثاً"], "max_questions": 1},
-      "notes": "12 Nov, logs/chat-20261112-163857.log 16:52: a follow-up about a ticket shown one turn earlier had no record (finalize clears the lookup); Respond invented a creation, then denied any record. last_lookup now keeps it."}
+    {
+      "id": "bare-ticket-request",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "ابغى تفتح لي تذكرة عاجلا"
+            }
+          ],
+          "language": "ar",
+          "intent": "other"
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "المشكلة",
+            "مشكلتك"
+          ]
+        ],
+        "max_questions": 1,
+        "offer_allowed": true
+      },
+      "notes": "A ticket request with no problem stated: Respond asks what the problem is, once."
+    },
+    {
+      "id": "earlier-ticket-not-queued",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "زر الارشفة ما يشتغل"
+            },
+            {
+              "role": "assistant",
+              "content": "تم إنشاء التذكرة رقم T-1001 بخصوص «زر الأرشفة لا يعمل»، وسيصلك رد فريق الدعم على بريدك."
+            },
+            {
+              "role": "user",
+              "content": "ولا موظف عندنا يقدر يسجل دخول من الصباح"
+            },
+            {
+              "role": "assistant",
+              "content": "هذا طلب عاجل. هل ترغب في فتح تذكرة دعم لعدم قدرة الموظفين على تسجيل الدخول؟"
+            },
+            {
+              "role": "user",
+              "content": "نعم"
+            }
+          ],
+          "language": "ar",
+          "intent": "pending_response",
+          "created_tickets": [
+            {
+              "ticket_number": "T-1001",
+              "title_customer": "زر الأرشفة لا يعمل",
+              "created_at": "2026-11-09"
+            }
+          ],
+          "active_issue": {
+            "id": "issue-2",
+            "description": "عدم قدرة جميع الموظفين على تسجيل الدخول"
+          },
+          "ticket_draft": {
+            "title_customer": "عدم قدرة جميع الموظفين على تسجيل الدخول",
+            "queue": "Ole5 Technical",
+            "type": "Bug",
+            "subtype": "خلل برمجي",
+            "priority": "High",
+            "missing": []
+          },
+          "ticket_operator_result": {
+            "action": "show_summary",
+            "issue_id": "issue-2",
+            "issue": "عدم قدرة جميع الموظفين على تسجيل الدخول"
+          },
+          "pending_customer_response": {
+            "kind": "summary",
+            "issue_id": "issue-2",
+            "item": null
+          }
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_not": [
+          "قائمة الانتظار",
+          "Ole5 Technical"
+        ],
+        "max_questions": 1,
+        "offer_allowed": true
+      },
+      "notes": "9 Nov, two-ticket check run 3: Respond said the already-created archive ticket was queued."
+    },
+    {
+      "id": "follow-up-on-a-shown-ticket",
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "وش اقدم تذكرة عندي"
+            },
+            {
+              "role": "assistant",
+              "content": "أقدم تذكرة لديك هي T-MOCK-20261110103732-0001 بعنوان Automatic translation of message text، أُنشئت في 2026-11-10، وحالتها New."
+            },
+            {
+              "role": "user",
+              "content": "متى انشئت هذي التذكرة؟"
+            }
+          ],
+          "language": "ar",
+          "intent": "other",
+          "last_lookup": {
+            "tickets": [
+              {
+                "ticket_number": "T-MOCK-20261110103732-0001",
+                "title": "Automatic translation of message text",
+                "product": "OLE5",
+                "created_at": "2026-11-10",
+                "state": "New",
+                "status_available": true
+              }
+            ],
+            "failed_lookups": []
+          }
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "2026-11-10",
+            "10 نوفمبر"
+          ]
+        ],
+        "must_not": [
+          "لا يوجد لدي سجل",
+          "تم إنشاء التذكرة حديثاً"
+        ],
+        "max_questions": 1
+      },
+      "notes": "12 Nov, logs/chat-20261112-163857.log 16:52: a follow-up about a ticket shown one turn earlier had no record (finalize clears the lookup); Respond invented a creation, then denied any record. last_lookup now keeps it."
+    }
   ]
 }

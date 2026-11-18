@@ -1,0 +1,46 @@
+{
+  "before": [
+    {
+      "case": "arabic-with-english-terms",
+      "turn": 4,
+      "flag": "formal passive ticket wording"
+    },
+    {
+      "case": "no-answer-offer-declined",
+      "turn": 2,
+      "flag": "formal passive ticket wording"
+    },
+    {
+      "case": "saudi-courtesy",
+      "turn": 1,
+      "flag": "courtesy echoed unchanged"
+    },
+    {
+      "case": "second-request-queued",
+      "turn": 3,
+      "flag": "identical consecutive reply"
+    }
+  ],
+  "after": [
+    {
+      "case": "arabic-with-english-terms",
+      "turn": 3,
+      "flag": "formal passive ticket wording"
+    },
+    {
+      "case": "cancel-with-question",
+      "turn": 2,
+      "flag": "formal passive ticket wording"
+    },
+    {
+      "case": "capabilities-then-thanks",
+      "turn": 1,
+      "flag": "formal passive ticket wording"
+    },
+    {
+      "case": "ticket-lookup",
+      "turn": 1,
+      "flag": "formal passive ticket wording"
+    }
+  ]
+}

@@ -1,16 +1,50 @@
-*.log
-/chatbot-pack
-/docs
-/venv
+# Local credentials and environment settings
 .env
+.env.*
+!.env.example
+/.aws/
+
+# Python environments, caches and build products
+/.venv/
+/venv/
 __pycache__/
-*.pyc
+*.py[cod]
 .pytest_cache/
-uploads/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
 *.egg-info/
-exp_results/
-retrieval_results/
-.evalkit/
-_to_delete/
-live_tests_results/
-reference/
+/build/
+/dist/
+
+# Runtime data: created on first use; existing files are kept locally
+/sheets/tickets.xlsx
+/sheets/attachments.xlsx
+/uploads/
+/logs/
+*.log
+
+# Machine-specific deployment and editor files
+/start.sh
+/nginx-ole5-chat.conf
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+~$*.xlsx
+
+# Generated experiments and temporary exports
+/exp_results/
+/retrieval_results/
+/.evalkit/
+/_to_delete/
+/live_tests_results/
+/reference/
+/chatbot-pack/
+# Keep the readable reports, combined transcripts and curated evaluation datasets.
+/reports/**/cases/
+/reports/**/before_source/
+/reports/**/first_pass/source/

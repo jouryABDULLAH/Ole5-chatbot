@@ -60,6 +60,8 @@ ROUTER_EXAMPLES = {
         '"مرحبا"; "شكراً"; "What can you do?"; "ايش تقدم"; "Who developed {product}?"; '
         '"وين توصلني الرسالة؟"; "كم ساعات الدعم؟"; '
         '"اشرحها ببساطة" after a product answer; '
+        '"ما فهمت عليك، وضحها لي أكثر" after a product answer → other, next_target=respond '
+        '(explain the same answer, not a failed attempt or a new search); '
         '"لوين ترسل التذكرة؟" or "لماذا تحتاج اسم المتصفح؟" while a step is pending (a question about the step); '
         '"الأرشفة" with nothing pending; "عندي مشكلة" or "افتح لي تذكرة" with no identifiable subject in the conversation (Respond asks what the problem is); '
         '"افتح لي تذكرة عن الأيام الممطرة" → other, explicit_ticket_request=false (the subject is outside the '
@@ -140,6 +142,7 @@ Urgent situations: {join_values(config.urgent_when)}
 Pending customer response: {pending_text}
 Latest customer message: {context['latest_customer_message'] or 'none'}
 Previous assistant message: {context['previous_assistant_message'] or 'none'}
+
 ## CHOOSING THE INTENT
 
 Choose exactly one intent based on the latest customer message and its conversation context.
@@ -148,6 +151,16 @@ Intent describes what the customer requested.
 {route_lines}
 
 ### INTENT CLASSIFICATION RULES
+
+- Resolve an explanation follow-up before classifying a new problem. When the customer asks to simplify,
+  clarify, or repeat the same supported answer (for example «ما فهمت عليك» or «وضحها خطوة خطوة»),
+  use other -> respond. Respond can use the retained evidence. Not understanding an explanation is not
+  a report of trying its steps and failing, and does not require another search or a ticket offer.
+  A follow-up asking a new product fact, condition or platform still goes to Search normally.
+- A new problem while a detail is pending is not an answer to that detail. For example, after asking for
+  the phone OS, «وبعد البحث في الأرشيف بطيء مرة» introduces a separate product problem: use question -> search.
+  Preserve the pending interaction while the new request follows the normal search/ticket rules.
+  Do not treat the new problem as a reason merely to repeat the old detail question.
 
 - Accounts: classify the help the customer requests within the product scope.
 
@@ -307,6 +320,16 @@ Example 4 (Capability / Support FAQ → Respond):
 - Decision: `intent="other"`, `next_target="respond"`, `explicit_ticket_request=false`.
 
 ### OUTPUT CONTRACT
+
+Final interpretation check:
+- Ordinary product problems still go to question/search when a ticket is requested, including a short ticket
+  request referring to an earlier unresolved problem. needs_ticket requires a policy topic, urgency, direct
+  account intervention, or an explicit report that troubleshooting failed; the word ticket alone is not enough.
+- An edit to the person or action in the SAME pending request is pending_response, even for account changes.
+- A bare "لا" after instructions does not establish that the customer tried them and failed: use other.
+- Read Arabic words in their sentence: "كيف اسوي كبسة؟" is a cooking question outside product scope;
+  "ابي أعرف أقدم تذكرة لي" asks for the oldest existing ticket, not submission.
+- "هل أقدر أشوف تذاكري؟" asks about capability (other); "ورني تذاكري" requests a lookup (ticket_enquiry).
 
 Return JSON only with `intent`, `next_target`, `explicit_ticket_request`, and `reason`.
 The reason should briefly explain the intent and target choices.

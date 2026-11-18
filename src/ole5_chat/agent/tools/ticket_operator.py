@@ -477,6 +477,7 @@ def build_ticket_operator_tools(state: AgentState, sink: list | None = None):
         state["summary_shown"] = False
         state["submission_requested"] = False
         # The submitted issue is finished: the next queued issue takes its place, as after a cancel.
+        submitted_issue = state.get("active_issue")
         state["issues_closed_at"] = _current_message(state)
         queue = list(state.get("pending_issues", []))
         state["active_issue"] = queue.pop(0) if queue else None
@@ -488,6 +489,7 @@ def build_ticket_operator_tools(state: AgentState, sink: list | None = None):
             "ticket": created,
             "corrections": corrections,
             "draft_version": draft_version,
+            "submitted_issue": submitted_issue,
             "active_issue": state.get("active_issue"),
             "pending_issues": queue,
         })

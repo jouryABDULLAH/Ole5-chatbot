@@ -1,0 +1,75 @@
+<!doctype html><html lang="en"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Bilingual response comparison</title>
+<style>body{font:17px/1.65 system-ui,sans-serif;max-width:1200px;margin:32px auto;padding:0 20px;color:#172b36;background:#f6f8fa}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:16px}article{background:white;border:1px solid #ccd6df;border-radius:10px;padding:18px}
+h3{font-size:14px;color:#526778;margin:0}p{white-space:pre-wrap}.customer{font-weight:600;border-left:4px solid #24736b;padding:12px;background:#e5f3ef}
+section{margin:36px 0}h2{font-size:19px;overflow-wrap:anywhere}@media(max-width:700px){.pair{grid-template-columns:1fr}}</style>
+<h1>Previous and updated conversations</h1><p>Exact recorded model output from the broad run and targeted recheck.
+Only rechecked scenarios appear here; this is a selected diagnostic comparison, not a quality score.
+Full conversations run independently, so their workflow can diverge. Read results.md for remaining failures.</p>
+<section><h2>bilingual_conversations/ar-simplification</h2>
+<p class="customer" dir="auto">كيف انشئ علامة مائية في النظام</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">السموحة، ما قدرت أطلع لك جواب أكيد على سؤالك. أرسله لي مرة ثانية لو سمحت.</p></article><article><h3>Updated reply</h3><p dir="auto">ادخل إعدادات النظام، انزل لأسفل الصفحة، اضغط على «العلامة المائية»، ارفع الشعار اللي تبي تستخدمه، ثم احفظ.</p></article></div>
+<p class="customer" dir="auto">اشرحها لي خطوة خطوة بدون تفاصيل زيادة</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">ما لقيت دليل لإنشاء علامة مائية. ودك أرفع لك تذكرة للفريق الفني بخصوص «إنشاء علامة مائية»؟</p></article><article><h3>Updated reply</h3><p dir="auto">1. افتح إعدادات النظام.
+2. انزل لأسفل الصفحة.
+3. اضغط على العلامة المائية.
+4. ارفع الشعار اللي تبي تستخدمه.
+5. احفظ.</p></article></div>
+</section>
+<section><h2>bilingual_conversations/en-mobile-submit</h2>
+<p class="customer" dir="auto">The Ole5 mobile app closes every time I open attachments.</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">The app closing every time you open attachments sounds serious. Would you like me to open a ticket for this?</p></article><article><h3>Updated reply</h3><p dir="auto">The Ole5 mobile app closing whenever you open attachments sounds serious. Would you like me to open a ticket with the technical support team about this?</p></article></div>
+<p class="customer" dir="auto">Yes, open a ticket.</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">Got it—I&#x27;m preparing a ticket about the app crashing when you open attachments. Could you let me know your phone’s operating system?</p></article><article><h3>Updated reply</h3><p dir="auto">Sure, to prepare the ticket about the app closing when you open attachments, could you tell me your phone’s operating system? This helps the team reproduce the crash.</p></article></div>
+<p class="customer" dir="auto">Why do you need that?</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">We need the operating system so the support team can reproduce the crash on the same platform. What&#x27;s your phone’s OS?</p></article><article><h3>Updated reply</h3><p dir="auto">Knowing the phone’s operating system lets the support team reproduce the crash in the same environment, which speeds up finding a fix. Could you tell me which OS your phone is running?</p></article></div>
+<p class="customer" dir="auto">Android 14</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">I&#x27;ve saved Android 14 as your OS. Shall I send the ticket now?</p></article><article><h3>Updated reply</h3><p dir="auto">Got Android 14. The ticket’s ready—shall I send it?</p></article></div>
+<p class="customer" dir="auto">[submit]</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">Your ticket has been submitted. The number is T-MOCK-20261117141019-0001. Keep it for any follow‑up. The support team will reply to you via the reply channel (your registered email).</p></article><article><h3>Updated reply</h3><p dir="auto">I’ve submitted the ticket T-MOCK-20261118095205-0001. Keep this number for any follow‑up, and the support team will reply through your registered email address.</p></article></div>
+<p class="customer" dir="auto">Thanks, that is all.</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">Sorry, something went wrong on my side while preparing the reply. Please send your message again.</p></article><article><h3>Updated reply</h3><p dir="auto">You&#x27;re welcome. If anything else comes up, just let me know.</p></article></div>
+</section>
+<section><h2>bilingual_conversations/en-second-issue</h2>
+<p class="customer" dir="auto">The Ole5 mobile app cannot open attachments.</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">Sorry to hear the Ole5 mobile app can’t open attachments. Would you like me to open a ticket for this?</p></article><article><h3>Updated reply</h3><p dir="auto">I see the Ole5 mobile app can’t open attachments. Would you like me to open a ticket for this?</p></article></div>
+<p class="customer" dir="auto">Yes.</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">Great, could you tell me which phone OS you’re using (iOS or Android) so the team can reproduce the issue?</p></article><article><h3>Updated reply</h3><p dir="auto">Got it, the mobile app can’t open attachments. I’ve prepared a ticket with that info—should I send it?</p></article></div>
+<p class="customer" dir="auto">Also, archive search is very slow.</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">I could not find an answer to your question. I noted your new request and will handle it after the current one. To complete «Ole5 mobile app cannot open attachments», I need your phone&#x27;s operating system.</p></article><article><h3>Updated reply</h3><p dir="auto">I’ve noted the archive search is slow and will handle that after we finish the attachment issue. For the mobile app not opening attachments, I’ve prepared a ticket—should I submit it?</p></article></div>
+<p class="customer" dir="auto">iPhone</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">Got it, iPhone noted. The ticket’s ready—should I send it?</p></article><article><h3>Updated reply</h3><p dir="auto">Got it, iPhone. I’ve updated the ticket with that detail. The ticket’s ready—should I submit it?</p></article></div>
+<p class="customer" dir="auto">[submit]</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">I see the archive search is very slow. Would you like me to open a ticket for this?</p></article><article><h3>Updated reply</h3><p dir="auto">I’ve noted the archive search is slow. Should I open a ticket for it?</p></article></div>
+<p class="customer" dir="auto">No thanks, leave the archive issue.</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">Got it, I won’t open a new ticket for the archive search. That issue is already covered by the ticket you have (T-MOCK-20261117141042-0001) about the Ole5 mobile app not opening attachments. Keep that number handy for any follow‑up; the support team’s reply will come through the reply channel. Let me know if what you’re seeing now is different from what’s in that ticket.</p></article><article><h3>Updated reply</h3><p dir="auto">Got it—the mobile app can’t open attachments, and that problem is already in ticket T-MOCK-20261118095338-0001. Keep that number handy; the team’s reply will be sent to your registered email. Let me know if what you see now differs from what was reported in that ticket.</p></article></div>
+</section>
+<section><h2>bilingual_conversations/language-switch</h2>
+<p class="customer" dir="auto">Hi</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">Hi, how can I help you?</p></article><article><h3>Updated reply</h3><p dir="auto">Hello, how can I help you?</p></article></div>
+<p class="customer" dir="auto">يعطيك العافية</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">الله يعافيك</p></article><article><h3>Updated reply</h3><p dir="auto">الله يعافيك</p></article></div>
+<p class="customer" dir="auto">What are your support hours?</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">Our support hours are Sunday to Thursday, 09:00 – 18:00 Riyadh time.</p></article><article><h3>Updated reply</h3><p dir="auto">Our support hours are Sunday to Thursday, 09:00 – 18:00 Riyadh time.</p></article></div>
+<p class="customer" dir="auto">مشكور</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">السموحة، صار خلل عندي وأنا أجهز الرد. أرسل رسالتك مرة ثانية لو سمحت.</p></article><article><h3>Updated reply</h3><p dir="auto">العفو</p></article></div>
+</section>
+<section><h2>bilingual_voice/ar-already_submitted</h2>
+<p class="customer" dir="auto">نفس المشكلة للحين ما انحلت</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">المشكلة إن التطبيق يقفل عند فتح المرفقات ما زالت موجودة، وقد تم رفع تذكرة لها برقم T‑1001. احتفظ بالرقم للمتابعة، والرد يوصل لك عبر البريد الإلكتروني المسجل. هل في شيء جديد تشوفه غير اللي تم ذكره في التذكرة؟</p></article><article><h3>Updated reply</h3><p dir="auto">المشكلة ما زالت موجودة، وهي نفسها اللي رفعت لك تذكرة عنها برقم T-1001 بخصوص إغلاق التطبيق عند فتح المرفقات. الرد يوصل لك على بريدك الإلكتروني المسجل. هل في شيء جديد أو مختلف عن اللي تم ذكره في التذكرة؟</p></article></div>
+</section>
+<section><h2>bilingual_voice/ar-submitted_cancellation</h2>
+<p class="customer" dir="auto">ألغ التذكرة المرفوعة T-1001</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">مع الأسف ما أقدر ألغي تذكرة تم رفعها من هنا. إذا تحتاج تفتح تذكرة جديدة أو عندك سؤال ثاني، قول لي.</p></article><article><h3>Updated reply</h3><p dir="auto">ما أقدر ألغي التذكرة T-1001 من هالدردشة. التذكرة تم رفعها وفريق الدعم هو المسؤول عنها. إذا تحتاج تعديل أو إضافة تفاصيل، أقدر أساعدك.</p></article></div>
+</section>
+<section><h2>bilingual_voice/en-already_submitted</h2>
+<p class="customer" dir="auto">The same problem is still happening.</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">Looks like the app is still closing when you open attachments. That issue is already recorded in ticket T‑1001 (app closes when opening attachments). Keep that number handy; the support team’s reply will reach you through the reply channel. Let me know if what you’re seeing now is any different from the earlier report.</p></article><article><h3>Updated reply</h3><p dir="auto">You’re still seeing the app close when you open attachments. That problem is already recorded in ticket T-1001 (app closes when opening attachments). Keep that number for any follow‑up—the support team will reply to you through the email address you used. Is there anything different about what you’re seeing now?</p></article></div>
+</section>
+<section><h2>reg_respond/first-detail</h2>
+<p class="customer" dir="auto">نعم</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">عشان الفريق يحدد مكان المشكلة، ممكن تذكر لي اسم الصفحة اللي كان فيها زر الأرشفة؟</p></article><article><h3>Updated reply</h3><p dir="auto">عشان أجهز التذكرة، ممكن تذكر لي اسم الصفحة اللي كان فيها زر الأرشفة؟</p></article></div>
+</section>
+<section><h2>reg_respond/no-answer</h2>
+<p class="customer" dir="auto">هل يدعم النظام الوضع الليلي؟</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">الوضع الليلي ما لقيت له إجابة.</p></article><article><h3>Updated reply</h3><p dir="auto">ما لقيت معلومات عن دعم الوضع الليلي في النظام.</p></article></div>
+</section>
+<section><h2>reg_respond/offer</h2>
+<p class="customer" dir="auto">زر الأرشفة لا يعمل</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">زر الأرشفة ما يشتغل، ودك أرفع لك تذكرة للفريق الفني يشيكون عليها؟</p></article><article><h3>Updated reply</h3><p dir="auto">زر الأرشفة ما يشتغل. ودك أرفع لك تذكرة للفريق الفني يشيكون عليها؟</p></article></div>
+</section>
+<section><h2>reg_respond/offer-after-cancel</h2>
+<p class="customer" dir="auto">لا الغها</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">حاضر، ما أرفع تذكرة بخصوص تنبيهات الواتساب.</p></article><article><h3>Updated reply</h3><p dir="auto">تم إلغاء طلب زر الأرشفة. تبي أفتح لك تذكرة بخصوص تنبيهات الواتساب ما توصل؟</p></article></div>
+</section>
+<section><h2>reg_respond/reply-time</h2>
+<p class="customer" dir="auto">متى يوصلني الرد؟</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">الرد يوصل لك على بريدك الإلكتروني المسجل عبر قناة الرد.</p></article><article><h3>Updated reply</h3><p dir="auto">الفريق راح يرد بأسرع وقت ممكن، والرد يوصل على بريدك الإلكتروني المسجل.</p></article></div>
+</section>
+<section><h2>reg_respond/search-failed</h2>
+<p class="customer" dir="auto">هل يدعم النظام الوضع الليلي؟</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">ما قدرنا نكمل البحث، وما عندنا معلومات عن دعم الوضع الليلي. تقدر تعيد سؤالك؟</p></article><article><h3>Updated reply</h3><p dir="auto">ما قدرنا نلقى إجابة عن وضع الليل في النظام. ممكن تعيد إرسال سؤالك أو توضح أكثر؟</p></article></div>
+</section>
+<section><h2>reg_respond/search-failed-pending</h2>
+<p class="customer" dir="auto">هل يدعم النظام الوضع الليلي؟</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">معذرة، ما قدرنا نكمل البحث فـ ما عندنا معلومات عن الوضع الليلي. ممكن تعيد إرسال سؤالك؟ وبالنسبة لزر الأرشفة اللي ما يشتغل، إذا ودك أرفع لك تذكرة خبرني.</p></article><article><h3>Updated reply</h3><p dir="auto">ما قدرت ألقى إجابة عن الوضع الليلي، ممكن تعيد رسالتك وتوضح إذا تبي أرفع لك تذكرة بخصوص زر الأرشفة لا يعمل؟</p></article></div>
+</section>
+<section><h2>reg_respond/submitted</h2>
+<p class="customer" dir="auto">نعم ارسلها</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">رفعت التذكرة، رقمها T-1001. احتفظ بالرقم للمتابعة، والرد يوصل إلى بريدك الإلكتروني المسجل.</p></article><article><h3>Updated reply</h3><p dir="auto">رفعت التذكرة، رقمها T-1001. احتفظ بالرقم للمتابعة، والرد بيجي على إيميلك المسجل.</p></article></div>
+</section>
+<section><h2>reg_respond/summary-after-edit</h2>
+<p class="customer" dir="auto">خل الأولوية عالية</p><div class="pair"><article><h3>Previous reply</h3><p dir="auto">جهزت ملخص التذكرة بأولوية عالية. تبغى أرسلها للفريق الآن؟</p></article><article><h3>Updated reply</h3><p dir="auto">غيّرت الأولوية إلى عالية، التذكرة جاهزة بأولوية عالية. تبي أرسلها للفريق الآن؟</p></article></div>
+</section></html>

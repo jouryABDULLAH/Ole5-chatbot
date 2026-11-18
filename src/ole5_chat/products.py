@@ -14,6 +14,8 @@ class Persona(BaseModel):
     name: str = ""
     identity: str
     introduction: dict[str, str]
+    arabic_register: str = "plain professional Arabic"
+    english_register: str = "plain, conversational English with natural contractions"
     greetings: list[str] = []
     questions: list[str] = []
     voice: list[str] = []

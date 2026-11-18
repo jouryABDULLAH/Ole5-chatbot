@@ -49,6 +49,12 @@ def _return_pass(state: AgentState) -> dict:
     try:
         decision = llm.structured(router_return_prompt(state), [], ReturnDecision, node="router")
         target, reason = decision.next_target, decision.reason
+        outcome = (state.get("search_result") or {}).get("outcome") or state.get("search_outcome")
+        expected = ("ticket_operator" if state["last_worker"] == "search"
+                    and outcome in {"partial", "no_answer"} else "respond")
+        if target != expected:
+            log.warning("router return target=%s corrected to %s from worker facts", target, expected)
+            target, reason = expected, "The completed worker's recorded outcome determines the next step."
     except llm.ModelFailed as exc:
         log.error("ERROR router return pass failed: %s", exc)
         target, reason = "respond", "The worker's result could not be routed; it is delivered as it is."

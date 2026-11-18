@@ -1,0 +1,510 @@
+{
+  "metadata": {
+    "model": "openai/gpt-oss-120b",
+    "endpoint": "https://api.me-central-1.groqcloud.com",
+    "response_temperature": 0.1,
+    "structured_first_attempt_temperature": 0,
+    "kb": "fixed/stub",
+    "tickets": "mock",
+    "source_hashes": {
+      "evals/datasets/bilingual_conversations.json": "95d50d1674cf07497ca56d32234f977554e033471882836a3a18f1e78cad5122",
+      "evals/datasets/bilingual_voice.json": "a9564fbb087112a5b57b567658dccd6c64f8802314440523bd8c90e95a058d69",
+      "evals/datasets/reg_guards.json": "369b60578d6e4985bab479218aa99cfedd89c8473773dd3b61b59d131f412a90",
+      "evals/datasets/reg_respond.json": "65f96ef96c1ed794ccd31a97051fc6a8e59be2b3140e93a1721b0afdfec4f607",
+      "evals/datasets/reg_router.json": "cdef9c144e584191664a61264f36fec045471176039e9b3f5b4d628d56fa9d76",
+      "products/ole5/chat.yaml": "128049231fbac882cc211ea6c96dd61ccc10c5796a006bc41ac26d3687345b6d",
+      "products/rich/chat.yaml": "3ad062072c8d1084d18ec3269095d9ca221f5bef08beb0edf9709525f07af80d",
+      "src/ole5_chat/__init__.py": "8d284f78e432b8c7e4797f1ba383caa34f5a433b84a34be375a5a96493f5c5cb",
+      "src/ole5_chat/agent/__init__.py": "7908c87e62135f60b4ac3d1665170a74415697cc1067a72bc19b12140712f6a5",
+      "src/ole5_chat/agent/context.py": "226cbac27e9ace1c7df99be46df4739cec4a4b5581d48a2cd16c7d02bec25c42",
+      "src/ole5_chat/agent/contracts.py": "0e244d0cef3857079e8174447e1302cba722d11899ed15be333aeea3da9bfd8e",
+      "src/ole5_chat/agent/graph.py": "68a2fc8133713b95233daa78b92b32a1973201d049dedbb3953e2e1eb6895f71",
+      "src/ole5_chat/agent/guards.py": "48d56b9f20011c005379d0e4f16db87cf4e8d973996e5267c3a3960e5108305b",
+      "src/ole5_chat/agent/nodes/__init__.py": "017fa77561ef9c1007a46fb712319c83ba6f854b08014ac7c1f90ed2d6a69ebf",
+      "src/ole5_chat/agent/nodes/finalize.py": "2354093744fa5570fdc3e56ff206d089b5283bb2e67c2b7c699ad8f42091f4f1",
+      "src/ole5_chat/agent/nodes/respond.py": "d38fb82b277a5394b1169becbbba8f259a6b4c1ea34eb3b6749c4814b959b0b3",
+      "src/ole5_chat/agent/nodes/router.py": "b6b7adb92dfc8b01fe709aa35a6cf0b52cb484f3c8ae44e8e613d78329eb3f03",
+      "src/ole5_chat/agent/nodes/search.py": "c795524219adf11d27f79f14d34fee3a472d784c69dac3516038d8aae1281429",
+      "src/ole5_chat/agent/nodes/ticket_enquiry.py": "090fde12aeae5d9b1388493304fab9ea91b95a817839d28910fdd3404f193ea3",
+      "src/ole5_chat/agent/nodes/ticket_operator.py": "7936df909a266ba4445c4f6d15b35317b1692fe99c3f8a407d9293f94cd7cb08",
+      "src/ole5_chat/agent/nodes/validate.py": "6ec326da84684b68df660e751c82b12505063b5357e1ae87c27b5f88b9a3effb",
+      "src/ole5_chat/agent/prompts/__init__.py": "57165dd25cb049807af619adf9038d007c24e3190fba853a72137b4c75093b5c",
+      "src/ole5_chat/agent/prompts/guards.py": "c89b09c5fc8e4feabb4c5da0e13738b1fde96543d065c4aba1836522ee3534b6",
+      "src/ole5_chat/agent/prompts/respond.py": "deda19dab92379959293ab8062745d68deb59c80eb9eb798e8640509d0ee1c2d",
+      "src/ole5_chat/agent/prompts/router.py": "788c919d42bffba4641d0766a67030f6b9784938113c9192e45464af4383eef1",
+      "src/ole5_chat/agent/prompts/search.py": "8c920fe71f9f1e5f7faa520010d4c4c24475e23609214133fdfcf44354f31919",
+      "src/ole5_chat/agent/prompts/ticket_enquiry.py": "94b55a5b9516e672d8729d1dc5fde0eca55c6e752bf6b4fcfbe9c4b0099fb725",
+      "src/ole5_chat/agent/prompts/ticket_operator.py": "5e476862d2cba2336b28da523f466f1e73d71496f9c66ce01484924741241b3a",
+      "src/ole5_chat/agent/session.py": "c381e2bb76d987abde5125dc2a841843652f54c8f0b807229dde22f6aea52ffb",
+      "src/ole5_chat/agent/state.py": "918046390e2a92f5e2db65732f9aa6f5f962f52272534818b1bb4001363b6e40",
+      "src/ole5_chat/agent/ticket_action_guard.py": "4170f83e50bd9a112d2db0f92fe080622c52f26a9cbe2eae2423b0634a715548",
+      "src/ole5_chat/agent/tools/__init__.py": "bac7273398677e7eaacb24532ae7fa6715f0f4a99ba6b3e0e88093c6d180602e",
+      "src/ole5_chat/agent/tools/ticket_operator.py": "4a89de251e40cfe6003bdbc5cca125d3d23c93d7d3b38888cd04a2dd4695ba41",
+      "src/ole5_chat/agent/turn_sheet.py": "5da246dc5da46b25e85bb8f5505ba87bd74f4acb10e94923725539e6f0978229",
+      "src/ole5_chat/api.py": "83fce18be00cc7b976b2cdc6e2f45b6c466e5de92a670b425e3ee9243518664b",
+      "src/ole5_chat/attachments.py": "2e6c938183ea4380565e097bd5667905f931ddd47389f28aed32f1f7bd5c5d44",
+      "src/ole5_chat/config.py": "005f98a05853c1e871434b87875646dc10519325e61973602495c1b3085f3baa",
+      "src/ole5_chat/identity.py": "e2ab63aff75b52d27ebe26c6e28121548be05e0e8e328d1cc96c3d844873bc11",
+      "src/ole5_chat/knowledge/__init__.py": "a681b500f4ed9d399fdbdada22e5d1cee84d910a5f9e2ab07e945ce87605fba6",
+      "src/ole5_chat/knowledge/contracts.py": "a7ccc7455d721a568a6364504c8308851c6e65e22bfca5bddb750a5a2f79e884",
+      "src/ole5_chat/knowledge/qdrant_login.py": "424464e7fc6c13e7c5c09d5dcaa649b3ee868e1953719d931175176d1bce8bb5",
+      "src/ole5_chat/knowledge/retriever.py": "aa06ff79922d7f19e786653fa66c19cf0d43b9e2e8645c50b705b2bdd2cf9748",
+      "src/ole5_chat/knowledge/search.py": "5c872276924253cb6f5f7ecd09ef81b316cb081b8538a8932b36d01ead81e5d1",
+      "src/ole5_chat/knowledge/stub.py": "4b1f84b33b5df1d546a0698414b2a22785d8ab4a66c7e9ef22d3796c7b0f692a",
+      "src/ole5_chat/knowledge/tool.py": "bd954a0d4b5299e6e118d49f70014e3548863a62148bfadb7f8e9fa86bf4b780",
+      "src/ole5_chat/llm.py": "645592dcfc3aee7f13f2250498d60bc0d52d38481bcb58518ba53c70347dc149",
+      "src/ole5_chat/main.py": "5bc81a2515a3609409d1626f9e5bb88e184abb83f378a45024a15ca6d325b77d",
+      "src/ole5_chat/products.py": "05a71deb461f782151078251d5e17283b2d8daf735e0a678a79dd57864a48766",
+      "src/ole5_chat/sessions.py": "7ff109420a338f8955897ed97092391e81c4e619ce6f1bc37d6007e4b05ec9c8",
+      "src/ole5_chat/sheets.py": "2fe403d29425ba6eb59d30d594d08a7014c7af048d067e5a7a80dc5d6aa35099",
+      "src/ole5_chat/support_core/__init__.py": "52d710875b17494c4bfd55badb108535ca1eca83f4013338e2232ea0f8f6e71a",
+      "src/ole5_chat/support_core/classify.py": "42ea987f574911f0f451891937f2598b3f96bf87bb9744ee7164715127a511e7",
+      "src/ole5_chat/support_core/contracts.py": "8ff6d68efc368afe705bc23fc5f914f5f06e214c0d6371a7c3b6edc88f28e05b",
+      "src/ole5_chat/support_core/detail_display.py": "dcbb5a9be2ac86be7482a54a35efa23621185f6e847a4a1557940dcc202b563b",
+      "src/ole5_chat/support_core/prompt.py": "2af03712039cdb77637e126fcea29c7ca9b7b28d0a0e5a4894f7e8a2ed306043",
+      "src/ole5_chat/support_core/state.py": "7f90d26c6b4b2d19160cc941630db2f2918c18256102ed60494df7a01acf0617",
+      "src/ole5_chat/support_core/validate.py": "271896c2232b61f8acecab59ca6252ce8e27bc23516ca99955ea9d42f625b49b",
+      "src/ole5_chat/tickets/__init__.py": "7ce9621abd8be9e91eb3aa2b6d3b5fb0fdcd64ca8dfde416424c1f8a325fdd0c",
+      "src/ole5_chat/tickets/client.py": "101a45ee3219f262bef78c71e54088f448509d4933406537797476fd9e95a408",
+      "src/ole5_chat/tickets/mock.py": "f0a263cb76a4c3ce4dc10eff8f43400f541ebbbae1f55f084be083d829b3ace4",
+      "src/ole5_chat/tickets/status.py": "bd158a42949f7d421bc56b9d3b0d3ac4a8175938fb72da1141f11fa2c6f6cc32",
+      "src/ole5_chat/tickets/submit.py": "059180ae69e8dd93335f6eed3511d47e6833adbb8ca6505a436ee3887d6b4e3b",
+      "src/ole5_chat/values.py": "9484f217204d2e78af9099e0e3be4bfaef0f82ad3b7ec27cfabf5a0111ccc3c4"
+    }
+  },
+  "cases": [
+    {
+      "suite": "bilingual_conversations",
+      "id": "en-second-issue",
+      "category": null,
+      "input": {
+        "product": "OLE5",
+        "turns": [
+          "The Ole5 mobile app cannot open attachments.",
+          "Yes.",
+          "Also, archive search is very slow.",
+          "iPhone",
+          "[submit]",
+          "No thanks, leave the archive issue."
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "language": "en",
+            "stage": "offer"
+          },
+          {
+            "language": "en",
+            "stage": "detail_requested"
+          },
+          {
+            "language": "en",
+            "stage": [
+              "queued",
+              "detail_requested"
+            ]
+          },
+          {
+            "language": "en",
+            "stage": "summary_shown"
+          },
+          {
+            "language": "en",
+            "stage": "submitted"
+          },
+          {
+            "language": "en",
+            "stage": "preparation_stopped"
+          }
+        ]
+      },
+      "model": "openai/gpt-oss-120b",
+      "failures": [],
+      "result": {
+        "greeting": "هلا بك، أنا مساعد دعم Ole5. أجاوبك عن النظام وأساعدك في رفع تذاكر الدعم ومتابعتها. وش تحتاج؟",
+        "turns": [
+          {
+            "turn_ms": 14752,
+            "search_ms": 1,
+            "answer": "I see the Ole5 mobile app can’t open attachments. Would you like me to open a ticket for this issue?",
+            "nodes": [
+              "router",
+              "search",
+              "router",
+              "ticket_operator",
+              "router",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "offer",
+            "intent": "question",
+            "explicit_ticket_request": false,
+            "search_outcome": "no_answer",
+            "search_queries": [
+              "The Ole5 mobile app cannot open attachments."
+            ],
+            "operator_action": "offer",
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [],
+            "evidence": "",
+            "chunks": [],
+            "pending": "offer",
+            "queued": 0,
+            "created": 0,
+            "active_issue": {
+              "id": "issue-1",
+              "description": "The Ole5 mobile app cannot open attachments",
+              "source": "no_answer",
+              "urgent": false,
+              "messages_from": 0
+            },
+            "draft": null,
+            "tickets": [],
+            "customer": "The Ole5 mobile app cannot open attachments.",
+            "language": "en"
+          },
+          {
+            "turn_ms": 25226,
+            "search_ms": null,
+            "answer": "Got it, the Ole5 mobile app can’t open attachments. Could you tell me your phone’s operating system? That helps the team reproduce the issue.",
+            "nodes": [
+              "router",
+              "ticket_operator",
+              "router",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "detail_requested",
+            "intent": "pending_response",
+            "explicit_ticket_request": true,
+            "search_outcome": null,
+            "search_queries": [],
+            "operator_action": "request_detail",
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [],
+            "evidence": "",
+            "chunks": [],
+            "pending": "detail",
+            "queued": 0,
+            "created": 0,
+            "active_issue": {
+              "id": "issue-1",
+              "description": "The Ole5 mobile app cannot open attachments",
+              "source": "no_answer",
+              "urgent": false,
+              "messages_from": 0
+            },
+            "draft": {
+              "product": "Ole5",
+              "queue": "Ole5 Technical",
+              "type": "Mobile App Issue",
+              "subtype": "Software malfunction",
+              "reason": "Mobile app issue - attachments cannot be opened",
+              "priority": "Medium",
+              "urgent": false,
+              "urgent_reason": null,
+              "title": "Ole5 mobile app cannot open attachments",
+              "summary": "The Ole5 mobile app fails to open attachment files.",
+              "title_customer": "Ole5 mobile app cannot open attachments",
+              "summary_customer": "The Ole5 mobile app fails to open attachment files.",
+              "collected": {},
+              "missing": [
+                "phone os"
+              ],
+              "unknown": [],
+              "required": {
+                "phone os": null
+              },
+              "required_customer": {},
+              "collected_customer": {},
+              "unknown_customer": [],
+              "classified": true,
+              "rounds": 0,
+              "confidence": "high",
+              "queue_reason": "Issue is with mobile app functionality, requires technical team"
+            },
+            "tickets": [],
+            "customer": "Yes.",
+            "language": "en"
+          },
+          {
+            "turn_ms": 12045,
+            "search_ms": 1,
+            "answer": "I’ve noted the archive search is slow. Could you tell me your phone’s operating system? That helps the team reproduce the attachment issue.",
+            "nodes": [
+              "router",
+              "search",
+              "router",
+              "ticket_operator",
+              "router",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "detail_requested",
+            "intent": "question",
+            "explicit_ticket_request": false,
+            "search_outcome": "no_answer",
+            "search_queries": [
+              "Also, archive search is very slow."
+            ],
+            "operator_action": "request_detail",
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [],
+            "evidence": "",
+            "chunks": [],
+            "pending": "detail",
+            "queued": 1,
+            "created": 0,
+            "active_issue": {
+              "id": "issue-1",
+              "description": "The Ole5 mobile app cannot open attachments",
+              "source": "no_answer",
+              "urgent": false,
+              "messages_from": 0
+            },
+            "draft": {
+              "product": "Ole5",
+              "queue": "Ole5 Technical",
+              "type": "Mobile App Issue",
+              "subtype": "Software malfunction",
+              "reason": "Mobile app issue - attachments cannot be opened",
+              "priority": "Medium",
+              "urgent": false,
+              "urgent_reason": null,
+              "title": "Ole5 mobile app cannot open attachments",
+              "summary": "The Ole5 mobile app fails to open attachment files.",
+              "title_customer": "Ole5 mobile app cannot open attachments",
+              "summary_customer": "The Ole5 mobile app fails to open attachment files.",
+              "collected": {},
+              "missing": [
+                "phone os"
+              ],
+              "unknown": [],
+              "required": {
+                "phone os": null
+              },
+              "required_customer": {},
+              "collected_customer": {},
+              "unknown_customer": [],
+              "classified": true,
+              "rounds": 0,
+              "confidence": "high",
+              "queue_reason": "Issue is with mobile app functionality, requires technical team"
+            },
+            "tickets": [],
+            "customer": "Also, archive search is very slow.",
+            "language": "en"
+          },
+          {
+            "turn_ms": 16079,
+            "search_ms": null,
+            "answer": "Got your iPhone info. The ticket for the mobile app attachment issue is ready (medium priority). Shall I submit it?",
+            "nodes": [
+              "router",
+              "ticket_operator",
+              "router",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "summary_shown",
+            "intent": "pending_response",
+            "explicit_ticket_request": false,
+            "search_outcome": null,
+            "search_queries": [],
+            "operator_action": "show_summary",
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [],
+            "evidence": "",
+            "chunks": [],
+            "pending": "summary",
+            "queued": 1,
+            "created": 0,
+            "active_issue": {
+              "id": "issue-1",
+              "description": "The Ole5 mobile app cannot open attachments",
+              "source": "no_answer",
+              "urgent": false,
+              "messages_from": 0
+            },
+            "draft": {
+              "product": "Ole5",
+              "queue": "Ole5 Technical",
+              "type": "Mobile App Issue",
+              "subtype": "Software malfunction",
+              "reason": "Mobile app issue - attachments cannot be opened",
+              "priority": "Medium",
+              "urgent": false,
+              "urgent_reason": null,
+              "title": "Ole5 mobile app cannot open attachments",
+              "summary": "The Ole5 mobile app fails to open attachment files.",
+              "title_customer": "Ole5 mobile app cannot open attachments",
+              "summary_customer": "The Ole5 mobile app fails to open attachment files.",
+              "collected": {
+                "phone os": "iPhone"
+              },
+              "missing": [],
+              "unknown": [],
+              "required": {
+                "phone os": "iPhone"
+              },
+              "required_customer": {
+                "phone os": "iPhone"
+              },
+              "collected_customer": {
+                "phone os": "iPhone"
+              },
+              "unknown_customer": [],
+              "classified": true,
+              "rounds": 0,
+              "confidence": "high",
+              "queue_reason": "Issue is with mobile app functionality, requires technical team"
+            },
+            "tickets": [],
+            "customer": "iPhone",
+            "language": "en"
+          },
+          {
+            "turn_ms": 19412,
+            "search_ms": null,
+            "answer": "Your ticket T-MOCK-20261118100126-0001 has been submitted. The support team will reply as soon as they can to your registered email address. Would you like me to open a ticket for the slow archive search?",
+            "nodes": [
+              "ticket_operator",
+              "router",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "submitted",
+            "intent": null,
+            "explicit_ticket_request": false,
+            "search_outcome": null,
+            "search_queries": [],
+            "operator_action": "submitted",
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [],
+            "evidence": "",
+            "chunks": [],
+            "pending": "offer",
+            "queued": 0,
+            "created": 1,
+            "active_issue": {
+              "id": "issue-2",
+              "description": "البحث في الأرشيف بطيء",
+              "source": "no_answer",
+              "urgent": false,
+              "messages_from": 5
+            },
+            "draft": null,
+            "tickets": [
+              {
+                "ticket_id": "47cdefa5-61b7-4104-af1d-c14954a4d230",
+                "ticket_number": "T-MOCK-20261118100126-0001",
+                "created_at": "2026-11-18T07:01:26+00:00",
+                "queue": "Ole5 Technical",
+                "type": "Mobile App Issue",
+                "subtype": "Software malfunction",
+                "priority": "Medium",
+                "title": "Ole5 mobile app cannot open attachments",
+                "summary": "The Ole5 mobile app fails to open attachment files.",
+                "title_customer": "Ole5 mobile app cannot open attachments",
+                "summary_customer": "The Ole5 mobile app fails to open attachment files.",
+                "collected": {
+                  "phone os": "iPhone"
+                },
+                "unknown": [],
+                "required": {
+                  "phone os": "iPhone"
+                },
+                "required_customer": {
+                  "phone os": "iPhone"
+                },
+                "collected_customer": {
+                  "phone os": "iPhone"
+                },
+                "unknown_customer": [],
+                "attachments": [],
+                "message_index": 9
+              }
+            ],
+            "customer": "[submit]",
+            "language": "en"
+          },
+          {
+            "turn_ms": 10844,
+            "search_ms": null,
+            "answer": "I stopped preparing the ticket for the slow archive search and didn’t send anything.",
+            "nodes": [
+              "router",
+              "ticket_operator",
+              "router",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "preparation_stopped",
+            "intent": "pending_response",
+            "explicit_ticket_request": false,
+            "search_outcome": null,
+            "search_queries": [],
+            "operator_action": "declined",
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [],
+            "evidence": "",
+            "chunks": [],
+            "pending": null,
+            "queued": 0,
+            "created": 1,
+            "active_issue": null,
+            "draft": null,
+            "tickets": [
+              {
+                "ticket_id": "47cdefa5-61b7-4104-af1d-c14954a4d230",
+                "ticket_number": "T-MOCK-20261118100126-0001",
+                "created_at": "2026-11-18T07:01:26+00:00",
+                "queue": "Ole5 Technical",
+                "type": "Mobile App Issue",
+                "subtype": "Software malfunction",
+                "priority": "Medium",
+                "title": "Ole5 mobile app cannot open attachments",
+                "summary": "The Ole5 mobile app fails to open attachment files.",
+                "title_customer": "Ole5 mobile app cannot open attachments",
+                "summary_customer": "The Ole5 mobile app fails to open attachment files.",
+                "collected": {
+                  "phone os": "iPhone"
+                },
+                "unknown": [],
+                "required": {
+                  "phone os": "iPhone"
+                },
+                "required_customer": {
+                  "phone os": "iPhone"
+                },
+                "collected_customer": {
+                  "phone os": "iPhone"
+                },
+                "unknown_customer": [],
+                "attachments": [],
+                "message_index": 9
+              }
+            ],
+            "customer": "No thanks, leave the archive issue.",
+            "language": "en"
+          }
+        ]
+      },
+      "passed": true,
+      "seconds": 99.65
+    }
+  ]
+}

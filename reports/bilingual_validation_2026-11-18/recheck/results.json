@@ -1,0 +1,2178 @@
+{
+  "metadata": {
+    "model": "openai/gpt-oss-120b",
+    "endpoint": "https://api.me-central-1.groqcloud.com",
+    "temperature": 0.1,
+    "kb": "fixed/stub",
+    "tickets": "mock"
+  },
+  "cases": [
+    {
+      "suite": "bilingual_conversations",
+      "id": "ar-simplification",
+      "category": null,
+      "input": {
+        "product": "OLE5",
+        "turns": [
+          "كيف انشئ علامة مائية في النظام",
+          "اشرحها لي خطوة خطوة بدون تفاصيل زيادة"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "language": "ar",
+            "stage": "answered"
+          },
+          {
+            "language": "ar",
+            "stage": "other"
+          }
+        ]
+      },
+      "model": "openai/gpt-oss-120b",
+      "failures": [],
+      "result": {
+        "greeting": "هلا بك، أنا مساعد دعم Ole5. أجاوبك عن النظام وأساعدك في رفع تذاكر الدعم ومتابعتها. وش تحتاج؟",
+        "turns": [
+          {
+            "turn_ms": 9940,
+            "search_ms": null,
+            "answer": "ادخل إعدادات النظام، انزل لأسفل الصفحة، اضغط على «العلامة المائية»، ارفع الشعار اللي تبي تستخدمه، ثم احفظ.",
+            "nodes": [
+              "router",
+              "search",
+              "router",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "answered",
+            "intent": "question",
+            "explicit_ticket_request": false,
+            "search_outcome": "answered",
+            "search_queries": [
+              "كيف انشئ علامة مائية في النظام"
+            ],
+            "operator_action": null,
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [
+              "نظام OLE5 — حلول المشكلات الشائعة"
+            ],
+            "evidence": "الطباعة والعلامة المائية\n- **نوافذ الطباعة لا تفتح** : المتصفح يحجب النوافذ المنبثقة؛ يُسمح بها في إعدادات المتصفح.\n- **طباعة صفحة فارغة إضافية** : تحديد نطاق الصفحات في إعدادات الطباعة ليكون الصفحة الأولى فقط.\n- **المحتوى يُطبع معكوساً** : مراجعة إعدادات اتجاه الطابعة في خصائصها.\n- **الطباعة بدون علامة مائية** : تُدار من إعدادات النظام ← قسم النقاط الأمنية، حيث يمكن إضافة استثناء للمستخدمين المصرَّح لهم.\n- **العلامة المائية تغطي النص عند عرض المرفقات** : يُستخدم شعار بشفافية أعلى، ويُتحقق من أن صورة الشعار بخلفية شفافة.\n- إضافة العلامة المائية: إعدادات النظام ← أسفل الصفحة ← العلامة المائية ← رفع الشعار ← حفظ.",
+            "chunks": [
+              {
+                "document": "نظام OLE5 — حلول المشكلات الشائعة",
+                "chunk": "chunk_018",
+                "relation": "DIRECT"
+              }
+            ],
+            "pending": null,
+            "queued": 0,
+            "created": 0,
+            "active_issue": null,
+            "draft": null,
+            "tickets": [],
+            "customer": "كيف انشئ علامة مائية في النظام",
+            "language": "ar"
+          },
+          {
+            "turn_ms": 18093,
+            "search_ms": null,
+            "answer": "1. افتح إعدادات النظام.  \n2. انزل لأسفل الصفحة.  \n3. اضغط على العلامة المائية.  \n4. ارفع الشعار اللي تبي تستخدمه.  \n5. احفظ.",
+            "nodes": [
+              "router",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "other",
+            "intent": "other",
+            "explicit_ticket_request": false,
+            "search_outcome": null,
+            "search_queries": [],
+            "operator_action": null,
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [],
+            "evidence": "",
+            "chunks": [],
+            "pending": null,
+            "queued": 0,
+            "created": 0,
+            "active_issue": null,
+            "draft": null,
+            "tickets": [],
+            "customer": "اشرحها لي خطوة خطوة بدون تفاصيل زيادة",
+            "language": "ar"
+          }
+        ]
+      },
+      "passed": true,
+      "seconds": 28.08
+    },
+    {
+      "suite": "bilingual_conversations",
+      "id": "en-mobile-submit",
+      "category": null,
+      "input": {
+        "product": "OLE5",
+        "turns": [
+          "The Ole5 mobile app closes every time I open attachments.",
+          "Yes, open a ticket.",
+          "Why do you need that?",
+          "Android 14",
+          "[submit]",
+          "Thanks, that is all."
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "language": "en",
+            "stage": "offer"
+          },
+          {
+            "language": "en",
+            "stage": "detail_requested"
+          },
+          {
+            "language": "en",
+            "stage": "other"
+          },
+          {
+            "language": "en",
+            "stage": "summary_shown"
+          },
+          {
+            "language": "en",
+            "stage": "submitted"
+          },
+          {
+            "language": "en",
+            "stage": "other"
+          }
+        ]
+      },
+      "model": "openai/gpt-oss-120b",
+      "failures": [],
+      "result": {
+        "greeting": "هلا بك، أنا مساعد دعم Ole5. أجاوبك عن النظام وأساعدك في رفع تذاكر الدعم ومتابعتها. وش تحتاج؟",
+        "turns": [
+          {
+            "turn_ms": 15974,
+            "search_ms": 1,
+            "answer": "The Ole5 mobile app closing whenever you open attachments sounds serious. Would you like me to open a ticket with the technical support team about this?",
+            "nodes": [
+              "router",
+              "search",
+              "router",
+              "ticket_operator",
+              "router",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "offer",
+            "intent": "question",
+            "explicit_ticket_request": false,
+            "search_outcome": "no_answer",
+            "search_queries": [
+              "The Ole5 mobile app closes every time I open attachments."
+            ],
+            "operator_action": "offer",
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [],
+            "evidence": "",
+            "chunks": [],
+            "pending": "offer",
+            "queued": 0,
+            "created": 0,
+            "active_issue": {
+              "id": "issue-1",
+              "description": "The Ole5 mobile app closes every time I open attachments",
+              "source": "no_answer",
+              "urgent": false,
+              "messages_from": 0
+            },
+            "draft": null,
+            "tickets": [],
+            "customer": "The Ole5 mobile app closes every time I open attachments.",
+            "language": "en"
+          },
+          {
+            "turn_ms": 19704,
+            "search_ms": null,
+            "answer": "Sure, to prepare the ticket about the app closing when you open attachments, could you tell me your phone’s operating system? This helps the team reproduce the crash.",
+            "nodes": [
+              "router",
+              "ticket_operator",
+              "router",
+              "respond",
+              "validate",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "detail_requested",
+            "intent": "pending_response",
+            "explicit_ticket_request": true,
+            "search_outcome": null,
+            "search_queries": [],
+            "operator_action": "request_detail",
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [],
+            "evidence": "",
+            "chunks": [],
+            "pending": "detail",
+            "queued": 0,
+            "created": 0,
+            "active_issue": {
+              "id": "issue-1",
+              "description": "The Ole5 mobile app closes every time I open attachments",
+              "source": "no_answer",
+              "urgent": false,
+              "messages_from": 0
+            },
+            "draft": {
+              "product": "Ole5",
+              "queue": "Ole5 Technical",
+              "type": "Mobile App Issue",
+              "subtype": "Application crash",
+              "reason": "Bug - App crashes when opening attachments",
+              "priority": "High",
+              "urgent": false,
+              "urgent_reason": null,
+              "title": "Mobile app crashes when opening attachments",
+              "summary": "The Ole5 mobile app closes every time an attachment is opened.",
+              "title_customer": "Mobile app crashes when opening attachments",
+              "summary_customer": "The Ole5 mobile app closes every time an attachment is opened.",
+              "collected": {},
+              "missing": [
+                "phone os"
+              ],
+              "unknown": [],
+              "required": {
+                "phone os": null
+              },
+              "required_customer": {},
+              "collected_customer": {},
+              "unknown_customer": [],
+              "classified": true,
+              "rounds": 0,
+              "confidence": "medium",
+              "queue_reason": "App crashes when opening attachments, a mobile app bug"
+            },
+            "tickets": [],
+            "customer": "Yes, open a ticket.",
+            "language": "en"
+          },
+          {
+            "turn_ms": 5610,
+            "search_ms": null,
+            "answer": "Knowing the phone’s operating system lets the support team reproduce the crash in the same environment, which speeds up finding a fix. Could you tell me which OS your phone is running?",
+            "nodes": [
+              "router",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "other",
+            "intent": "other",
+            "explicit_ticket_request": false,
+            "search_outcome": null,
+            "search_queries": [],
+            "operator_action": null,
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [],
+            "evidence": "",
+            "chunks": [],
+            "pending": "detail",
+            "queued": 0,
+            "created": 0,
+            "active_issue": {
+              "id": "issue-1",
+              "description": "The Ole5 mobile app closes every time I open attachments",
+              "source": "no_answer",
+              "urgent": false,
+              "messages_from": 0
+            },
+            "draft": {
+              "product": "Ole5",
+              "queue": "Ole5 Technical",
+              "type": "Mobile App Issue",
+              "subtype": "Application crash",
+              "reason": "Bug - App crashes when opening attachments",
+              "priority": "High",
+              "urgent": false,
+              "urgent_reason": null,
+              "title": "Mobile app crashes when opening attachments",
+              "summary": "The Ole5 mobile app closes every time an attachment is opened.",
+              "title_customer": "Mobile app crashes when opening attachments",
+              "summary_customer": "The Ole5 mobile app closes every time an attachment is opened.",
+              "collected": {},
+              "missing": [
+                "phone os"
+              ],
+              "unknown": [],
+              "required": {
+                "phone os": null
+              },
+              "required_customer": {},
+              "collected_customer": {},
+              "unknown_customer": [],
+              "classified": true,
+              "rounds": 0,
+              "confidence": "medium",
+              "queue_reason": "App crashes when opening attachments, a mobile app bug"
+            },
+            "tickets": [],
+            "customer": "Why do you need that?",
+            "language": "en"
+          },
+          {
+            "turn_ms": 23437,
+            "search_ms": null,
+            "answer": "Got Android 14. The ticket’s ready—shall I send it?",
+            "nodes": [
+              "router",
+              "ticket_operator",
+              "router",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "summary_shown",
+            "intent": "pending_response",
+            "explicit_ticket_request": false,
+            "search_outcome": null,
+            "search_queries": [],
+            "operator_action": "show_summary",
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [],
+            "evidence": "",
+            "chunks": [],
+            "pending": "summary",
+            "queued": 0,
+            "created": 0,
+            "active_issue": {
+              "id": "issue-1",
+              "description": "The Ole5 mobile app closes every time I open attachments",
+              "source": "no_answer",
+              "urgent": false,
+              "messages_from": 0
+            },
+            "draft": {
+              "product": "Ole5",
+              "queue": "Ole5 Technical",
+              "type": "Mobile App Issue",
+              "subtype": "Application crash",
+              "reason": "Bug - App crashes when opening attachments",
+              "priority": "High",
+              "urgent": false,
+              "urgent_reason": null,
+              "title": "Mobile app crashes when opening attachments",
+              "summary": "The Ole5 mobile app closes every time an attachment is opened.",
+              "title_customer": "Mobile app crashes when opening attachments",
+              "summary_customer": "The Ole5 mobile app closes every time an attachment is opened.",
+              "collected": {
+                "phone os": "Android 14"
+              },
+              "missing": [],
+              "unknown": [],
+              "required": {
+                "phone os": "Android 14"
+              },
+              "required_customer": {
+                "phone os": "Android 14"
+              },
+              "collected_customer": {
+                "phone os": "Android 14"
+              },
+              "unknown_customer": [],
+              "classified": true,
+              "rounds": 0,
+              "confidence": "high",
+              "queue_reason": "App crashes when opening attachments, a mobile app bug"
+            },
+            "tickets": [],
+            "customer": "Android 14",
+            "language": "en"
+          },
+          {
+            "turn_ms": 6777,
+            "search_ms": null,
+            "answer": "I’ve submitted the ticket T-MOCK-20261118095205-0001. Keep this number for any follow‑up, and the support team will reply through your registered email address.",
+            "nodes": [
+              "ticket_operator",
+              "router",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "submitted",
+            "intent": null,
+            "explicit_ticket_request": false,
+            "search_outcome": null,
+            "search_queries": [],
+            "operator_action": "submitted",
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [],
+            "evidence": "",
+            "chunks": [],
+            "pending": null,
+            "queued": 0,
+            "created": 1,
+            "active_issue": null,
+            "draft": null,
+            "tickets": [
+              {
+                "ticket_id": "e06447c7-8a6e-421a-ae4b-b213eedd55a7",
+                "ticket_number": "T-MOCK-20261118095205-0001",
+                "created_at": "2026-11-18T06:52:05+00:00",
+                "queue": "Ole5 Technical",
+                "type": "Mobile App Issue",
+                "subtype": "Application crash",
+                "priority": "High",
+                "title": "Mobile app crashes when opening attachments",
+                "summary": "The Ole5 mobile app closes every time an attachment is opened.",
+                "title_customer": "Mobile app crashes when opening attachments",
+                "summary_customer": "The Ole5 mobile app closes every time an attachment is opened.",
+                "collected": {
+                  "phone os": "Android 14"
+                },
+                "unknown": [],
+                "required": {
+                  "phone os": "Android 14"
+                },
+                "required_customer": {
+                  "phone os": "Android 14"
+                },
+                "collected_customer": {
+                  "phone os": "Android 14"
+                },
+                "unknown_customer": [],
+                "attachments": [],
+                "message_index": 9
+              }
+            ],
+            "customer": "[submit]",
+            "language": "en"
+          },
+          {
+            "turn_ms": 8748,
+            "search_ms": null,
+            "answer": "You're welcome. If anything else comes up, just let me know.",
+            "nodes": [
+              "router",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "other",
+            "intent": "other",
+            "explicit_ticket_request": false,
+            "search_outcome": null,
+            "search_queries": [],
+            "operator_action": null,
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [],
+            "evidence": "",
+            "chunks": [],
+            "pending": null,
+            "queued": 0,
+            "created": 1,
+            "active_issue": null,
+            "draft": null,
+            "tickets": [
+              {
+                "ticket_id": "e06447c7-8a6e-421a-ae4b-b213eedd55a7",
+                "ticket_number": "T-MOCK-20261118095205-0001",
+                "created_at": "2026-11-18T06:52:05+00:00",
+                "queue": "Ole5 Technical",
+                "type": "Mobile App Issue",
+                "subtype": "Application crash",
+                "priority": "High",
+                "title": "Mobile app crashes when opening attachments",
+                "summary": "The Ole5 mobile app closes every time an attachment is opened.",
+                "title_customer": "Mobile app crashes when opening attachments",
+                "summary_customer": "The Ole5 mobile app closes every time an attachment is opened.",
+                "collected": {
+                  "phone os": "Android 14"
+                },
+                "unknown": [],
+                "required": {
+                  "phone os": "Android 14"
+                },
+                "required_customer": {
+                  "phone os": "Android 14"
+                },
+                "collected_customer": {
+                  "phone os": "Android 14"
+                },
+                "unknown_customer": [],
+                "attachments": [],
+                "message_index": 9
+              }
+            ],
+            "customer": "Thanks, that is all.",
+            "language": "en"
+          }
+        ]
+      },
+      "passed": true,
+      "seconds": 80.41
+    },
+    {
+      "suite": "bilingual_conversations",
+      "id": "en-second-issue",
+      "category": null,
+      "input": {
+        "product": "OLE5",
+        "turns": [
+          "The Ole5 mobile app cannot open attachments.",
+          "Yes.",
+          "Also, archive search is very slow.",
+          "iPhone",
+          "[submit]",
+          "No thanks, leave the archive issue."
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "language": "en",
+            "stage": "offer"
+          },
+          {
+            "language": "en",
+            "stage": "detail_requested"
+          },
+          {
+            "language": "en",
+            "stage": [
+              "queued",
+              "detail_requested"
+            ]
+          },
+          {
+            "language": "en",
+            "stage": "summary_shown"
+          },
+          {
+            "language": "en",
+            "stage": "submitted"
+          },
+          {
+            "language": "en",
+            "stage": "preparation_stopped"
+          }
+        ]
+      },
+      "model": "openai/gpt-oss-120b",
+      "failures": [
+        "turn 2: stage: expected ['detail_requested'], got 'summary_shown'",
+        "turn 5: stage: expected ['submitted'], got 'offer'",
+        "turn 6: stage: expected ['preparation_stopped'], got 'already_submitted'"
+      ],
+      "result": {
+        "greeting": "هلا بك، أنا مساعد دعم Ole5. أجاوبك عن النظام وأساعدك في رفع تذاكر الدعم ومتابعتها. وش تحتاج؟",
+        "turns": [
+          {
+            "turn_ms": 12846,
+            "search_ms": 1,
+            "answer": "I see the Ole5 mobile app can’t open attachments. Would you like me to open a ticket for this?",
+            "nodes": [
+              "router",
+              "search",
+              "router",
+              "ticket_operator",
+              "router",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "offer",
+            "intent": "question",
+            "explicit_ticket_request": false,
+            "search_outcome": "no_answer",
+            "search_queries": [
+              "The Ole5 mobile app cannot open attachments."
+            ],
+            "operator_action": "offer",
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [],
+            "evidence": "",
+            "chunks": [],
+            "pending": "offer",
+            "queued": 0,
+            "created": 0,
+            "active_issue": {
+              "id": "issue-1",
+              "description": "Ole5 mobile app cannot open attachments",
+              "source": "no_answer",
+              "urgent": false,
+              "messages_from": 0
+            },
+            "draft": null,
+            "tickets": [],
+            "customer": "The Ole5 mobile app cannot open attachments.",
+            "language": "en"
+          },
+          {
+            "turn_ms": 21453,
+            "search_ms": null,
+            "answer": "Got it, the mobile app can’t open attachments. I’ve prepared a ticket with that info—should I send it?",
+            "nodes": [
+              "router",
+              "ticket_operator",
+              "router",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "summary_shown",
+            "intent": "pending_response",
+            "explicit_ticket_request": true,
+            "search_outcome": null,
+            "search_queries": [],
+            "operator_action": "show_summary",
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [],
+            "evidence": "",
+            "chunks": [],
+            "pending": "summary",
+            "queued": 0,
+            "created": 0,
+            "active_issue": {
+              "id": "issue-1",
+              "description": "Ole5 mobile app cannot open attachments",
+              "source": "no_answer",
+              "urgent": false,
+              "messages_from": 0
+            },
+            "draft": {
+              "product": "Ole5",
+              "queue": "Ole5 Technical",
+              "type": "Bug",
+              "subtype": "Software malfunction",
+              "reason": "Bug - Attachments cannot be opened in the Ole5 mobile app",
+              "priority": "Medium",
+              "urgent": false,
+              "urgent_reason": null,
+              "title": "Mobile app cannot open attachments",
+              "summary": "The Ole5 mobile app fails to open attachment files.",
+              "title_customer": "Mobile app cannot open attachments",
+              "summary_customer": "The Ole5 mobile app fails to open attachment files.",
+              "collected": {},
+              "missing": [],
+              "unknown": [],
+              "required": {},
+              "required_customer": {},
+              "collected_customer": {},
+              "unknown_customer": [],
+              "classified": true,
+              "rounds": 0,
+              "confidence": "high",
+              "queue_reason": "Issue is a mobile app malfunction, handled by Technical team"
+            },
+            "tickets": [],
+            "customer": "Yes.",
+            "language": "en"
+          },
+          {
+            "turn_ms": 21745,
+            "search_ms": 1,
+            "answer": "I’ve noted the archive search is slow and will handle that after we finish the attachment issue. For the mobile app not opening attachments, I’ve prepared a ticket—should I submit it?",
+            "nodes": [
+              "router",
+              "search",
+              "router",
+              "ticket_operator",
+              "router",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "queued",
+            "intent": "question",
+            "explicit_ticket_request": false,
+            "search_outcome": "no_answer",
+            "search_queries": [
+              "Also, archive search is very slow."
+            ],
+            "operator_action": "queued",
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [],
+            "evidence": "",
+            "chunks": [],
+            "pending": "summary",
+            "queued": 1,
+            "created": 0,
+            "active_issue": {
+              "id": "issue-1",
+              "description": "Ole5 mobile app cannot open attachments",
+              "source": "no_answer",
+              "urgent": false,
+              "messages_from": 0
+            },
+            "draft": {
+              "product": "Ole5",
+              "queue": "Ole5 Technical",
+              "type": "Bug",
+              "subtype": "Software malfunction",
+              "reason": "Bug - Attachments cannot be opened in the Ole5 mobile app",
+              "priority": "Medium",
+              "urgent": false,
+              "urgent_reason": null,
+              "title": "Mobile app cannot open attachments",
+              "summary": "The Ole5 mobile app fails to open attachment files.",
+              "title_customer": "Mobile app cannot open attachments",
+              "summary_customer": "The Ole5 mobile app fails to open attachment files.",
+              "collected": {},
+              "missing": [],
+              "unknown": [],
+              "required": {},
+              "required_customer": {},
+              "collected_customer": {},
+              "unknown_customer": [],
+              "classified": true,
+              "rounds": 0,
+              "confidence": "high",
+              "queue_reason": "Issue is a mobile app malfunction, handled by Technical team"
+            },
+            "tickets": [],
+            "customer": "Also, archive search is very slow.",
+            "language": "en"
+          },
+          {
+            "turn_ms": 21336,
+            "search_ms": null,
+            "answer": "Got it, iPhone. I’ve updated the ticket with that detail. The ticket’s ready—should I submit it?",
+            "nodes": [
+              "router",
+              "ticket_operator",
+              "router",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "summary_shown",
+            "intent": "pending_response",
+            "explicit_ticket_request": false,
+            "search_outcome": null,
+            "search_queries": [],
+            "operator_action": "show_summary",
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [],
+            "evidence": "",
+            "chunks": [],
+            "pending": "summary",
+            "queued": 1,
+            "created": 0,
+            "active_issue": {
+              "id": "issue-1",
+              "description": "Ole5 mobile app cannot open attachments",
+              "source": "no_answer",
+              "urgent": false,
+              "messages_from": 0
+            },
+            "draft": {
+              "product": "Ole5",
+              "queue": "Ole5 Technical",
+              "type": "Bug",
+              "subtype": "Software malfunction",
+              "reason": "Bug - Attachments cannot be opened in the Ole5 mobile app",
+              "priority": "Medium",
+              "urgent": false,
+              "urgent_reason": null,
+              "title": "Mobile app cannot open attachments",
+              "summary": "The Ole5 mobile app fails to open attachment files.",
+              "title_customer": "Mobile app cannot open attachments",
+              "summary_customer": "The Ole5 mobile app fails to open attachment files.",
+              "collected": {},
+              "missing": [],
+              "unknown": [],
+              "required": {},
+              "required_customer": {},
+              "collected_customer": {},
+              "unknown_customer": [],
+              "classified": true,
+              "rounds": 0,
+              "confidence": "high",
+              "queue_reason": "Issue is a mobile app malfunction, handled by Technical team"
+            },
+            "tickets": [],
+            "customer": "iPhone",
+            "language": "en"
+          },
+          {
+            "turn_ms": 19236,
+            "search_ms": null,
+            "answer": "I’ve noted the archive search is slow. Should I open a ticket for it?",
+            "nodes": [
+              "ticket_operator",
+              "router",
+              "respond",
+              "validate",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "offer",
+            "intent": null,
+            "explicit_ticket_request": false,
+            "search_outcome": null,
+            "search_queries": [],
+            "operator_action": "offer",
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [],
+            "evidence": "",
+            "chunks": [],
+            "pending": "offer",
+            "queued": 0,
+            "created": 1,
+            "active_issue": {
+              "id": "issue-2",
+              "description": "البحث في الأرشيف بطيء",
+              "source": "no_answer",
+              "urgent": false,
+              "messages_from": 5
+            },
+            "draft": null,
+            "tickets": [
+              {
+                "ticket_id": "7712d99f-f237-48b0-a5f3-3d2e28627774",
+                "ticket_number": "T-MOCK-20261118095338-0001",
+                "created_at": "2026-11-18T06:53:38+00:00",
+                "queue": "Ole5 Technical",
+                "type": "Bug",
+                "subtype": "Software malfunction",
+                "priority": "Medium",
+                "title": "Mobile app cannot open attachments",
+                "summary": "The Ole5 mobile app fails to open attachment files.",
+                "title_customer": "Mobile app cannot open attachments",
+                "summary_customer": "The Ole5 mobile app fails to open attachment files.",
+                "collected": {},
+                "unknown": [],
+                "required": {},
+                "required_customer": {},
+                "collected_customer": {},
+                "unknown_customer": [],
+                "attachments": [],
+                "message_index": 9
+              }
+            ],
+            "customer": "[submit]",
+            "language": "en"
+          },
+          {
+            "turn_ms": 24630,
+            "search_ms": null,
+            "answer": "Got it—the mobile app can’t open attachments, and that problem is already in ticket T-MOCK-20261118095338-0001. Keep that number handy; the team’s reply will be sent to your registered email. Let me know if what you see now differs from what was reported in that ticket.",
+            "nodes": [
+              "router",
+              "ticket_operator",
+              "router",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "already_submitted",
+            "intent": "pending_response",
+            "explicit_ticket_request": false,
+            "search_outcome": null,
+            "search_queries": [],
+            "operator_action": "already_submitted",
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [],
+            "evidence": "",
+            "chunks": [],
+            "pending": null,
+            "queued": 0,
+            "created": 1,
+            "active_issue": null,
+            "draft": null,
+            "tickets": [
+              {
+                "ticket_id": "7712d99f-f237-48b0-a5f3-3d2e28627774",
+                "ticket_number": "T-MOCK-20261118095338-0001",
+                "created_at": "2026-11-18T06:53:38+00:00",
+                "queue": "Ole5 Technical",
+                "type": "Bug",
+                "subtype": "Software malfunction",
+                "priority": "Medium",
+                "title": "Mobile app cannot open attachments",
+                "summary": "The Ole5 mobile app fails to open attachment files.",
+                "title_customer": "Mobile app cannot open attachments",
+                "summary_customer": "The Ole5 mobile app fails to open attachment files.",
+                "collected": {},
+                "unknown": [],
+                "required": {},
+                "required_customer": {},
+                "collected_customer": {},
+                "unknown_customer": [],
+                "attachments": [],
+                "message_index": 9
+              }
+            ],
+            "customer": "No thanks, leave the archive issue.",
+            "language": "en"
+          }
+        ]
+      },
+      "passed": false,
+      "seconds": 121.39
+    },
+    {
+      "suite": "bilingual_conversations",
+      "id": "language-switch",
+      "category": null,
+      "input": {
+        "product": "OLE5",
+        "turns": [
+          "Hi",
+          "يعطيك العافية",
+          "What are your support hours?",
+          "مشكور"
+        ]
+      },
+      "expected": {
+        "turns": [
+          {
+            "language": "en",
+            "stage": "other"
+          },
+          {
+            "language": "ar",
+            "stage": "other"
+          },
+          {
+            "language": "en",
+            "stage": "other"
+          },
+          {
+            "language": "ar",
+            "stage": "other"
+          }
+        ]
+      },
+      "model": "openai/gpt-oss-120b",
+      "failures": [],
+      "result": {
+        "greeting": "هلا بك، أنا مساعد دعم Ole5. أجاوبك عن النظام وأساعدك في رفع تذاكر الدعم ومتابعتها. وش تحتاج؟",
+        "turns": [
+          {
+            "turn_ms": 6306,
+            "search_ms": null,
+            "answer": "Hello, how can I help you?",
+            "nodes": [
+              "router",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "other",
+            "intent": "other",
+            "explicit_ticket_request": false,
+            "search_outcome": null,
+            "search_queries": [],
+            "operator_action": null,
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [],
+            "evidence": "",
+            "chunks": [],
+            "pending": null,
+            "queued": 0,
+            "created": 0,
+            "active_issue": null,
+            "draft": null,
+            "tickets": [],
+            "customer": "Hi",
+            "language": "en"
+          },
+          {
+            "turn_ms": 6671,
+            "search_ms": null,
+            "answer": "الله يعافيك",
+            "nodes": [
+              "router",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "other",
+            "intent": "other",
+            "explicit_ticket_request": false,
+            "search_outcome": null,
+            "search_queries": [],
+            "operator_action": null,
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [],
+            "evidence": "",
+            "chunks": [],
+            "pending": null,
+            "queued": 0,
+            "created": 0,
+            "active_issue": null,
+            "draft": null,
+            "tickets": [],
+            "customer": "يعطيك العافية",
+            "language": "ar"
+          },
+          {
+            "turn_ms": 9598,
+            "search_ms": null,
+            "answer": "Our support hours are Sunday to Thursday, 09:00 – 18:00 Riyadh time.",
+            "nodes": [
+              "router",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "other",
+            "intent": "other",
+            "explicit_ticket_request": false,
+            "search_outcome": null,
+            "search_queries": [],
+            "operator_action": null,
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [],
+            "evidence": "",
+            "chunks": [],
+            "pending": null,
+            "queued": 0,
+            "created": 0,
+            "active_issue": null,
+            "draft": null,
+            "tickets": [],
+            "customer": "What are your support hours?",
+            "language": "en"
+          },
+          {
+            "turn_ms": 8755,
+            "search_ms": null,
+            "answer": "العفو",
+            "nodes": [
+              "router",
+              "respond",
+              "validate",
+              "finalize"
+            ],
+            "stage": "other",
+            "intent": "other",
+            "explicit_ticket_request": false,
+            "search_outcome": null,
+            "search_queries": [],
+            "operator_action": null,
+            "enquiry_tickets": [],
+            "validation": "pass",
+            "sources": [],
+            "evidence": "",
+            "chunks": [],
+            "pending": null,
+            "queued": 0,
+            "created": 0,
+            "active_issue": null,
+            "draft": null,
+            "tickets": [],
+            "customer": "مشكور",
+            "language": "ar"
+          }
+        ]
+      },
+      "passed": true,
+      "seconds": 31.42
+    },
+    {
+      "suite": "bilingual_voice",
+      "id": "ar-already_submitted",
+      "category": "already_submitted",
+      "input": {
+        "product": "OLE5",
+        "state": {
+          "language": "ar",
+          "intent": "other",
+          "messages": [
+            {
+              "role": "user",
+              "content": "نفس المشكلة للحين ما انحلت"
+            }
+          ],
+          "ticket_operator_result": {
+            "action": "already_submitted",
+            "issue_id": "issue-1",
+            "issue": "التطبيق يقفل عند فتح المرفقات",
+            "existing_ticket": "T-1001",
+            "existing_ticket_title": "التطبيق يقفل عند فتح المرفقات"
+          },
+          "created_tickets": [
+            {
+              "ticket_number": "T-1001",
+              "title_customer": "التطبيق يقفل عند فتح المرفقات",
+              "created_at": "2026-11-17"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "stage": "already_submitted",
+        "language": "ar",
+        "max_questions": 1,
+        "must_have": [
+          [
+            "T-1001"
+          ]
+        ]
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "المشكلة ما زالت موجودة، وهي نفسها اللي رفعت لك تذكرة عنها برقم T-1001 بخصوص إغلاق التطبيق عند فتح المرفقات. الرد يوصل لك على بريدك الإلكتروني المسجل. هل في شيء جديد أو مختلف عن اللي تم ذكره في التذكرة؟",
+        "language": "ar",
+        "stage": "already_submitted",
+        "validation": "pass",
+        "validation_reason": "Basic reply checks passed."
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 7.03
+    },
+    {
+      "suite": "bilingual_voice",
+      "id": "ar-submitted_cancellation",
+      "category": "submitted_cancellation",
+      "input": {
+        "product": "OLE5",
+        "state": {
+          "language": "ar",
+          "intent": "other",
+          "messages": [
+            {
+              "role": "user",
+              "content": "ألغ التذكرة المرفوعة T-1001"
+            }
+          ],
+          "created_tickets": [
+            {
+              "ticket_number": "T-1001",
+              "title_customer": "التطبيق يقفل عند فتح المرفقات"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "stage": "other",
+        "language": "ar",
+        "max_questions": 0,
+        "must_have": [
+          [
+            "ما أقدر",
+            "ما اقدر",
+            "لا أستطيع",
+            "ما تقدر"
+          ]
+        ]
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "ما أقدر ألغي التذكرة T-1001 من هالدردشة. التذكرة تم رفعها وفريق الدعم هو المسؤول عنها. إذا تحتاج تعديل أو إضافة تفاصيل، أقدر أساعدك.",
+        "language": "ar",
+        "stage": "other",
+        "validation": "pass",
+        "validation_reason": "Basic reply checks passed."
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 11.74
+    },
+    {
+      "suite": "bilingual_voice",
+      "id": "en-already_submitted",
+      "category": "already_submitted",
+      "input": {
+        "product": "OLE5",
+        "state": {
+          "language": "en",
+          "intent": "other",
+          "messages": [
+            {
+              "role": "user",
+              "content": "The same problem is still happening."
+            }
+          ],
+          "ticket_operator_result": {
+            "action": "already_submitted",
+            "issue_id": "issue-1",
+            "issue": "The app closes when opening attachments",
+            "existing_ticket": "T-1001",
+            "existing_ticket_title": "The app closes when opening attachments"
+          },
+          "created_tickets": [
+            {
+              "ticket_number": "T-1001",
+              "title_customer": "The app closes when opening attachments",
+              "created_at": "2026-11-17"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "stage": "already_submitted",
+        "language": "en",
+        "max_questions": 1,
+        "must_have": [
+          [
+            "T-1001"
+          ]
+        ]
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "You’re still seeing the app close when you open attachments. That problem is already recorded in ticket T-1001 (app closes when opening attachments). Keep that number for any follow‑up—the support team will reply to you through the email address you used. Is there anything different about what you’re seeing now?",
+        "language": "en",
+        "stage": "already_submitted",
+        "validation": "pass",
+        "validation_reason": "Basic reply checks passed."
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 5.84
+    },
+    {
+      "suite": "reg_respond",
+      "id": "first-detail",
+      "category": null,
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "زر الأرشفة لا يعمل"
+            },
+            {
+              "role": "assistant",
+              "content": "هل ترغب بفتح تذكرة؟"
+            },
+            {
+              "role": "user",
+              "content": "نعم"
+            }
+          ],
+          "language": "ar",
+          "intent": "pending_response",
+          "active_issue": {
+            "id": "issue-1",
+            "description": "زر الأرشفة لا يعمل"
+          },
+          "ticket_operator_result": {
+            "action": "request_detail",
+            "issue_id": "issue-1",
+            "issue": "زر الأرشفة لا يعمل",
+            "requested_detail": "page"
+          },
+          "pending_customer_response": {
+            "kind": "detail",
+            "issue_id": "issue-1",
+            "item": "page"
+          }
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "الصفحة"
+          ]
+        ],
+        "max_questions": 1,
+        "offer_allowed": true
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "عشان أجهز التذكرة، ممكن تذكر لي اسم الصفحة اللي كان فيها زر الأرشفة؟",
+        "language": "ar",
+        "stage": "detail_requested",
+        "validation": "pass",
+        "validation_reason": "Basic reply checks passed."
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 6.37
+    },
+    {
+      "suite": "reg_respond",
+      "id": "no-answer",
+      "category": null,
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "هل يدعم النظام الوضع الليلي؟"
+            }
+          ],
+          "language": "ar",
+          "intent": "question",
+          "search_outcome": "no_answer"
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "لم أجد",
+            "لم أعثر",
+            "راجعت",
+            "بحثت",
+            "تحققت",
+            "ما لقيت",
+            "ما عندي جواب",
+            "ما عندي إجابة"
+          ]
+        ],
+        "must_not": [
+          "لا يتوفر",
+          "لا تتوفر",
+          "لا توجد",
+          "لا يوجد"
+        ]
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "ما لقيت معلومات عن دعم الوضع الليلي في النظام.",
+        "language": "ar",
+        "stage": "no_answer",
+        "validation": "pass",
+        "validation_reason": "Basic reply checks passed."
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 6.17
+    },
+    {
+      "suite": "reg_respond",
+      "id": "offer",
+      "category": null,
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "زر الأرشفة لا يعمل"
+            }
+          ],
+          "language": "ar",
+          "intent": "question",
+          "search_outcome": "no_answer",
+          "active_issue": {
+            "id": "issue-1",
+            "description": "زر الأرشفة لا يعمل"
+          },
+          "ticket_operator_result": {
+            "action": "offer",
+            "issue_id": "issue-1",
+            "issue": "زر الأرشفة لا يعمل"
+          },
+          "pending_customer_response": {
+            "kind": "offer",
+            "issue_id": "issue-1",
+            "item": null
+          }
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "تذكرة"
+          ],
+          [
+            "الأرشفة",
+            "الارشفة"
+          ]
+        ],
+        "max_questions": 1,
+        "offer_allowed": true
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "زر الأرشفة ما يشتغل. ودك أرفع لك تذكرة للفريق الفني يشيكون عليها؟",
+        "language": "ar",
+        "stage": "offer",
+        "validation": "pass",
+        "validation_reason": "Basic reply checks passed."
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 25.32
+    },
+    {
+      "suite": "reg_respond",
+      "id": "offer-after-cancel",
+      "category": null,
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "اواجه مشكلة في زر الارشفة"
+            },
+            {
+              "role": "assistant",
+              "content": "هل ترغب بفتح تذكرة؟"
+            },
+            {
+              "role": "user",
+              "content": "لا الغها"
+            }
+          ],
+          "language": "ar",
+          "intent": "pending_response",
+          "active_issue": {
+            "id": "issue-2",
+            "description": "تنبيهات الواتساب لا تصل"
+          },
+          "pending_customer_response": {
+            "kind": "offer",
+            "issue_id": "issue-2",
+            "item": null
+          },
+          "ticket_operator_result": {
+            "action": "offer",
+            "issue_id": "issue-2",
+            "issue": "تنبيهات الواتساب لا تصل",
+            "cancelled_issue": "زر الأرشفة لا يعمل"
+          }
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "الأرشفة",
+            "الارشفة"
+          ],
+          [
+            "الواتساب",
+            "واتساب"
+          ]
+        ],
+        "max_questions": 1,
+        "offer_allowed": true
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "تم إلغاء طلب زر الأرشفة. تبي أفتح لك تذكرة بخصوص تنبيهات الواتساب ما توصل؟",
+        "language": "ar",
+        "stage": "offer",
+        "validation": "pass",
+        "validation_reason": "Basic reply checks passed."
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 6.34
+    },
+    {
+      "suite": "reg_respond",
+      "id": "reply-time",
+      "category": null,
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "متى يوصلني الرد؟"
+            }
+          ],
+          "language": "ar",
+          "intent": "other",
+          "created_tickets": [
+            {
+              "ticket_number": "T-1001",
+              "title_customer": "زر الأرشفة لا يعمل",
+              "created_at": "2026-11-06"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "أقرب",
+            "أسرع",
+            "يقدرون"
+          ],
+          [
+            "البريد",
+            "بريدك",
+            "الإيميل"
+          ]
+        ],
+        "must_not": [
+          "لا يوجد وقت",
+          "قناة الرد"
+        ]
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "الفريق راح يرد بأسرع وقت ممكن، والرد يوصل على بريدك الإلكتروني المسجل.",
+        "language": "ar",
+        "stage": "other",
+        "validation": "pass",
+        "validation_reason": "Basic reply checks passed."
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 9.22
+    },
+    {
+      "suite": "reg_respond",
+      "id": "search-failed",
+      "category": null,
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "هل يدعم النظام الوضع الليلي؟"
+            }
+          ],
+          "language": "ar",
+          "intent": "question",
+          "search_outcome": "failed"
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "أعد",
+            "إعادة",
+            "أرسل",
+            "مرة أخرى",
+            "تعيد",
+            "ترسل"
+          ]
+        ],
+        "must_not": [
+          "لا يتوفر",
+          "لا تتوفر",
+          "لا توجد",
+          "لا يوجد"
+        ]
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "ما قدرنا نلقى إجابة عن وضع الليل في النظام. ممكن تعيد إرسال سؤالك أو توضح أكثر؟",
+        "language": "ar",
+        "stage": "search_failed",
+        "validation": "pass",
+        "validation_reason": "Basic reply checks passed."
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 11.52
+    },
+    {
+      "suite": "reg_respond",
+      "id": "search-failed-pending",
+      "category": null,
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "هل يدعم النظام الوضع الليلي؟"
+            }
+          ],
+          "language": "ar",
+          "intent": "question",
+          "search_outcome": "failed",
+          "active_issue": {
+            "id": "issue-1",
+            "description": "زر الأرشفة لا يعمل"
+          },
+          "pending_customer_response": {
+            "kind": "offer",
+            "issue_id": "issue-1",
+            "item": null
+          }
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "أعد",
+            "إعادة",
+            "أرسل",
+            "مرة أخرى",
+            "تعيد",
+            "ترسل"
+          ],
+          [
+            "الأرشفة",
+            "الارشفة"
+          ]
+        ],
+        "offer_allowed": true,
+        "must_not": [
+          "لا يتوفر",
+          "لا تتوفر",
+          "لا توجد",
+          "لا يوجد"
+        ]
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "ما قدرت ألقى إجابة عن الوضع الليلي، ممكن تعيد رسالتك وتوضح إذا تبي أرفع لك تذكرة بخصوص زر الأرشفة لا يعمل؟",
+        "language": "ar",
+        "stage": "search_failed",
+        "validation": "pass",
+        "validation_reason": "Basic reply checks passed."
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 4.56
+    },
+    {
+      "suite": "reg_respond",
+      "id": "submitted",
+      "category": null,
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "نعم ارسلها"
+            }
+          ],
+          "language": "ar",
+          "intent": "pending_response",
+          "ticket_operator_result": {
+            "action": "submitted",
+            "issue_id": "issue-1",
+            "issue": "زر الأرشفة لا يعمل",
+            "ticket_result": {
+              "submission_requested": true,
+              "submission_succeeded": true,
+              "ticket": {
+                "ticket_number": "T-1001"
+              },
+              "corrections": [],
+              "error": null
+            }
+          },
+          "ticket_result": {
+            "submission_requested": true,
+            "submission_succeeded": true,
+            "ticket": {
+              "ticket_number": "T-1001"
+            },
+            "corrections": [],
+            "error": null
+          },
+          "created_tickets": [
+            {
+              "ticket_number": "T-1001",
+              "title_customer": "زر الأرشفة لا يعمل",
+              "created_at": "2026-11-06"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "T-1001"
+          ],
+          [
+            "البريد",
+            "بريدك",
+            "الإيميل"
+          ]
+        ],
+        "max_questions": 0
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "رفعت التذكرة، رقمها T-1001. احتفظ بالرقم للمتابعة، والرد بيجي على إيميلك المسجل.",
+        "language": "ar",
+        "stage": "submitted",
+        "validation": "pass",
+        "validation_reason": "Basic reply checks passed."
+      },
+      "failures": [
+        "missing one of ['البريد', 'بريدك', 'الإيميل']"
+      ],
+      "passed": false,
+      "seconds": 9.14
+    },
+    {
+      "suite": "reg_respond",
+      "id": "summary-after-edit",
+      "category": null,
+      "input": {
+        "state": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "خل الأولوية عالية"
+            }
+          ],
+          "language": "ar",
+          "intent": "pending_response",
+          "active_issue": {
+            "id": "issue-1",
+            "description": "زر الأرشفة لا يعمل"
+          },
+          "ticket_draft": {
+            "title_customer": "زر الأرشفة لا يعمل",
+            "queue": "Ole5 Technical",
+            "type": "Bug",
+            "subtype": "خلل برمجي",
+            "priority": "High",
+            "missing": []
+          },
+          "ticket_operator_result": {
+            "action": "show_summary",
+            "issue_id": "issue-1",
+            "issue": "زر الأرشفة لا يعمل",
+            "confirmed_changes": [
+              {
+                "field": "priority",
+                "before": "Normal",
+                "after": "High"
+              }
+            ]
+          },
+          "pending_customer_response": {
+            "kind": "summary",
+            "issue_id": "issue-1",
+            "item": null
+          }
+        }
+      },
+      "expected": {
+        "language": "ar",
+        "must_have": [
+          [
+            "الأولوية",
+            "أولوية"
+          ],
+          [
+            "عالية"
+          ]
+        ],
+        "max_questions": 1,
+        "offer_allowed": true
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "غيّرت الأولوية إلى عالية، التذكرة جاهزة بأولوية عالية. تبي أرسلها للفريق الآن؟",
+        "language": "ar",
+        "stage": "summary_shown",
+        "validation": "pass",
+        "validation_reason": "Basic reply checks passed."
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 7.34
+    },
+    {
+      "suite": "reg_router",
+      "id": "bare-ticket-resolved-from-context",
+      "category": null,
+      "input": {
+        "state": {
+          "language": "ar",
+          "messages": [
+            {
+              "role": "user",
+              "content": "زر الأرشفة ما يشتغل"
+            },
+            {
+              "role": "user",
+              "content": "افتح لي تذكرة"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "facts": {
+          "intent": "question",
+          "next_target": "search",
+          "explicit_ticket_request": true
+        }
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "Customer asks to open a ticket about the previously mentioned archive button not working. The issue is a normal product problem (not always-ticket, urgent, or account change), so it is classified as a product question with an explicit ticket request, routing to search.",
+        "intent": "question",
+        "next_target": "search",
+        "explicit_ticket_request": true
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 2.5
+    },
+    {
+      "suite": "reg_router",
+      "id": "composite-enquiry-plus-question",
+      "category": null,
+      "input": {
+        "state": {
+          "language": "ar",
+          "messages": [
+            {
+              "role": "user",
+              "content": "وش حالة تذكرتي، وكيف أطبع مراسلة؟"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "facts": {
+          "intent": "UNDECIDED"
+        }
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "The user asks \"وش حالة تذكرتي\" which is a request for the status of an existing ticket, fitting the ticket_enquiry intent. Although they also ask how to print a correspondence, the ticket status request is a direct ticket enquiry and takes priority for routing.",
+        "intent": "ticket_enquiry",
+        "next_target": "ticket_enquiry",
+        "explicit_ticket_request": false
+      },
+      "failures": [],
+      "passed": null,
+      "seconds": 1.34,
+      "review_note": "Expected behavior has not been decided; this case is unscored."
+    },
+    {
+      "suite": "reg_router",
+      "id": "enquiry-capability-question",
+      "category": null,
+      "input": {
+        "state": {
+          "language": "ar",
+          "messages": [
+            {
+              "role": "user",
+              "content": "هل أقدر أشوف تذاكري؟"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "facts": {
+          "intent": "other",
+          "next_target": "respond"
+        }
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "The customer asks to view their existing tickets, which is a ticket enquiry about existing tickets; no new ticket is requested.",
+        "intent": "ticket_enquiry",
+        "next_target": "ticket_enquiry",
+        "explicit_ticket_request": false
+      },
+      "failures": [
+        "intent: expected 'other', got 'ticket_enquiry'",
+        "next_target: expected 'respond', got 'ticket_enquiry'"
+      ],
+      "passed": false,
+      "seconds": 2.57
+    },
+    {
+      "suite": "reg_router",
+      "id": "enquiry-oldest-with-greeting",
+      "category": null,
+      "input": {
+        "state": {
+          "language": "ar",
+          "messages": [
+            {
+              "role": "user",
+              "content": "مساء الخير، ابي أعرف أقدم تذكرة لي"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "facts": {
+          "intent": "ticket_enquiry",
+          "next_target": "ticket_enquiry"
+        }
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "The user asks how to submit a ticket (a support-process capability question). This is not a product question or a request about an existing ticket, so it is classified as other and routed to respond.",
+        "intent": "other",
+        "next_target": "respond",
+        "explicit_ticket_request": false
+      },
+      "failures": [
+        "intent: expected 'ticket_enquiry', got 'other'",
+        "next_target: expected 'ticket_enquiry', got 'respond'"
+      ],
+      "passed": false,
+      "seconds": 3.14
+    },
+    {
+      "suite": "reg_router",
+      "id": "nothing-pending-no",
+      "category": null,
+      "input": {
+        "state": {
+          "language": "ar",
+          "messages": [
+            {
+              "role": "user",
+              "content": "كيف أحفظ المراسلة كمسودة؟"
+            },
+            {
+              "role": "assistant",
+              "content": "في أسفل شاشة إنشاء المراسلة اضغط زر \"حفظ\" لنقلها إلى المسودات."
+            },
+            {
+              "role": "user",
+              "content": "لا"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "facts": {
+          "intent": "other",
+          "next_target": "respond"
+        }
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "Customer replied with a brief \"لا\" after receiving instructions; this does not indicate a failed attempt or a new request, so it is classified as other and routed to respond.",
+        "intent": "other",
+        "next_target": "respond",
+        "explicit_ticket_request": false
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 0.75
+    },
+    {
+      "suite": "reg_router",
+      "id": "out-of-scope-recipe",
+      "category": null,
+      "input": {
+        "state": {
+          "language": "ar",
+          "messages": [
+            {
+              "role": "user",
+              "content": "كيف اسوي كبسة؟"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "facts": {
+          "intent": "other",
+          "next_target": "respond"
+        }
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "The user asks how to make a kabsa, which is a cooking question unrelated to the Ole5 product; therefore it is classified as other and routed to respond.",
+        "intent": "other",
+        "next_target": "respond",
+        "explicit_ticket_request": false
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 2.63
+    },
+    {
+      "suite": "reg_router",
+      "id": "pending-account-edit",
+      "category": null,
+      "input": {
+        "state": {
+          "language": "ar",
+          "active_issue": {
+            "id": "issue-1",
+            "description": "تفعيل حساب موظف"
+          },
+          "pending_customer_response": {
+            "kind": "detail",
+            "issue_id": "issue-1",
+            "item": "person"
+          },
+          "messages": [
+            {
+              "role": "user",
+              "content": "فعّلوا حساب محمد"
+            },
+            {
+              "role": "assistant",
+              "content": "ما اسم الموظف الذي تريد تفعيل حسابه؟"
+            },
+            {
+              "role": "user",
+              "content": "فعّلوا حساب أحمد بدل محمد"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "facts": {
+          "intent": "pending_response",
+          "next_target": "ticket_operator"
+        }
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "Customer gave the requested person name (Ahmed) for the pending account activation request, answering the detail prompt. This is a pending_response, so route to ticket_operator. The request is an account activation (in‑scope intervention), thus explicit_ticket_request is true.",
+        "intent": "pending_response",
+        "next_target": "ticket_operator",
+        "explicit_ticket_request": true
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 2.35
+    },
+    {
+      "suite": "reg_router",
+      "id": "repeated-earlier-question",
+      "category": null,
+      "input": {
+        "state": {
+          "language": "ar",
+          "messages": [
+            {
+              "role": "user",
+              "content": "كيف أحفظ المراسلة كمسودة؟"
+            },
+            {
+              "role": "assistant",
+              "content": "في أسفل شاشة إنشاء المراسلة اضغط زر \"حفظ\" لنقلها إلى المسودات والعودة إليها لاحقاً بدلاً من إرسالها."
+            },
+            {
+              "role": "user",
+              "content": "وكيف أربط مراسلة بمراسلة ثانية؟"
+            },
+            {
+              "role": "assistant",
+              "content": "من حقل \"المراسلات المرتبطة\" في شاشة إنشاء المراسلة، اختر المراسلة التي تريد ربطها."
+            },
+            {
+              "role": "user",
+              "content": "طيب ارجع لي، كيف احفظ المراسلة مسودة؟"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "facts": {
+          "intent": "other",
+          "next_target": "respond"
+        }
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "The customer asks how to save a correspondence as a draft, which is a product usage question. It does not request a ticket or refer to an existing ticket, so it should be handled by a knowledge‑base search.",
+        "intent": "question",
+        "next_target": "search",
+        "explicit_ticket_request": false
+      },
+      "failures": [
+        "intent: expected 'other', got 'question'",
+        "next_target: expected 'respond', got 'search'"
+      ],
+      "passed": false,
+      "seconds": 0.73
+    },
+    {
+      "suite": "reg_router",
+      "id": "ticket-request-product-subject",
+      "category": null,
+      "input": {
+        "state": {
+          "language": "ar",
+          "messages": [
+            {
+              "role": "user",
+              "content": "ابي تكت عن البحث في الأرشيف بطيء"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "facts": {
+          "intent": "question",
+          "next_target": "search",
+          "explicit_ticket_request": true
+        }
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "Customer requests a ticket for a slow archive search, a product issue. It does not meet needs_ticket criteria, so it's a question with explicit_ticket_request=true, routed to search.",
+        "intent": "question",
+        "next_target": "search",
+        "explicit_ticket_request": true
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 1.26
+    },
+    {
+      "suite": "reg_router",
+      "id": "ticket-request-product-subject-en",
+      "category": null,
+      "input": {
+        "state": {
+          "language": "en",
+          "messages": [
+            {
+              "role": "user",
+              "content": "I need a ticket, attachments won't upload"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "facts": {
+          "intent": "question",
+          "next_target": "search",
+          "explicit_ticket_request": true
+        }
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "User reports a product issue (attachments won't upload) and explicitly asks for a ticket, but the request does not meet needs_ticket criteria (not an always‑ticket topic, urgent situation, or account change). Therefore it's classified as a product question with explicit_ticket_request=true, routing to search.",
+        "intent": "question",
+        "next_target": "search",
+        "explicit_ticket_request": true
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 1.71
+    }
+  ]
+}
