@@ -88,10 +88,11 @@ def validate_unsourced() -> str:
 
 
 def test_conversation_language_kept_when_semantic_detection_unavailable():
-    # No regex fallback: when the detector gives no language, the conversation's language (here the profile's) stays.
-    values = state("Hello")
+    # When the detector gives no language, the conversation's language (here the profile's) stays. Letters now decide
+    # an all-Latin or all-Arabic message without the model (2026-11-18), so the message has none: only the model reads it.
+    values = state("12345")
     # Respond no longer checks the reply's language (Validate does, since 2026-11-17), so only the detector is patched.
-    with patch.object(respond, "language_of", return_value=None), \
+    with patch.object(respond, "model_language", return_value=None), \
          patch.object(respond.llm, "invoke", return_value=AIMessage(content="مرحبا")) as generate:
         result = respond.respond_node(values)
     assert result == {"reply": "مرحبا", "language": "ar"}

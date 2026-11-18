@@ -10,7 +10,7 @@ from ole5_chat.agent.contracts import Grounding, SentenceVerdict
 from ole5_chat.support_core.state import TicketDraft
 from ole5_chat.agent.contracts import Language
 from ole5_chat.agent import graph
-from ole5_chat.agent.contracts import (OperatorCompletion, PendingCustomerResponse, ReturnDecision, RouterDecision,
+from ole5_chat.agent.contracts import (OperatorCompletion, PendingCustomerResponse, RouterDecision,
                                       RouterDecisionWithoutPending, manager_schema)
 from ole5_chat.agent.nodes import respond, validate
 from ole5_chat.agent.state import initial_state
@@ -58,14 +58,14 @@ def test_username_remains_arabic_when_operator_advances(model, operator_model, n
     # A bare value names no language; the reply keeps the conversation's.
     model.add(RouterDecision(intent="pending_response", next_target="ticket_operator", explicit_ticket_request=False, reason="Requested username"),
               completion,
-              ReturnDecision(next_target="respond", reason="Ticket detail was processed."),
               Language(language="none"))
     with patch("ole5_chat.support_core.classify.classify", return_value={"ticket_draft": draft}),          patch.object(llm, "invoke", return_value=AIMessage(content="تم تسجيل اسم المستخدم.")) as writer:
         result = graph.build().invoke(state)
     assert result["language"] == "ar"
     assert result["pending_customer_response"].kind == ("detail" if next_field else "summary")
     assert "in Arabic" in writer.call_args_list[0].args[0][-1].content  # the first reply, before any rewrite
-    assert sum(schema is Language for schema, _ in model.calls) == 2  # the customer's value, then the reply
+    # The customer's bare value needs the model; the all-Arabic reply is settled by its letters (2026-11-18).
+    assert sum(schema is Language for schema, _ in model.calls) == 1
 
 
 @pytest.mark.parametrize("text,route,action", [
@@ -80,7 +80,8 @@ def test_conversational_messages_use_language_detector(text, route, action):
     state = conversation(text)
     state.update(intent=route, manager_action=action,
                  answered_detail=PendingCustomerResponse(kind="detail", issue_id="issue-1", item="error text"))
-    with patch.object(respond, "language_of", return_value="en") as detector:
+    # The conversation is Arabic and these letters are Latin (or absent), so the model reads them (2026-11-18).
+    with patch.object(respond, "model_language", return_value="en") as detector:
         assert respond._expected_language(state) == "en"
     detector.assert_called_once_with(text)
 
@@ -92,7 +93,7 @@ def test_literal_values_preserve_language(item, text):
     state = conversation(text)
     state.update(intent="pending_response", manager_action="provide",
                  answered_detail=PendingCustomerResponse(kind="detail", issue_id="issue-1", item=item))
-    with patch.object(respond, "language_of", return_value=None) as detector:
+    with patch.object(respond, "model_language", return_value=None) as detector:
         assert respond._expected_language(state) == "ar"
     detector.assert_called_once_with(text)
 
@@ -206,6 +207,22 @@ def test_zero_passage_reply_the_check_accepts_is_sent_as_written(model, reply):
         result = respond_then_validate(state)
     assert result["reply"] == reply and result["validation_outcome"] == "pass"
     assert writer.call_count == 1 and sum(schema is Grounding for schema, _ in model.calls) == 1
+
+
+@pytest.mark.parametrize("pending", [False, True])
+def test_courtesy_only_skips_grounding_and_ticket_checks_unless_a_step_is_pending(model, pending):
+    # Since 2026-11-18: the Router marks courtesy alone; with nothing pending, only the language check runs.
+    from ole5_chat.agent.contracts import TicketActionCheck
+    state = conversation("شكراً")
+    state.update(intent="other", current_references=[], courtesy_only=True)
+    if pending:  # a pending step brings a reminder about the ticket, so both checks still run
+        state.update(active_issue={"id": "issue-1", "description": "ما أقدر أرفق ملفات"},
+                     pending_customer_response=PendingCustomerResponse(kind="summary", issue_id="issue-1"))
+    with patch.object(llm, "invoke", return_value=AIMessage(content="العفو، وإذا احتجت شي ثاني أنا موجود.")):
+        result = respond_then_validate(state)
+    assert result["validation_outcome"] == "pass"
+    checked = {schema for schema, _ in model.calls}
+    assert (Grounding in checked and TicketActionCheck in checked) is pending
 
 
 

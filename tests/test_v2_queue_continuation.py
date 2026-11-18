@@ -8,7 +8,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from ole5_chat import llm
 from ole5_chat.support_core.state import TicketDraft
 from ole5_chat.agent.graph import build
-from ole5_chat.agent.contracts import (OperatorCompletion, PendingCustomerResponse, ReturnDecision, RouterDecision,
+from ole5_chat.agent.contracts import (OperatorCompletion, PendingCustomerResponse, RouterDecision,
                                       RouterDecisionWithoutPending)
 from ole5_chat.agent.state import initial_state
 from ole5_chat.identity import Identity
@@ -43,7 +43,6 @@ def test_queue_moves_on_after_operator(model, operator_model, kind, action, next
         stopped = "declined" if action == "decline" else "cancelled"
         model.add(OperatorCompletion(action=stopped if next_kind == "empty" else "offer", reason=action,
                                      issue_id=None if next_kind == "empty" else "issue-2"))
-    model.add(ReturnDecision(next_target="respond", reason="Ticket Operator completed this turn."))
     notes = []
 
     def writer(messages, temperature=0):
@@ -57,7 +56,9 @@ def test_queue_moves_on_after_operator(model, operator_model, kind, action, next
     # The first pass classifies (none on a Submit press); the return pass only routes the Operator's result.
     assert sum(schema in (RouterDecision, RouterDecisionWithoutPending)
                for schema, _ in model.calls) == (0 if action == "submit" else 1)
-    assert sum(schema is ReturnDecision for schema, _ in model.calls) == 1
+    # The return pass routes in code (2026-11-18): the only model calls are the Router's first pass, the Operator's
+    # interpretation and the checks.
+    assert all(schema.__name__ != "ReturnDecision" for schema, _ in model.calls)
     assert len(result["created_tickets"]) == (1 if action == "submit" else 0)
     # Urgency does not bypass consent for the next queued request. Preparation starts only after acceptance.
     assert classify.call_count == 0

@@ -23,6 +23,7 @@ def finalize_node(state: AgentState) -> dict:
         "input_event": None,
         "route_reason": None,
         "explicit_ticket_request": False,
+        "courtesy_only": False,
         "current_request": None,
         "current_references": [],
         "search_queries": [],

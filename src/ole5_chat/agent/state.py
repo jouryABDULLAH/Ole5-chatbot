@@ -41,6 +41,7 @@ class AgentState(MessagesState, total=False):
     response_packet: ResponsePacket | None
     route_reason: str | None
     explicit_ticket_request: bool
+    courtesy_only: bool  # the Router found the message is only a greeting, thanks, goodbye or courtesy
     
     current_request: str | None
     
@@ -99,6 +100,7 @@ def initial_state(identity: Identity) -> AgentState:
         response_packet=None,
         route_reason=None,
         explicit_ticket_request=False,
+        courtesy_only=False,
         current_request=None,
         search_scope=None,
         search_result=None,

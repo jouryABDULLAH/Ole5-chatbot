@@ -11,12 +11,27 @@ from ole5_chat.agent.prompts.guards import language_prompt
 NAMES = {"ar": "Arabic", "en": "English"}
 
 
-def language_of(text: str) -> str | None:
+def script_language(text: str) -> str | None:
+    """The language the letters show, without a model call: ar for Arabic letters only, en for Latin letters only.
+    Words with a digit (Ole5, ticket numbers, codes) are left out first. None when both scripts or no letters remain:
+    a mixed message, or a bare value such as a username."""
+    letters = re.sub(r"\S*\d\S*", " ", text)
+    arabic = bool(re.search(r"[؀-ۿ]", letters))
+    latin = bool(re.search(r"[A-Za-z]", letters))
+    return "ar" if arabic and not latin else "en" if latin and not arabic else None
+
+
+def model_language(text: str) -> str | None:
+    """The model's reading, for text the letters do not settle. None for a bare value with no language."""
     try:
         found = llm.structured(language_prompt(), [HumanMessage(content=text)], Language, node="language").language
     except llm.ModelFailed:
         return None
     return None if found == "none" else found
+
+
+def language_of(text: str) -> str | None:
+    return script_language(text) or model_language(text)
 
 
 def language_problem(text: str, language: str) -> str | None:

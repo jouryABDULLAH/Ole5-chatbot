@@ -3,9 +3,9 @@
 import logging
 
 from ole5_chat import llm
-from ole5_chat.agent.contracts import ResponsePacket, ReturnDecision, router_schema
+from ole5_chat.agent.contracts import ResponsePacket, router_schema
 from ole5_chat.agent.context import router_context
-from ole5_chat.agent.prompts.router import router_prompt, router_return_prompt
+from ole5_chat.agent.prompts.router import router_prompt
 from ole5_chat.agent.state import AgentState
 
 log = logging.getLogger(__name__)
@@ -44,20 +44,14 @@ def _response_packet(state: AgentState) -> dict:
 
 
 def _return_pass(state: AgentState) -> dict:
-    """After a worker: route its result. The message is not classified again, so it cannot be sent to a worker a
-    second time as if it were new; the first pass's intent stays."""
-    try:
-        decision = llm.structured(router_return_prompt(state), [], ReturnDecision, node="router")
-        target, reason = decision.next_target, decision.reason
-        outcome = (state.get("search_result") or {}).get("outcome") or state.get("search_outcome")
-        expected = ("ticket_operator" if state["last_worker"] == "search"
-                    and outcome in {"partial", "no_answer"} else "respond")
-        if target != expected:
-            log.warning("router return target=%s corrected to %s from worker facts", target, expected)
-            target, reason = expected, "The completed worker's recorded outcome determines the next step."
-    except llm.ModelFailed as exc:
-        log.error("ERROR router return pass failed: %s", exc)
-        target, reason = "respond", "The worker's result could not be routed; it is delivered as it is."
+    """After a worker: route its result from the worker's recorded outcome, without a model call. The message is not
+    classified again, so it cannot be sent to a worker a second time as if it were new; the first pass's intent
+    stays. Search with no or a partial answer goes to the Ticket Operator; every other result goes to Respond."""
+    outcome = (state.get("search_result") or {}).get("outcome") or state.get("search_outcome")
+    if state["last_worker"] == "search" and outcome in {"partial", "no_answer"}:
+        target, reason = "ticket_operator", f"Search outcome {outcome}: the Ticket Operator handles the request."
+    else:
+        target, reason = "respond", f"The {state['last_worker']} result goes to Respond."
     log.info("router  return pass worker=%s next_target=%s reason=%r", state["last_worker"], target, reason)
     update = {"next_target": target, "route_reason": reason}
     if target == "respond":
@@ -95,6 +89,8 @@ def router_node(state: AgentState) -> dict:
         "next_target": router_result.next_target,
         "route_reason": router_result.reason,
         "explicit_ticket_request": router_result.explicit_ticket_request,
+        # Only an other message can be courtesy alone; it lets Validate skip checks a greeting does not need.
+        "courtesy_only": router_result.intent == "other" and router_result.courtesy_only,
     }
     # The step the customer's message answers, kept so the return pass can tell it from a step a worker creates.
     update["pending_before_worker"] = pending

@@ -10,7 +10,7 @@ from langchain_core.messages import HumanMessage
 from ole5_chat.agent.context import router_context
 from ole5_chat.agent.nodes.finalize import finalize_node
 from ole5_chat.agent.nodes.router import _response_packet
-from ole5_chat.agent.prompts.router import router_prompt, router_return_prompt
+from ole5_chat.agent.prompts.router import router_prompt
 from ole5_chat.agent.prompts.router import ROUTER_EXAMPLES
 from ole5_chat.agent.contracts import PendingCustomerResponse
 from ole5_chat import products
@@ -25,16 +25,15 @@ def state():
 
 @pytest.mark.parametrize("outcome,expected", [("answered", "respond"), ("failed", "respond"),
                                              ("no_answer", "ticket_operator"), ("partial", "ticket_operator")])
-def test_worker_outcome_cannot_be_overridden_by_wrong_return_target(model, outcome, expected):
-    from ole5_chat.agent.contracts import ReturnDecision
+def test_return_pass_routes_the_worker_outcome_without_a_model_call(model, outcome, expected):
+    # The return pass is decided in code from the worker's recorded outcome (2026-11-18): no model call is made.
     from ole5_chat.agent.nodes.router import router_node
     current = state()
     current.update(last_worker="search", intent="question", search_outcome=outcome)
-    wrong = "respond" if expected == "ticket_operator" else "ticket_operator"
-    model.add(ReturnDecision(next_target=wrong, reason="Wrong interpretation"))
     result = router_node(current)
     assert result["next_target"] == expected
     assert current["intent"] == "question"
+    assert model.calls == []
 
 
 @pytest.mark.parametrize("has_pending", [False, True])
@@ -77,15 +76,9 @@ def test_router_omits_payloads_without_changing_response_facts(worker):
     )
     original = deepcopy(current)
     context = router_context(current)
-    prompt = router_return_prompt(current)
+    # The return pass no longer has a prompt (2026-11-18): only the context's compact summaries are checked here.
     for field in ("search_result", "ticket_operator_result", "ticket_enquiry_result"):
         assert field not in context
-    for marker in ("PRIVATE_CHUNK_SENTINEL", "PRIVATE_INSTRUCTION_SENTINEL",
-                   "PRIVATE_TICKET_SENTINEL", "PRIVATE_DEFINITION_SENTINEL"):
-        assert marker not in prompt
-    assert f"already handled by {worker}" in prompt
-    assert f"Worker result: {context[worker + '_summary']}" in prompt
-    assert "classify that message again" in prompt
     assert context["search_summary"] == {"outcome": "answered", "reference_count": 1, "scope": "product"}
     assert context["ticket_operator_summary"]["ticket_created"] is False
     assert context["ticket_enquiry_summary"]["ticket_count"] == 1
@@ -109,7 +102,6 @@ def test_latest_worker_replaces_previous_marker_and_finalize_clears_it(worker, f
         update = getattr(module, f"{worker}_node")(current)
     current.update(update)
     assert router_context(current)["last_worker"] == worker
-    assert f"already handled by {worker}" in router_return_prompt(current)
     current.update(finalize_node(current))
     assert current["last_worker"] is None
     assert "Worker result:" not in router_prompt(current)

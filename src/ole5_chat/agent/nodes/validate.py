@@ -133,10 +133,23 @@ def _wrong_language(reply: str, language: str) -> str | None:
     return language_problem(reply, language)
 
 
+def _routine(state: AgentState, sheet: TurnSheet, passages: list[dict]) -> bool:
+    """A reply to courtesy alone skips the grounding and ticket checks. All four must hold: the Router marked the
+    message courtesy only (a greeting, thanks, goodbye or courtesy phrase and nothing else), the stage is other, no
+    passages were given, and no ticket step is pending (a pending step brings a reminder about the ticket, which the
+    ticket check must see). The reply's wording decides nothing."""
+    return (bool(state.get("courtesy_only")) and sheet["stage"] == "other" and not passages
+            and state.get("pending_customer_response") is None)
+
+
 def _checks(state: AgentState, sheet: TurnSheet, reply: str, passages: list[dict]):
     """The three checks of one reply, at the same time: none depends on another. Returns the language problem (or
     None), the grounding issues (None when that check failed) and the ticket-action violations (None when that check
-    failed). Each thread runs in its own copy of the context, so its model calls stay under this node's trace."""
+    failed). Each thread runs in its own copy of the context, so its model calls stay under this node's trace. A
+    routine reply gets the language check only."""
+    if _routine(state, sheet, passages):
+        log.info("validate  routine reply: grounding and ticket checks skipped")
+        return _wrong_language(reply, sheet["language"]), [], []
     with ThreadPoolExecutor(max_workers=3) as pool:
         def run(function, *args):
             return pool.submit(contextvars.copy_context().run, function, *args)

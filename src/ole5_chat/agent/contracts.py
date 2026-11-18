@@ -41,12 +41,18 @@ class ResponsePacket(BaseModel):
     sources: list[str] = []
 
 
+COURTESY_ONLY = ("true only when the latest message is nothing but a greeting, a thanks, a goodbye or a courtesy "
+                 "phrase (such as يعطيك العافية), with no question, request, problem report or answer to a pending "
+                 "step; false for everything else, including a greeting that comes with a request.")
+
+
 class RouterDecision(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     intent: Literal["question", "pending_response", "ticket_enquiry", "needs_ticket", "other"]
     next_target: Literal["search", "ticket_operator", "ticket_enquiry", "respond"]
     explicit_ticket_request: bool
+    courtesy_only: bool = Field(default=False, description=COURTESY_ONLY)
     reason: str
 
 
@@ -56,16 +62,9 @@ class RouterDecisionWithoutPending(BaseModel):
     intent: Literal["question", "ticket_enquiry", "needs_ticket", "other"]
     next_target: Literal["search", "ticket_operator", "ticket_enquiry", "respond"]
     explicit_ticket_request: bool
+    courtesy_only: bool = Field(default=False, description=COURTESY_ONLY)
     reason: str
 
-
-class ReturnDecision(BaseModel):
-    """The Router's return pass, after a worker: where the result goes. The message is not classified again."""
-    model_config = ConfigDict(extra="forbid")
-
-    next_target: Literal["respond", "ticket_operator"] = Field(
-        description="Where the completed worker's result goes next.")
-    reason: str = Field(description="One sentence: the worker result that decides it.")
 
 
 @lru_cache(maxsize=2)

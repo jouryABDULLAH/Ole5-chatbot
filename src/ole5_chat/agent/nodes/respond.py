@@ -9,17 +9,23 @@ from ole5_chat.agent.prompts.respond import system_prompt, turn_note
 from ole5_chat.agent.turn_sheet import TurnSheet, build_turn_sheet
 
 from ole5_chat.agent.state import AgentState
-from ole5_chat.agent.guards import language_of, plain
+from ole5_chat.agent.guards import model_language, plain, script_language
 
 log = logging.getLogger(__name__)
 
 
 def _expected_language(state: AgentState) -> str:
-    """The language of the customer's latest message. A message that names no language (a bare value such as a
-    username or an error code) keeps the conversation's language."""
+    """The language of the customer's latest message. Its letters decide when they are all Arabic or all Latin and
+    agree with the conversation's language (or there is none yet). The model reads the message only when it is mixed,
+    has no letters, or its letters differ from the conversation's language: a bare value such as a username or an
+    error code names no language and keeps the conversation's."""
     latest = next((str(message.content) for message in reversed(state.get("messages", []))
                    if message.type == "human"), "")
-    return language_of(latest) or state.get("language") or state["identity"].language or "ar"
+    stored = state.get("language")
+    script = script_language(latest)
+    if script and (not stored or script == stored):
+        return script
+    return model_language(latest) or stored or state["identity"].language or "ar"
 
 
 def _messages(state: AgentState, sheet: TurnSheet) -> list:
