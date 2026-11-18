@@ -95,6 +95,15 @@ task = "evals.regression_task:stub_task"
 graders = ["evals.regression_graders:no_fallback"]
 timeout = 900
 
+# What the customer sees, on fixed passages and mock tickets, to compare runs across prompt or architecture changes
+# (docs/eval_spec_observable.md).
+[tool.evalkit.suites.observable]
+task = "evals.observable_task:observable_task"
+graders = ["evals.observable_graders:workflow", "evals.observable_graders:out_of_scope",
+           "evals.regression_graders:required_text", "evals.observable_graders:ticket_number",
+           "evals.graders:language_matches"]
+timeout = 900
+
 [tool.evalkit.suites.reg_guards]
 task = "evals.regression_task:guard_task"
 graders = ["evals.regression_graders:guard_outcome", "evals.regression_graders:required_text"]
