@@ -23,8 +23,7 @@ CUSTOMERS = [
 
 @pytest.fixture(autouse=True)
 def sheets_dir(tmp_path, monkeypatch):
-    for name in ("values", "tickets", "attachments"):
-        shutil.copy(ROOT / "sheets" / f"{name}.xlsx", tmp_path)
+    shutil.copy(ROOT / "sheets" / "values.xlsx", tmp_path)
     wb = Workbook()
     for row in CUSTOMERS:
         wb.active.append(row)
@@ -39,6 +38,7 @@ def sheets_dir(tmp_path, monkeypatch):
     sheets._rows.cache_clear()
     products.load.cache_clear()
     ticket_api.ticket_client.cache_clear()
+    sheets.initialize_runtime_sheets()
     yield tmp_path
     get_settings.cache_clear()
 
@@ -84,6 +84,9 @@ class ScriptedModel:
 def model(monkeypatch):
     scripted = ScriptedModel()
     monkeypatch.setattr(llm, "structured", scripted)
+    def unexpected_client(temperature):
+        raise AssertionError("Unscripted model call in an offline test; provide an explicit model fixture.")
+    monkeypatch.setattr(llm, "tool_client", unexpected_client)
     return scripted
 
 

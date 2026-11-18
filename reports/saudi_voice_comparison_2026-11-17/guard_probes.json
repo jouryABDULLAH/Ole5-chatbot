@@ -1,0 +1,24 @@
+[
+  {
+    "id": "unsupported-location",
+    "reply": "من الشاشة الرئيسية للمستخدم افتح إعدادات النظام (من القائمة الجانبية أو أيقونة الترس أعلى اليمين).",
+    "expected_rejection": true,
+    "rejected": true,
+    "passed": true,
+    "issues": [
+      {
+        "sentence": "من الشاشة الرئيسية للمستخدم افتح إعدادات النظام (من القائمة الجانبية أو أيقونة الترس أعلى اليمين).",
+        "problem": "No passage states that the user should open system settings from the main screen via the side menu or gear icon",
+        "passage": "none"
+      }
+    ]
+  },
+  {
+    "id": "documented-steps",
+    "reply": "افتح إعدادات النظام وانزل لأسفل الصفحة. اختر العلامة المائية، ارفع الشعار، ثم احفظ.",
+    "expected_rejection": false,
+    "rejected": false,
+    "passed": true,
+    "issues": []
+  }
+]

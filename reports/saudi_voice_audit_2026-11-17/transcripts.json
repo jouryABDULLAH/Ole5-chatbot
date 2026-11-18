@@ -1,0 +1,709 @@
+{
+  "metadata": {
+    "date": "2026-11-17",
+    "model": "openai/gpt-oss-120b",
+    "response_temperature": 0.1,
+    "scope": "Saudi Arabic voice and conversational naturalness; manual review of recorded live model replies",
+    "full_graph_conversations": 14,
+    "full_graph_replies": 45,
+    "fixed_state_respond_validate_cases": 6,
+    "total_replies": 51,
+    "products": {
+      "OLE5": 49,
+      "RICH": 2
+    },
+    "knowledge_backend": "stub / fixed evidence from repository; no live Qdrant retrieval",
+    "ticket_backend": "mock",
+    "sheets": "temporary isolated copies with a synthetic customer and repository test ticket fixture",
+    "automated_validation": "51 final replies passed existing application guards; this is not a Saudi voice score",
+    "offline_checks": {
+      "command": "GROQ_API_KEY=invalid PYTHONPATH=src python -m pytest -q tests/test_v2_respond_language.py tests/test_v2_response_guards.py",
+      "passed": 29
+    },
+    "limitations": [
+      "One sample per case, not a statistical benchmark or a Saudi native-speaker panel.",
+      "Stub knowledge base only matches fixed questions; no-answer and escalation rates are not production retrieval measurements.",
+      "Six fixed-state cases bypass Router and Search but use real Respond and Validate.",
+      "The fixed initial greeting was reviewed separately and is excluded from the 51 generated replies."
+    ]
+  },
+  "cases": [
+    {
+      "id": "answer-then-simplify",
+      "mode": "full_graph_stub_kb",
+      "model": "openai/gpt-oss-120b",
+      "greeting": "أهلاً بك، أنا مساعد دعم Ole5. أجيب عن أسئلتك حول النظام، وأفتح لك تذكرة دعم عند الحاجة، وأساعدك في الاستعلام عن تذاكر الدعم المرفوعة. اكتب لي سؤالك أو المشكلة اللي تواجهك.",
+      "turns": [
+        {
+          "customer": "كيف انشئ علامة مائية في النظام",
+          "answer": "عشان تضيف علامة مائية، أدخل على إعدادات النظام، انزل لأسفل الصفحة، اختار «العلامة المائية»، ارفع الشعار اللي تبي (يفضل يكون بخلفية شفافة)، ثم احفظ.",
+          "stage": "answered",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": "answered",
+          "seconds": 4.25
+        },
+        {
+          "customer": "ما فهمت عليك، وضحها لي أكثر",
+          "answer": "ما عليك، واضح إن الشرح ما كان واضح. ودك أرفع لك تذكرة للفريق الفني بخصوص إنشاء علامة مائية؟",
+          "stage": "offer",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": "no_answer",
+          "seconds": 18.75
+        }
+      ],
+      "completed": true
+    },
+    {
+      "id": "answer-with-pending-detail",
+      "mode": "full_graph_stub_kb",
+      "model": "openai/gpt-oss-120b",
+      "greeting": "أهلاً بك، أنا مساعد دعم Ole5. أجيب عن أسئلتك حول النظام، وأفتح لك تذكرة دعم عند الحاجة، وأساعدك في الاستعلام عن تذاكر الدعم المرفوعة. اكتب لي سؤالك أو المشكلة اللي تواجهك.",
+      "turns": [
+        {
+          "customer": "تطبيق الجوال يطلع لي شاشة بيضاء بعد تسجيل الدخول",
+          "answer": "أفهم إن تطبيق الجوال يطلع لك شاشة بيضاء بعد تسجيل الدخول. ما أقدر أشوف إعدادات حسابك من هنا، لكن أقدر أرفع لك تذكرة للفريق الفني. ودك أرفعها؟",
+          "stage": "offer",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": "no_answer",
+          "seconds": 20.62
+        },
+        {
+          "customer": "ايه",
+          "answer": "عشان الفريق يقدر يحدد سبب الشاشة البيضاء، أحتاج أعرف نظام تشغيل جوالك، iOS ولا أندرويد؟",
+          "stage": "detail_requested",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 17.43
+        },
+        {
+          "customer": "كيف احفظ الرسالة كمسودة بدلًا من إرسالها",
+          "answer": "عشان تحفظ الرسالة كمسودة، بعد ما تكتب المحتوى اضغط زر «حفظ» الموجود أسفل الشاشة بدل زر «إرسال».  \n\nوبالنسبة لمشكلة الشاشة البيضاء في التطبيق، ممكن تقول لي نظام تشغيل جوالك؟",
+          "stage": "answered",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": "answered",
+          "seconds": 3.97
+        }
+      ],
+      "completed": true
+    },
+    {
+      "id": "arabic-with-english-terms",
+      "mode": "full_graph_stub_kb",
+      "model": "openai/gpt-oss-120b",
+      "greeting": "أهلاً بك، أنا مساعد دعم Ole5. أجيب عن أسئلتك حول النظام، وأفتح لك تذكرة دعم عند الحاجة، وأساعدك في الاستعلام عن تذاكر الدعم المرفوعة. اكتب لي سؤالك أو المشكلة اللي تواجهك.",
+      "turns": [
+        {
+          "customer": "الـ app يطلع لي error 500 لما افتح المرفقات",
+          "answer": "الخطأ 500 عند فتح المرفقات واضح، وما أقدر أشوف تفاصيل حسابك من هنا. ودك أرفع لك تذكرة للفريق الفني عشان يشيكون عليها؟",
+          "stage": "offer",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": "no_answer",
+          "seconds": 5.58
+        },
+        {
+          "customer": "ايه",
+          "answer": "زبطت ملخص التذكرة بخصوص خطأ 500 عند فتح المرفقات. تبغى أرسلها للفريق الآن؟",
+          "stage": "summary_shown",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 11.23
+        },
+        {
+          "customer": "Android 14",
+          "answer": "حفظت نظام Android 14. ملخص التذكرة جاهز، تبغى أرسله للفريق؟",
+          "stage": "summary_shown",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 13.03
+        },
+        {
+          "customer": "خلاص كنسل الطلب",
+          "answer": "ألغيت طلبك بخصوص خطأ 500 عند فتح المرفقات، وما تم رفع أي تذكرة. إذا تحتاج شيء ثاني أنا حاضر.",
+          "stage": "preparation_stopped",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 16.05
+        }
+      ],
+      "completed": true
+    },
+    {
+      "id": "bug-full-flow",
+      "mode": "full_graph_stub_kb",
+      "model": "openai/gpt-oss-120b",
+      "greeting": "أهلاً بك، أنا مساعد دعم Ole5. أجيب عن أسئلتك حول النظام، وأفتح لك تذكرة دعم عند الحاجة، وأساعدك في الاستعلام عن تذاكر الدعم المرفوعة. اكتب لي سؤالك أو المشكلة اللي تواجهك.",
+      "turns": [
+        {
+          "customer": "تطبيق Ole5 في الجوال يقفل لحاله لما أفتح المراسلات",
+          "answer": "أفهم إن تطبيق Ole5 على الجوال يقفل لحاله لما تفتح المراسلات. ودك أرفع لك تذكرة بخصوص مشكلة إغلاق التطبيق؟",
+          "stage": "offer",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": "no_answer",
+          "seconds": 8.32
+        },
+        {
+          "customer": "ايه",
+          "answer": "تمام، عشان الفريق يقدر يحدد سبب الإغلاق، ياليت تقول لي نظام تشغيل جوالك (أندرويد أو iOS).",
+          "stage": "detail_requested",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 12.55
+        },
+        {
+          "customer": "ليش تحتاجها؟",
+          "answer": "عشان نحدد إذا العطل يخص أندرويد أو iOS، نحتاج نعرف نظام تشغيل جوالك. نحتاج نظام تشغيل جوالك عشان نكمل التحضير.",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 6.49
+        },
+        {
+          "customer": "والله ما أدري",
+          "answer": "ما عليك، ما نحتاج نظام التشغيل الآن. حضرت ملخص التذكرة وجاهز للإرسال. ودك أرسله للفريق؟",
+          "stage": "summary_shown",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 13.35
+        },
+        {
+          "customer": "ارسلها لهم",
+          "answer": "رفعت التذكرة، رقمها T-MOCK-20261117111842-0001، الرد يوصل لك على إيميلك المسجل.",
+          "stage": "submitted",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 7.67
+        },
+        {
+          "customer": "مشكور",
+          "answer": "العفو، إذا فيه شيء ثاني تحتاجه أنا حاضر.",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 5.03
+        }
+      ],
+      "completed": true
+    },
+    {
+      "id": "cancel-with-question",
+      "mode": "full_graph_stub_kb",
+      "model": "openai/gpt-oss-120b",
+      "greeting": "أهلاً بك، أنا مساعد دعم Ole5. أجيب عن أسئلتك حول النظام، وأفتح لك تذكرة دعم عند الحاجة، وأساعدك في الاستعلام عن تذاكر الدعم المرفوعة. اكتب لي سؤالك أو المشكلة اللي تواجهك.",
+      "turns": [
+        {
+          "customer": "ما أقدر أرفق ملفات في المراسلة",
+          "answer": "ما عليك، واضح إنك ما تقدر ترفق ملفات في المراسلة. ما أقدر أشوف إعدادات حسابك من هنا، لكن أقدر أرفع لك تذكرة للفريق الفني يشيكون على المشكلة. تبي أرفع التذكرة الآن؟",
+          "stage": "offer",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": "no_answer",
+          "seconds": 9.87
+        },
+        {
+          "customer": "ايه",
+          "answer": "ودك أرسله الآن؟",
+          "stage": "summary_shown",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 20.24
+        },
+        {
+          "customer": "لا خلها، بس أبي أعرف وش الإيميل المسجل عندكم؟",
+          "answer": "ما أقدر أشوف بريدك المسجل من عندي، لكن أقدر أفتح لك تذكرة للفريق الفني يشيكون على الموضوع. تبي أرفع التذكرة؟",
+          "stage": "offer",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": "no_answer",
+          "seconds": 14.98
+        }
+      ],
+      "completed": true
+    },
+    {
+      "id": "capabilities-then-thanks",
+      "mode": "full_graph_stub_kb",
+      "model": "openai/gpt-oss-120b",
+      "greeting": "أهلاً بك، أنا مساعد دعم Ole5. أجيب عن أسئلتك حول النظام، وأفتح لك تذكرة دعم عند الحاجة، وأساعدك في الاستعلام عن تذاكر الدعم المرفوعة. اكتب لي سؤالك أو المشكلة اللي تواجهك.",
+      "turns": [
+        {
+          "customer": "أنت وش شغلك بالضبط؟",
+          "answer": "أنا أساعدك في استخدام نظام Ole5، أجاوب على أسئلتك عن الإجراءات والقواعد، وأقدر أفتح لك تذكرة دعم إذا صادفتك مشكلة، وأستعلم لك عن حالة التذاكر اللي رفعتها. وش تحتاج الآن؟",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 6.56
+        },
+        {
+          "customer": "تمام مشكور",
+          "answer": "العفو، إذا فيه شيء ثاني أقدر أساعدك فيه، قول.",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 7.44
+        }
+      ],
+      "completed": true
+    },
+    {
+      "id": "direct-delivery-overview",
+      "mode": "respond_validate_fixed_evidence",
+      "product": "OLE5",
+      "model": "openai/gpt-oss-120b",
+      "completed": true,
+      "evidence": [
+        {
+          "text": "بيانات التسليم والمراسلات العينية\n- يوفر النظام آلية للتحقق من استلام المرفقات العينية من خلال بيانات التسليم الموقعة وإمكانية إرفاقها في النظام.\n- يتيح النظام تأكيد الاستلام الإلكتروني للمراسلة العينية.\n- يتيح النظام طباعة بيان تسليم للمراسلة العينية بعد إرسالها وتخصيص المستقبلين داخل البيان.\n- يدعم النظام QR code عن طريق بيان التسليم.\n- يتيح النظام عرض وإدارة جميع بيانات التسليم بشكل مركزي على مستوى كل مراسلات النظام أو الإدارات الرئيسية، مع إمكانية رفع وعرض بيان التسليم للمراسلات الورقية في النظام.\n- يتيح النظام البحث عن بيان تسليم معين.\n- يتيح النظام المسح المتعدد لبيانات التسليم، بحيث يرفع المستخدم عدة بيانات تسليم معاً وتُضاف آلياً إلى كل بيان حسب رقمه دون تدخل منه.",
+          "document": "نظام OLE5 — قاعدة المعرفة",
+          "section": "بيانات التسليم والمراسلات العينية",
+          "source_file": null,
+          "relation": "DIRECT",
+          "score": 3,
+          "reason": "مقطع مطابق للسؤال من بيانات الاختبار الثابتة.",
+          "chunk_index": null
+        }
+      ],
+      "turns": [
+        {
+          "customer": "وش أقدر أسوي ببيانات التسليم للمراسلات الورقية؟",
+          "answer": "تقدر ببيانات التسليم للمراسلات الورقية:\n\n- تتحقق من استلام المرفقات العينية عبر توقيع بيان التسليم.  \n- تأكد الاستلام إلكترونياً.  \n- تطبع بيان التسليم بعد الإرسال وتضيف المستلمين داخل البيان.  \n- تستفيد من كود QR الموجود في البيان.  \n- تعرض وتدير كل بيانات التسليم مركزيًا على مستوى المراسلات أو الإدارات.  \n- ترفع وتعرض بيان التسليم للمراسلات الورقية داخل النظام.  \n- تبحث عن بيان تسليم معين.  \n- ترفع عدة بيانات تسليم مرة وحدة وتضيفها آليًا لكل بيان حسب رقمه.",
+          "stage": "answered",
+          "validation": "pass",
+          "seconds": 5.01
+        }
+      ]
+    },
+    {
+      "id": "direct-draft-najdi",
+      "mode": "respond_validate_fixed_evidence",
+      "product": "OLE5",
+      "model": "openai/gpt-oss-120b",
+      "completed": true,
+      "evidence": [
+        {
+          "text": "حقول شاشة إنشاء المراسلة الداخلية\nالحقول بالترتيب كما تظهر في الشاشة:\n\n1. **إلى** — كتابة بريد الإدارة المراد الإرسال إليها أو اسم الشخص، أو الضغط على (+) لتظهر نافذة بأسماء الإدارات حسب الهيكل أو بأسماء الأشخاص.\n2. **الموضوع** — عنوان المراسلة الموجهة.\n3. **تصنيف المراسلات** — كتابة اسم التصنيف يدوياً، أو اختيار تصنيف أو أكثر من التصنيفات الموجودة بالضغط على (+).\n4. **الخصائص** — تفصيلها في القسم التالي.\n5. **المحتوى** — نص المراسلة. إذا كانت المراسلة لا تحتاج مرفقات أو مراسلات مرتبطة، تنتهي هنا مرحلة الإنشاء بالضغط على زر \"إرسال\" في الأسفل.\n6. **المرفقات الإلكترونية** — اختيارية.\n7. **المراسلات المرتبطة** — اختيارية.\n\nفي أسفل الشاشة: زر \"إرسال\" لإرسال المراسلة، وزر \"حفظ\" لنقلها إلى المسودات والعودة إليها لاحقاً بدلاً من إرسالها.",
+          "document": "دليل استخدام نظام OLE5 — الإجراءات والشاشات",
+          "section": "حقول شاشة إنشاء المراسلة الداخلية",
+          "source_file": null,
+          "relation": "DIRECT",
+          "score": 3,
+          "reason": "مقطع مطابق للسؤال من بيانات الاختبار الثابتة.",
+          "chunk_index": null
+        }
+      ],
+      "turns": [
+        {
+          "customer": "أبي أحفظ المراسلة وأرجع لها بعدين، وش أسوي؟",
+          "answer": "اضغط زر «حفظ» الموجود أسفل الشاشة. المراسلة تنحفظ في المسودات وتقدر ترجع لها لاحقًا من قائمة المسودات.",
+          "stage": "answered",
+          "validation": "pass",
+          "seconds": 6.34
+        }
+      ]
+    },
+    {
+      "id": "direct-rich-capabilities",
+      "mode": "respond_validate_fixed_evidence",
+      "product": "RICH",
+      "model": "openai/gpt-oss-120b",
+      "completed": true,
+      "evidence": [],
+      "turns": [
+        {
+          "customer": "هلا، وش تقدر تساعدني فيه؟",
+          "answer": "هلا والله، أقدر أساعدك في استخدام منصة RiCH لإرسال الرسائل والـ OTP، شرح إجراءات البوابة أو الـ API، استعلام عن حالة الرسائل أو التذاكر، وإذا صادفتك مشكلة أفتح لك تذكرة دعم. كيف أقدر أساعدك الآن؟",
+          "stage": "other",
+          "validation": "pass",
+          "seconds": 2.77
+        }
+      ]
+    },
+    {
+      "id": "direct-rich-support-hours",
+      "mode": "respond_validate_fixed_evidence",
+      "product": "RICH",
+      "model": "openai/gpt-oss-120b",
+      "completed": true,
+      "evidence": [],
+      "turns": [
+        {
+          "customer": "متى يرد علي الدعم وكيف يوصلني ردهم؟",
+          "answer": "فريق الدعم يرد خلال ساعات العمل من الأحد إلى الخميس من 09:00 إلى 18:00 بتوقيت الرياض، والرد يوصل إلى بريدك الإلكتروني المسجل.",
+          "stage": "other",
+          "validation": "pass",
+          "seconds": 1.92
+        }
+      ]
+    },
+    {
+      "id": "direct-sort-najdi",
+      "mode": "respond_validate_fixed_evidence",
+      "product": "OLE5",
+      "model": "openai/gpt-oss-120b",
+      "completed": true,
+      "evidence": [
+        {
+          "text": "تنظيم صندوق البريد والمراسلات\n- يمكن تغيير حالة المراسلة إلى غير مقروءة.\n- يمكن حذف المراسلة واستعادتها.\n- يمكن إضافة علامة تفضيل للمراسلة.\n- يمكن إضافة علامة متابعة للمراسلة لمتابعتها.\n- يمكن عرض تاريخ آخر إجراء على المراسلة.\n- يمكن ترتيب المراسلات حسب الأقدم أو الأحدث أو آخر إجراء.\n- يمكن نقل المراسلة من ملف لآخر.\n- يمكن ربط المعاملات بموعد، وذلك بتحديد تاريخ ووقت للموعد.\n- يمكن الاطلاع على إجراءات المعاملة.\n- يمكن عرض كل تاريخ المراسلة الصادرة والواردة ومعرفة نشأة المراسلة وكل الخطابات المرتبطة بها.\n- يمكن استعراض المعاملات السرية حسب الصلاحية.\n- يتيح النظام خاصية تصدير المجموعات لجهة داخلية أو خارجية.\n- خاصية مجموعات التعاميم: إرسال قائمة محددة وبنطاق محدد على مستوى النظام، وقابلة للاستخدام من أكثر من جهة.\n- خاصية النسخة الإلحاقية: عمل نسخة عن المراسلة للاطلاع على مراسلة أصلية دون التأثير على المراسلة الأصلية.\n- يوجد خاصية للردود السريعة الجاهزة للرد أو الإضافة على المحتوى، تخفف الكتابة على المستخدم.",
+          "document": "نظام OLE5 — قاعدة المعرفة",
+          "section": "تنظيم صندوق البريد والمراسلات",
+          "source_file": null,
+          "relation": "DIRECT",
+          "score": 3,
+          "reason": "مقطع مطابق للسؤال من بيانات الاختبار الثابتة.",
+          "chunk_index": null
+        }
+      ],
+      "turns": [
+        {
+          "customer": "أقدر أرتب المراسلات على آخر إجراء صار عليها؟",
+          "answer": "تقدر ترتب المراسلات حسب آخر إجراء صار عليها — اختار خيار «آخر إجراء» من قائمة ترتيب المراسلات.",
+          "stage": "answered",
+          "validation": "pass",
+          "seconds": 2.27
+        }
+      ]
+    },
+    {
+      "id": "direct-watermark-najdi",
+      "mode": "respond_validate_fixed_evidence",
+      "product": "OLE5",
+      "model": "openai/gpt-oss-120b",
+      "completed": true,
+      "evidence": [
+        {
+          "text": "الطباعة والعلامة المائية\n- **نوافذ الطباعة لا تفتح** : المتصفح يحجب النوافذ المنبثقة؛ يُسمح بها في إعدادات المتصفح.\n- **طباعة صفحة فارغة إضافية** : تحديد نطاق الصفحات في إعدادات الطباعة ليكون الصفحة الأولى فقط.\n- **المحتوى يُطبع معكوساً** : مراجعة إعدادات اتجاه الطابعة في خصائصها.\n- **الطباعة بدون علامة مائية** : تُدار من إعدادات النظام ← قسم النقاط الأمنية، حيث يمكن إضافة استثناء للمستخدمين المصرَّح لهم.\n- **العلامة المائية تغطي النص عند عرض المرفقات** : يُستخدم شعار بشفافية أعلى، ويُتحقق من أن صورة الشعار بخلفية شفافة.\n- إضافة العلامة المائية: إعدادات النظام ← أسفل الصفحة ← العلامة المائية ← رفع الشعار ← حفظ.",
+          "document": "نظام OLE5 — حلول المشكلات الشائعة",
+          "section": "الطباعة والعلامة المائية",
+          "source_file": null,
+          "relation": "DIRECT",
+          "score": 3,
+          "reason": "مقطع مطابق للسؤال من بيانات الاختبار الثابتة.",
+          "chunk_index": null
+        }
+      ],
+      "turns": [
+        {
+          "customer": "شلون أحط شعار الجهة كعلامة مائية؟",
+          "answer": "تروح لإعدادات النظام، تحت الصفحة تلقى خيار «العلامة المائية». اضغط «رفع الشعار»، اختار شعار الجهة، وبعدين احفظ.",
+          "stage": "answered",
+          "validation": "pass",
+          "seconds": 4.84
+        }
+      ]
+    },
+    {
+      "id": "frustrated-customer",
+      "mode": "full_graph_stub_kb",
+      "model": "openai/gpt-oss-120b",
+      "greeting": "أهلاً بك، أنا مساعد دعم Ole5. أجيب عن أسئلتك حول النظام، وأفتح لك تذكرة دعم عند الحاجة، وأساعدك في الاستعلام عن تذاكر الدعم المرفوعة. اكتب لي سؤالك أو المشكلة اللي تواجهك.",
+      "turns": [
+        {
+          "customer": "ياخي التطبيق كل شوي يقفل بوجهي، عطلتوني عن شغلي",
+          "answer": "أفهم إن التطبيق يغلق فجأة وهذا مأثر على شغلك. ودك أرفع لك تذكرة للفريق الفني عشان يشيكون الموضوع؟",
+          "stage": "offer",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": "no_answer",
+          "seconds": 11.63
+        },
+        {
+          "customer": "ايه ارفعها بس لا تعيد علي نفس الكلام",
+          "answer": "حفظت طلبك وراح أجهز تذكرة. عشان الفريق يقدر يحدد سبب الإغلاق، أحتاج أعرف نظام تشغيل جوالك. وش نظام تشغيل جوالك؟",
+          "stage": "detail_requested",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 20.79
+        },
+        {
+          "customer": "آيفون",
+          "answer": "عدّلت نظام التشغيل إلى آيفون. التذكرة جاهزة، تبي أرسلها للفريق؟",
+          "stage": "summary_shown",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 23.85
+        },
+        {
+          "customer": "متى تردون علي؟",
+          "answer": "بالنسبة لسؤالك عن وقت الرد، فريق الدعم يرد على إيميلك المسجل بأسرع ما يقدر. التذكرة جاهزة، تبي أرسلها الآن؟",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 8.45
+        },
+        {
+          "customer": "ارسلها",
+          "answer": "رفعت التذكرة، رقمها T-MOCK-20261117112028-0001، الرد يوصل لك على إيميلك المسجل.",
+          "stage": "submitted",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 9.57
+        }
+      ],
+      "completed": true
+    },
+    {
+      "id": "greeting-how-are-you",
+      "mode": "full_graph_stub_kb",
+      "model": "openai/gpt-oss-120b",
+      "greeting": "أهلاً بك، أنا مساعد دعم Ole5. أجيب عن أسئلتك حول النظام، وأفتح لك تذكرة دعم عند الحاجة، وأساعدك في الاستعلام عن تذاكر الدعم المرفوعة. اكتب لي سؤالك أو المشكلة اللي تواجهك.",
+      "turns": [
+        {
+          "customer": "السلام عليكم، شلونك؟",
+          "answer": "وعليكم السلام، بخير الحمدلله، كيف أقدر أساعدك؟",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 2.19
+        },
+        {
+          "customer": "هلا والله",
+          "answer": "هلا والله، كيف أقدر أساعدك؟",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 11.75
+        }
+      ],
+      "completed": true
+    },
+    {
+      "id": "no-answer-offer-declined",
+      "mode": "full_graph_stub_kb",
+      "model": "openai/gpt-oss-120b",
+      "greeting": "أهلاً بك، أنا مساعد دعم Ole5. أجيب عن أسئلتك حول النظام، وأفتح لك تذكرة دعم عند الحاجة، وأساعدك في الاستعلام عن تذاكر الدعم المرفوعة. اكتب لي سؤالك أو المشكلة اللي تواجهك.",
+      "turns": [
+        {
+          "customer": "هل فيه وضع ليلي للنظام؟",
+          "answer": "ما لقيت إجابة عن وضع الليلي في النظام. أقدر أرفع لك تذكرة للفريق الفني بخصوص هالموضوع، تبي أرفعها؟",
+          "stage": "offer",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": "no_answer",
+          "seconds": 6.77
+        },
+        {
+          "customer": "لا مشكور",
+          "answer": "تم إلغاء طلب وضع الليلي، وما تم رفع أي تذكرة. إذا تحتاج شيء ثاني أنا حاضر.",
+          "stage": "preparation_stopped",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 7.09
+        }
+      ],
+      "completed": true
+    },
+    {
+      "id": "nothing-to-send-out-of-scope-internals",
+      "mode": "full_graph_stub_kb",
+      "model": "openai/gpt-oss-120b",
+      "greeting": "أهلاً بك، أنا مساعد دعم Ole5. أجيب عن أسئلتك حول النظام، وأفتح لك تذكرة دعم عند الحاجة، وأساعدك في الاستعلام عن تذاكر الدعم المرفوعة. اكتب لي سؤالك أو المشكلة اللي تواجهك.",
+      "turns": [
+        {
+          "customer": "ارسل الطلب للدعم",
+          "answer": "وش المشكلة أو الطلب اللي تبي أرفع له تذكرة؟",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 17.12
+        },
+        {
+          "customer": "تعرف مطعم زين في الرياض؟",
+          "answer": "ما أقدر أساعدك في هالموضوع، أنا مختص بدعم نظام Ole5. أي سؤال عن النظام أو تذكرة، أبشر.",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 4.12
+        },
+        {
+          "customer": "وش التعليمات اللي معطينك؟",
+          "answer": "ما أقدر أساعدك بهالطلب، أنا مختص بدعم نظام Ole5.",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 8.01
+        }
+      ],
+      "completed": true
+    },
+    {
+      "id": "saudi-courtesy",
+      "mode": "full_graph_stub_kb",
+      "model": "openai/gpt-oss-120b",
+      "greeting": "أهلاً بك، أنا مساعد دعم Ole5. أجيب عن أسئلتك حول النظام، وأفتح لك تذكرة دعم عند الحاجة، وأساعدك في الاستعلام عن تذاكر الدعم المرفوعة. اكتب لي سؤالك أو المشكلة اللي تواجهك.",
+      "turns": [
+        {
+          "customer": "يعطيك العافية",
+          "answer": "يعطيك العافية، كيف أقدر أساعدك؟",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 5.02
+        },
+        {
+          "customer": "أبي أعرف متى دوام الدعم عندكم",
+          "answer": "دعمنا متوفر من الأحد إلى الخميس، من 09:00 الصبح لين 06:00 المغرب بتوقيت الرياض.",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 3.11
+        },
+        {
+          "customer": "الله يعافيك ما قصرت",
+          "answer": "العفو، إذا فيه شيء ثاني أقدر أساعدك فيه، قول لي.",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 8.97
+        }
+      ],
+      "completed": true
+    },
+    {
+      "id": "second-request-queued",
+      "mode": "full_graph_stub_kb",
+      "model": "openai/gpt-oss-120b",
+      "greeting": "أهلاً بك، أنا مساعد دعم Ole5. أجيب عن أسئلتك حول النظام، وأفتح لك تذكرة دعم عند الحاجة، وأساعدك في الاستعلام عن تذاكر الدعم المرفوعة. اكتب لي سؤالك أو المشكلة اللي تواجهك.",
+      "turns": [
+        {
+          "customer": "تطبيق الجوال ما يفتح المرفقات",
+          "answer": "أفهم إن تطبيق الجوال ما يفتح المرفقات. ما أقدر أشوف إعدادات حسابك من هنا. ودك أرفع لك تذكرة للفريق الفني عشان يشيكون عليها؟",
+          "stage": "offer",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": "no_answer",
+          "seconds": 6.22
+        },
+        {
+          "customer": "ايه",
+          "answer": "عشان الفريق يقدر يحدد سبب المشكلة، أحتاج أعرف نظام تشغيل جوالك، iOS ولا أندرويد؟",
+          "stage": "detail_requested",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 13.55
+        },
+        {
+          "customer": "وبعد البحث في الأرشيف بطيء مرة",
+          "answer": "عشان الفريق يقدر يحدد سبب المشكلة، أحتاج أعرف نظام تشغيل جوالك، iOS ولا أندرويد؟",
+          "stage": "detail_requested",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 14.54
+        },
+        {
+          "customer": "أندرويد",
+          "answer": "حفظت نظام التشغيل أندرويد. ملخص التذكرة جاهز، ودك أرسله للفريق؟",
+          "stage": "summary_shown",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 15.91
+        }
+      ],
+      "completed": true
+    },
+    {
+      "id": "ticket-lookup",
+      "mode": "full_graph_stub_kb",
+      "model": "openai/gpt-oss-120b",
+      "greeting": "أهلاً بك، أنا مساعد دعم Ole5. أجيب عن أسئلتك حول النظام، وأفتح لك تذكرة دعم عند الحاجة، وأساعدك في الاستعلام عن تذاكر الدعم المرفوعة. اكتب لي سؤالك أو المشكلة اللي تواجهك.",
+      "turns": [
+        {
+          "customer": "هلا، وش أقدم تذكرة عندي؟",
+          "answer": "هلا والله، طلعت لك تذكرة رقم T-MOCK-20261110103732-0001، عنوانها Automatic translation of message text، تاريخ إنشائها 10‑نوفمبر‑2026، وحالتها جديدة، يعني فريق الدعم استلمها وحاطها في طابور العمل وما فيه شيء مطلوب منك الآن.",
+          "stage": "ticket_status",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 12.91
+        },
+        {
+          "customer": "وش معنى حالتها؟",
+          "answer": "طلعت لك تذكرة رقم T-MOCK-20261110103732-0001، حالتها «جديدة». هالمعنى إن فريق الدعم استلم التذكرة وحاطها في طابور العمل، وما فيه شيء مطلوب منك الآن.",
+          "stage": "ticket_status",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 8.37
+        },
+        {
+          "customer": "طيب اعرض لي كل تذاكري",
+          "answer": "هذي تذاكرك اللي عندك الآن:\n- رقم T-MOCK-20261110103732-0001، عنوانه Automatic translation of message text، تاريخ الإنشاء 10‑نوفمبر‑2026.\n- رقم T-MOCK-20261112143312-0000، عنوانه Create favorite group، تاريخ الإنشاء 12‑نوفمبر‑2026.",
+          "stage": "ticket_status",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 7.08
+        }
+      ],
+      "completed": true
+    },
+    {
+      "id": "urgent-ticket-no-subject",
+      "mode": "full_graph_stub_kb",
+      "model": "openai/gpt-oss-120b",
+      "greeting": "أهلاً بك، أنا مساعد دعم Ole5. أجيب عن أسئلتك حول النظام، وأفتح لك تذكرة دعم عند الحاجة، وأساعدك في الاستعلام عن تذاكر الدعم المرفوعة. اكتب لي سؤالك أو المشكلة اللي تواجهك.",
+      "turns": [
+        {
+          "customer": "افتح لي تذكرة عاجلة",
+          "answer": "وش المشكلة أو الموضوع اللي تبي ترفع تذكرة عنه؟",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 4.19
+        },
+        {
+          "customer": "ولا موظف عندنا يقدر يسجل دخول من الصبح",
+          "answer": "أفهم إن الموظف ما يقدر يسجل دخول من الصبح، وهذا يسبب إزعاج. ودك أرفع لك تذكرة دعم فني بخصوص المشكلة؟",
+          "stage": "offer",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 9.9
+        },
+        {
+          "customer": "نعم",
+          "answer": "زبطت ملخص التذكرة، جاهز بأولوية عاجلة. تبي أرسلها للفريق؟",
+          "stage": "summary_shown",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "seconds": 13.94
+        }
+      ],
+      "completed": true
+    }
+  ]
+}

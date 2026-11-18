@@ -11,7 +11,7 @@ from pathlib import Path
 from langchain_core.messages import AIMessage, HumanMessage
 
 from evals.task import _email
-from ole5_chat import llm, sessions
+from ole5_chat import llm, sessions, sheets
 from ole5_chat.agent import session as agent_session
 from ole5_chat.agent.contracts import PendingCustomerResponse
 from ole5_chat.agent.guards import language_problem
@@ -142,10 +142,11 @@ def proof_task(input: dict) -> dict:
     """conversation_task on a fresh copy of the sheets, with the fixed tickets of evals/fixtures/proof_tickets.xlsx,
     so a ticket one case creates is not there for the next case or the next run."""
     folder = Path(tempfile.mkdtemp(prefix="proof-sheets-"))
-    for name in ("customers", "values", "attachments"):
+    for name in ("customers", "values"):
         shutil.copy(Path("sheets") / f"{name}.xlsx", folder)
     shutil.copy(Path("evals/fixtures/proof_tickets.xlsx"), folder / "tickets.xlsx")
     get_settings().sheets_dir = folder
+    sheets.initialize_runtime_sheets()
     return conversation_task(input)
 
 

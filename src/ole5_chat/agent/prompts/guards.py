@@ -56,6 +56,10 @@ value, limit, permission, cause or fix. Every other kind is not_product_fact, an
 The workflow facts, ticket records, company facts and assistant facts are given so you can recognise these kinds.
 
 Step 2. Only for a product fact: is it supported?
+- Check every claim within the sentence, including parentheses and examples. One supported action does not
+  support the whole sentence when it also invents a menu location, an icon, a file format or an effect.
+  Such a mixed sentence is unsupported; name the unsupported detail in problem. A request for a simpler
+  explanation does not authorize product details from general knowledge.
 - supported: a source states it with the same meaning, in any wording or language. The sources are the passages
   (DIRECT and INFERENTIAL both count), the ticket records, the company facts, the assistant facts, and the customer's
   message for what the customer reported or asked. So a sentence you took for a product fact that the ticket records

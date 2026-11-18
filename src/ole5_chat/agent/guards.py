@@ -40,3 +40,14 @@ def plain(text: str) -> str:
     text = re.sub(r"\*\*|__|`", "", text)
     return re.sub(r"(?m)^[ \t]*#+[ \t]+", "", text)  # "- " bullets stay: replies keep the passage's lists
 
+
+def canonical_ticket_numbers(text: str, numbers: list[str]) -> str:
+    """Restore typographic hyphens only in known ticket IDs; leave other codes and text alone."""
+    for number in sorted(set(numbers), key=len, reverse=True):
+        if "-" not in number:
+            continue
+        pattern = re.escape(number).replace(r"\-", "[-\u2010\u2011]")
+        text = re.sub(r"(?<![A-Za-z0-9_\-\u2010\u2011])" + pattern + r"(?![A-Za-z0-9_\-\u2010\u2011])",
+                      lambda match: number, text)
+    return text
+

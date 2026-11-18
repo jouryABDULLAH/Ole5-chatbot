@@ -1,0 +1,936 @@
+{
+  "metadata": {
+    "source_hashes": {
+      "products/ole5/chat.yaml": "de06297b30bc2b4872fde30a8eddf17cc4cc65c6ff41ab458a5519af7c143eaf",
+      "products/rich/chat.yaml": "ca4eb806e4e73cbca8b30e9a3e94fa7f817fb77e888136eed45f7eee84eb313f",
+      "src/ole5_chat/agent/prompts/respond.py": "de4ff2e272d2f8f64806104bebdd444f9a70354ac73d285c01695c88e8e68677",
+      "src/ole5_chat/agent/prompts/router.py": "ef22d4fb407a8c911c653d851ba4295b0f95760e036a68c9dd5bb37043cb6cb0",
+      "src/ole5_chat/agent/prompts/ticket_operator.py": "5e476862d2cba2336b28da523f466f1e73d71496f9c66ce01484924741241b3a",
+      "src/ole5_chat/products.py": "993e26dafb2683859f9885175659670655ee657d72e69384e5caca80e3433cc4",
+      "src/ole5_chat/agent/turn_sheet.py": "1fe5e778d5121d9602d779397804a7d2293dd76e69f4cdfb7892d42e2a7ff55e",
+      "src/ole5_chat/agent/prompts/guards.py": "c89b09c5fc8e4feabb4c5da0e13738b1fde96543d065c4aba1836522ee3534b6"
+    },
+    "model": "openai/gpt-oss-120b",
+    "response_temperature": 0.1,
+    "baseline": "reports/saudi_voice_comparison_2026-11-17/before.json",
+    "method": "same archived customer messages/evidence; isolated sheets and mock tickets"
+  },
+  "cases": [
+    {
+      "id": "answer-then-simplify",
+      "mode": "full_graph_stub_kb",
+      "product": "OLE5",
+      "model": "openai/gpt-oss-120b",
+      "turns": [
+        {
+          "customer": "كيف انشئ علامة مائية في النظام",
+          "answer": "افتح إعدادات النظام → انزل لأسفل الصفحة → اختر «العلامة المائية» → اضغط «رفع الشعار» → احفظ.",
+          "stage": "answered",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": "answered",
+          "intent": "question",
+          "route_reason": "Worker outcome is answered, so the response can be sent directly",
+          "operator_action": null,
+          "queued": 0,
+          "retained_evidence": true,
+          "seconds": 22.79
+        },
+        {
+          "customer": "ما فهمت عليك، وضحها لي أكثر",
+          "answer": "روح لإعدادات النظام، تحت أسفل الصفحة تلقى خيار «العلامة المائية». اضغطه، ارفع الشعار اللي تبي، وبعدين احفظ.",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "other",
+          "route_reason": "Customer asks for clarification of the previous explanation, which is a follow‑up request to simplify/expand the answer. This is classified as 'other' and should be handled by the respond node.",
+          "operator_action": null,
+          "queued": 0,
+          "retained_evidence": true,
+          "seconds": 5.72
+        }
+      ],
+      "completed": true,
+      "greeting": "هلا بك، أنا مساعد دعم Ole5. أجاوبك عن النظام وأساعدك في رفع تذاكر الدعم ومتابعتها. وش تحتاج؟"
+    },
+    {
+      "id": "answer-with-pending-detail",
+      "mode": "full_graph_stub_kb",
+      "product": "OLE5",
+      "model": "openai/gpt-oss-120b",
+      "turns": [
+        {
+          "customer": "تطبيق الجوال يطلع لي شاشة بيضاء بعد تسجيل الدخول",
+          "answer": "شاشة التطبيق بيضاء بعد تسجيل الدخول، ودك أرفع لك تذكرة للفريق الفني؟",
+          "stage": "offer",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": "no_answer",
+          "intent": "question",
+          "route_reason": "Worker created an offer pending for the customer, so we should respond with the offer.",
+          "operator_action": "offer",
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 8.91
+        },
+        {
+          "customer": "ايه",
+          "answer": "عشان الفريق يقدر يحدد إذا المشكلة خاصة بنظام iOS أو أندرويد، نظام تشغيل جوالك آيفون ولا أندرويد؟",
+          "stage": "detail_requested",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "pending_response",
+          "route_reason": "The worker performed a request_detail action (ticket_operator type), so the result should be responded to the customer asking for phone OS details.",
+          "operator_action": "request_detail",
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 15.18
+        },
+        {
+          "customer": "كيف احفظ الرسالة كمسودة بدلًا من إرسالها",
+          "answer": "عشان تحفظ الرسالة كمسودة، بعد ما تكتب العنوان والمحتوى اضغط زر «حفظ» الموجود أسفل الشاشة بدل زر «إرسال».  \n\nنظام تشغيل جوالك آيفون ولا أندرويد؟",
+          "stage": "answered",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": "answered",
+          "intent": "question",
+          "route_reason": "Worker outcome is answered, so the response can be sent directly",
+          "operator_action": null,
+          "queued": 0,
+          "retained_evidence": true,
+          "seconds": 5.32
+        }
+      ],
+      "completed": true,
+      "greeting": "هلا بك، أنا مساعد دعم Ole5. أجاوبك عن النظام وأساعدك في رفع تذاكر الدعم ومتابعتها. وش تحتاج؟"
+    },
+    {
+      "id": "arabic-with-english-terms",
+      "mode": "full_graph_stub_kb",
+      "product": "OLE5",
+      "model": "openai/gpt-oss-120b",
+      "turns": [
+        {
+          "customer": "الـ app يطلع لي error 500 لما افتح المرفقات",
+          "answer": "الخطأ 500 عند فتح المرفقات واضح، ودك أرفع لك تذكرة للفريق الفني؟",
+          "stage": "offer",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": "no_answer",
+          "intent": "question",
+          "route_reason": "Worker created an offer, so we should respond to the customer",
+          "operator_action": "offer",
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 11.36
+        },
+        {
+          "customer": "ايه",
+          "answer": "جهزت ملخص التذكرة بخصوص خطأ 500 عند فتح المرفقات. تبغى أرسلها للفريق الآن؟",
+          "stage": "summary_shown",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "pending_response",
+          "route_reason": "Worker produced a summary (show_summary) so we should respond to the customer",
+          "operator_action": "show_summary",
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 19.02
+        },
+        {
+          "customer": "Android 14",
+          "answer": "حفظت نظام Android 14. التذكرة جاهزة، تبغى أرسلها للفريق الآن؟",
+          "stage": "summary_shown",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "pending_response",
+          "route_reason": "Worker is ticket_operator (show_summary) so response should be sent",
+          "operator_action": "show_summary",
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 18.33
+        },
+        {
+          "customer": "خلاص كنسل الطلب",
+          "answer": "وقفت تجهيز التذكرة وما أرسلت شي.",
+          "stage": "preparation_stopped",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "pending_response",
+          "route_reason": "Worker cancelled the request and no ticket was created, so the response should be sent directly",
+          "operator_action": "cancelled",
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 12.01
+        }
+      ],
+      "completed": true,
+      "greeting": "هلا بك، أنا مساعد دعم Ole5. أجاوبك عن النظام وأساعدك في رفع تذاكر الدعم ومتابعتها. وش تحتاج؟"
+    },
+    {
+      "id": "bug-full-flow",
+      "mode": "full_graph_stub_kb",
+      "product": "OLE5",
+      "model": "openai/gpt-oss-120b",
+      "turns": [
+        {
+          "customer": "تطبيق Ole5 في الجوال يقفل لحاله لما أفتح المراسلات",
+          "answer": "تطبيق Ole5 يقفل عند فتح المراسلات، واضح إن المشكلة تأثر على الاستخدام. تبي أرفع لك تذكرة للفريق الفني يشيكون عليها؟",
+          "stage": "offer",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": "no_answer",
+          "intent": "question",
+          "route_reason": "Worker created an offer, so we should respond to the customer",
+          "operator_action": "offer",
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 7.31
+        },
+        {
+          "customer": "ايه",
+          "answer": "سجلت المشكلة، وعشان الفريق يقدر يحدد السبب، ممكن تقول لي نظام تشغيل جوالك (آيفون ولا أندرويد)؟",
+          "stage": "detail_requested",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "pending_response",
+          "route_reason": "Worker requested phone OS detail, so we need to respond to the customer",
+          "operator_action": "request_detail",
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 18.42
+        },
+        {
+          "customer": "ليش تحتاجها؟",
+          "answer": "عشان الفريق يقدر يجرب التطبيق على نفس نظام التشغيل ويحدد إذا المشكلة خاصة بنظام معين. نظام تشغيل جوالك آيفون ولا أندرويد؟",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "other",
+          "route_reason": "The user asks why the OS info is needed, which is a clarification about the pending request, not providing the detail. This is classified as 'other' and should be answered directly without moving to ticket handling.",
+          "operator_action": null,
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 5.27
+        },
+        {
+          "customer": "والله ما أدري",
+          "answer": "جهزت التذكرة بأولوية عالية، الملخص جاهز. تبي أرسلها للفريق؟",
+          "stage": "summary_shown",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "pending_response",
+          "route_reason": "Worker produced a summary (ticket_operator action), so the response should be sent back to the customer.",
+          "operator_action": "show_summary",
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 11.79
+        },
+        {
+          "customer": "ارسلها لهم",
+          "answer": "رفعت التذكرة، رقمها T-MOCK-20261117114320-0001. الرد بيجي على بريدك الإلكتروني المسجل.",
+          "stage": "submitted",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "pending_response",
+          "route_reason": "Worker ticket_operator created a ticket, so the result should be sent as a response to the customer.",
+          "operator_action": "submitted",
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 11.65
+        },
+        {
+          "customer": "مشكور",
+          "answer": "العفو.",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "other",
+          "route_reason": "The customer only expressed thanks without any further request or question, which maps to the 'other' intent and should be handled by a direct response.",
+          "operator_action": null,
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 11.01
+        }
+      ],
+      "completed": true,
+      "greeting": "هلا بك، أنا مساعد دعم Ole5. أجاوبك عن النظام وأساعدك في رفع تذاكر الدعم ومتابعتها. وش تحتاج؟"
+    },
+    {
+      "id": "cancel-with-question",
+      "mode": "full_graph_stub_kb",
+      "product": "OLE5",
+      "model": "openai/gpt-oss-120b",
+      "turns": [
+        {
+          "customer": "ما أقدر أرفق ملفات في المراسلة",
+          "answer": "أقدر أرفع لك تذكرة بخصوص مشكلة إرفاق الملفات في المراسلة، تحب أرفعها؟",
+          "stage": "offer",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": "no_answer",
+          "intent": "question",
+          "route_reason": "Worker created an offer, so we should respond to the customer",
+          "operator_action": "offer",
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 10.44
+        },
+        {
+          "customer": "ايه",
+          "answer": "جهزت ملخص التذكرة، جاهزة للإرسال. تبغى أرسلها للفريق؟",
+          "stage": "summary_shown",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "pending_response",
+          "route_reason": "Worker produced a summary (show_summary) for the request, so we should respond",
+          "operator_action": "show_summary",
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 9.77
+        },
+        {
+          "customer": "لا خلها، بس أبي أعرف وش الإيميل المسجل عندكم؟",
+          "answer": "وقفت تجهيز التذكرة وما أرسلت شي. بخصوص البريد المسجل، ما أقدر أشوفه من عندي، وما عندي خطوات مؤكدة أقدر أعطيك إياها.",
+          "stage": "preparation_stopped",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "pending_response",
+          "route_reason": "Worker cancelled the request (action cancelled) with no ticket created, so the result should be responded to directly.",
+          "operator_action": "cancelled",
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 15.81
+        }
+      ],
+      "completed": true,
+      "greeting": "هلا بك، أنا مساعد دعم Ole5. أجاوبك عن النظام وأساعدك في رفع تذاكر الدعم ومتابعتها. وش تحتاج؟"
+    },
+    {
+      "id": "capabilities-then-thanks",
+      "mode": "full_graph_stub_kb",
+      "product": "OLE5",
+      "model": "openai/gpt-oss-120b",
+      "turns": [
+        {
+          "customer": "أنت وش شغلك بالضبط؟",
+          "answer": "أنا مساعد دعم Ole5 مخصص لعملاء الحكومة. أقدر أجاوبك عن نظام Ole5، أساعدك في رفع تذاكر الدعم ومتابعتها، وأستعلم عن حالة تذاكرك إذا احتجت. وش تحتاج الآن؟",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "other",
+          "route_reason": "The user asks about the assistant's role, a capability/about question, which is classified as 'other' and routed to respond.",
+          "operator_action": null,
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 4.77
+        },
+        {
+          "customer": "تمام مشكور",
+          "answer": "العفو",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "other",
+          "route_reason": "The customer only says \"تمام مشكور\" (thanks), which is a gratitude expression with no request. This falls under the 'other' category, so the router should respond directly.",
+          "operator_action": null,
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 14.11
+        }
+      ],
+      "completed": true,
+      "greeting": "هلا بك، أنا مساعد دعم Ole5. أجاوبك عن النظام وأساعدك في رفع تذاكر الدعم ومتابعتها. وش تحتاج؟"
+    },
+    {
+      "id": "direct-delivery-overview",
+      "mode": "respond_validate_fixed_evidence",
+      "product": "OLE5",
+      "model": "openai/gpt-oss-120b",
+      "turns": [
+        {
+          "customer": "وش أقدر أسوي ببيانات التسليم للمراسلات الورقية؟",
+          "answer": "تقدر من النظام تعرض وتدير كل بيانات التسليم بشكل مركزي، وترفع وتعرض بيان التسليم للمراسلات الورقية داخل النظام. كمان تقدر تبحث عن بيان تسليم معين وتسوي مسح متعدد لبيانات التسليم بحيث ترفع عدة بيانات مرة وحدة وتُضاف آلياً لكل بيان حسب رقمه.",
+          "stage": "answered",
+          "validation": "pass",
+          "seconds": 3.54
+        }
+      ],
+      "completed": true,
+      "evidence": [
+        {
+          "text": "بيانات التسليم والمراسلات العينية\n- يوفر النظام آلية للتحقق من استلام المرفقات العينية من خلال بيانات التسليم الموقعة وإمكانية إرفاقها في النظام.\n- يتيح النظام تأكيد الاستلام الإلكتروني للمراسلة العينية.\n- يتيح النظام طباعة بيان تسليم للمراسلة العينية بعد إرسالها وتخصيص المستقبلين داخل البيان.\n- يدعم النظام QR code عن طريق بيان التسليم.\n- يتيح النظام عرض وإدارة جميع بيانات التسليم بشكل مركزي على مستوى كل مراسلات النظام أو الإدارات الرئيسية، مع إمكانية رفع وعرض بيان التسليم للمراسلات الورقية في النظام.\n- يتيح النظام البحث عن بيان تسليم معين.\n- يتيح النظام المسح المتعدد لبيانات التسليم، بحيث يرفع المستخدم عدة بيانات تسليم معاً وتُضاف آلياً إلى كل بيان حسب رقمه دون تدخل منه.",
+          "document": "نظام OLE5 — قاعدة المعرفة",
+          "section": "بيانات التسليم والمراسلات العينية",
+          "source_file": null,
+          "relation": "DIRECT",
+          "score": 3,
+          "reason": "مقطع مطابق للسؤال من بيانات الاختبار الثابتة.",
+          "chunk_index": null
+        }
+      ]
+    },
+    {
+      "id": "direct-draft-najdi",
+      "mode": "respond_validate_fixed_evidence",
+      "product": "OLE5",
+      "model": "openai/gpt-oss-120b",
+      "turns": [
+        {
+          "customer": "أبي أحفظ المراسلة وأرجع لها بعدين، وش أسوي؟",
+          "answer": "اضغط زر “حفظ” عشان تنقل المراسلة إلى المسودات وتقدر ترجع لها لاحقاً.",
+          "stage": "answered",
+          "validation": "pass",
+          "seconds": 14.87
+        }
+      ],
+      "completed": true,
+      "evidence": [
+        {
+          "text": "حقول شاشة إنشاء المراسلة الداخلية\nالحقول بالترتيب كما تظهر في الشاشة:\n\n1. **إلى** — كتابة بريد الإدارة المراد الإرسال إليها أو اسم الشخص، أو الضغط على (+) لتظهر نافذة بأسماء الإدارات حسب الهيكل أو بأسماء الأشخاص.\n2. **الموضوع** — عنوان المراسلة الموجهة.\n3. **تصنيف المراسلات** — كتابة اسم التصنيف يدوياً، أو اختيار تصنيف أو أكثر من التصنيفات الموجودة بالضغط على (+).\n4. **الخصائص** — تفصيلها في القسم التالي.\n5. **المحتوى** — نص المراسلة. إذا كانت المراسلة لا تحتاج مرفقات أو مراسلات مرتبطة، تنتهي هنا مرحلة الإنشاء بالضغط على زر \"إرسال\" في الأسفل.\n6. **المرفقات الإلكترونية** — اختيارية.\n7. **المراسلات المرتبطة** — اختيارية.\n\nفي أسفل الشاشة: زر \"إرسال\" لإرسال المراسلة، وزر \"حفظ\" لنقلها إلى المسودات والعودة إليها لاحقاً بدلاً من إرسالها.",
+          "document": "دليل استخدام نظام OLE5 — الإجراءات والشاشات",
+          "section": "حقول شاشة إنشاء المراسلة الداخلية",
+          "source_file": null,
+          "relation": "DIRECT",
+          "score": 3,
+          "reason": "مقطع مطابق للسؤال من بيانات الاختبار الثابتة.",
+          "chunk_index": null
+        }
+      ]
+    },
+    {
+      "id": "direct-rich-capabilities",
+      "mode": "respond_validate_fixed_evidence",
+      "product": "RICH",
+      "model": "openai/gpt-oss-120b",
+      "turns": [
+        {
+          "customer": "هلا، وش تقدر تساعدني فيه؟",
+          "answer": "أستطيع مساعدتك في استفسارات حول منصة RiCH، مثل إعداد الرسائل، استخدام الـ API، حل المشكلات، أو فتح تذكرة دعم. يمكنك أن تسألني عن كيفية تنفيذ شيء معين، أو تخبرني بما لا يعمل لديك.",
+          "stage": "other",
+          "validation": "pass",
+          "seconds": 10.53
+        }
+      ],
+      "completed": true,
+      "evidence": []
+    },
+    {
+      "id": "direct-rich-support-hours",
+      "mode": "respond_validate_fixed_evidence",
+      "product": "RICH",
+      "model": "openai/gpt-oss-120b",
+      "turns": [
+        {
+          "customer": "متى يرد علي الدعم وكيف يوصلني ردهم؟",
+          "answer": "فريق الدعم يرد على التذاكر خلال ساعات العمل من الأحد إلى الخميس، من 09:00 إلى 18:00 بتوقيت الرياض. يتم إرسال الرد إلى البريد الإلكتروني المسجل في حسابك.",
+          "stage": "other",
+          "validation": "pass",
+          "seconds": 5.36
+        }
+      ],
+      "completed": true,
+      "evidence": []
+    },
+    {
+      "id": "direct-sort-najdi",
+      "mode": "respond_validate_fixed_evidence",
+      "product": "OLE5",
+      "model": "openai/gpt-oss-120b",
+      "turns": [
+        {
+          "customer": "أقدر أرتب المراسلات على آخر إجراء صار عليها؟",
+          "answer": "نعم، يمكن ترتيب المراسلات حسب آخر إجراء.",
+          "stage": "answered",
+          "validation": "pass",
+          "seconds": 10.83
+        }
+      ],
+      "completed": true,
+      "evidence": [
+        {
+          "text": "تنظيم صندوق البريد والمراسلات\n- يمكن تغيير حالة المراسلة إلى غير مقروءة.\n- يمكن حذف المراسلة واستعادتها.\n- يمكن إضافة علامة تفضيل للمراسلة.\n- يمكن إضافة علامة متابعة للمراسلة لمتابعتها.\n- يمكن عرض تاريخ آخر إجراء على المراسلة.\n- يمكن ترتيب المراسلات حسب الأقدم أو الأحدث أو آخر إجراء.\n- يمكن نقل المراسلة من ملف لآخر.\n- يمكن ربط المعاملات بموعد، وذلك بتحديد تاريخ ووقت للموعد.\n- يمكن الاطلاع على إجراءات المعاملة.\n- يمكن عرض كل تاريخ المراسلة الصادرة والواردة ومعرفة نشأة المراسلة وكل الخطابات المرتبطة بها.\n- يمكن استعراض المعاملات السرية حسب الصلاحية.\n- يتيح النظام خاصية تصدير المجموعات لجهة داخلية أو خارجية.\n- خاصية مجموعات التعاميم: إرسال قائمة محددة وبنطاق محدد على مستوى النظام، وقابلة للاستخدام من أكثر من جهة.\n- خاصية النسخة الإلحاقية: عمل نسخة عن المراسلة للاطلاع على مراسلة أصلية دون التأثير على المراسلة الأصلية.\n- يوجد خاصية للردود السريعة الجاهزة للرد أو الإضافة على المحتوى، تخفف الكتابة على المستخدم.",
+          "document": "نظام OLE5 — قاعدة المعرفة",
+          "section": "تنظيم صندوق البريد والمراسلات",
+          "source_file": null,
+          "relation": "DIRECT",
+          "score": 3,
+          "reason": "مقطع مطابق للسؤال من بيانات الاختبار الثابتة.",
+          "chunk_index": null
+        }
+      ]
+    },
+    {
+      "id": "direct-watermark-najdi",
+      "mode": "respond_validate_fixed_evidence",
+      "product": "OLE5",
+      "model": "openai/gpt-oss-120b",
+      "turns": [
+        {
+          "customer": "شلون أحط شعار الجهة كعلامة مائية؟",
+          "answer": "1. افتح إعدادات النظام.  \n2. انزل لأسفل الصفحة.  \n3. اضغط على «العلامة المائية».  \n4. اختر «رفع الشعار» وحمّل صورة الشعار.  \n5. اضغط حفظ.",
+          "stage": "answered",
+          "validation": "pass",
+          "seconds": 15.65
+        }
+      ],
+      "completed": true,
+      "evidence": [
+        {
+          "text": "الطباعة والعلامة المائية\n- **نوافذ الطباعة لا تفتح** : المتصفح يحجب النوافذ المنبثقة؛ يُسمح بها في إعدادات المتصفح.\n- **طباعة صفحة فارغة إضافية** : تحديد نطاق الصفحات في إعدادات الطباعة ليكون الصفحة الأولى فقط.\n- **المحتوى يُطبع معكوساً** : مراجعة إعدادات اتجاه الطابعة في خصائصها.\n- **الطباعة بدون علامة مائية** : تُدار من إعدادات النظام ← قسم النقاط الأمنية، حيث يمكن إضافة استثناء للمستخدمين المصرَّح لهم.\n- **العلامة المائية تغطي النص عند عرض المرفقات** : يُستخدم شعار بشفافية أعلى، ويُتحقق من أن صورة الشعار بخلفية شفافة.\n- إضافة العلامة المائية: إعدادات النظام ← أسفل الصفحة ← العلامة المائية ← رفع الشعار ← حفظ.",
+          "document": "نظام OLE5 — حلول المشكلات الشائعة",
+          "section": "الطباعة والعلامة المائية",
+          "source_file": null,
+          "relation": "DIRECT",
+          "score": 3,
+          "reason": "مقطع مطابق للسؤال من بيانات الاختبار الثابتة.",
+          "chunk_index": null
+        }
+      ]
+    },
+    {
+      "id": "frustrated-customer",
+      "mode": "full_graph_stub_kb",
+      "product": "OLE5",
+      "model": "openai/gpt-oss-120b",
+      "turns": [
+        {
+          "customer": "ياخي التطبيق كل شوي يقفل بوجهي، عطلتوني عن شغلي",
+          "answer": "تطبيقك يغلق بشكل متكرر ويعطلك عن شغلك، ودك أرفع لك تذكرة للفريق الفني؟",
+          "stage": "offer",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": "no_answer",
+          "intent": "question",
+          "route_reason": "Worker created an offer for the request, so we should respond to the customer",
+          "operator_action": "offer",
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 14.67
+        },
+        {
+          "customer": "ايه ارفعها بس لا تعيد علي نفس الكلام",
+          "answer": "حفظت طلبك بخصوص إغلاق التطبيق، عشان الفريق يقدر يحدد السبب، جوالك آيفون ولا أندرويد؟",
+          "stage": "detail_requested",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "pending_response",
+          "route_reason": "worker is ticket_operator requesting detail, so we should respond",
+          "operator_action": "request_detail",
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 17.84
+        },
+        {
+          "customer": "آيفون",
+          "answer": "آيفون حفظته. التذكرة جاهزة بخصوص إغلاق التطبيق المتكرر، ودك أرسلها للفريق؟",
+          "stage": "summary_shown",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "pending_response",
+          "route_reason": "Worker produced a summary (action show_summary) for the pending summary step, so the response should be sent back to the customer.",
+          "operator_action": "show_summary",
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 18.99
+        },
+        {
+          "customer": "متى تردون علي؟",
+          "answer": "فريق الدعم بيرد عليك بأسرع ما يمكن، والرد يوصل عبر البريد الإلكتروني المسجل. ملخص التذكرة بخصوص إغلاق التطبيق جاهز، ودك أرسله للفريق؟",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "other",
+          "route_reason": "The customer asks when they will receive a reply, which is a support‑process question about response time. This falls under 'other' and should be answered directly without searching or creating a ticket.",
+          "operator_action": null,
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 10.86
+        },
+        {
+          "customer": "ارسلها",
+          "answer": "رفعت التذكرة، رقمها T-MOCK-20261117114445-0001. خلك محتفظ بالرقم للمتابعة، والرد يوصل لك على بريدك الإلكتروني المسجل.",
+          "stage": "submitted",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "pending_response",
+          "route_reason": "Ticket operator created a ticket, so the response should be sent to the customer",
+          "operator_action": "submitted",
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 11.25
+        }
+      ],
+      "completed": true,
+      "greeting": "هلا بك، أنا مساعد دعم Ole5. أجاوبك عن النظام وأساعدك في رفع تذاكر الدعم ومتابعتها. وش تحتاج؟"
+    },
+    {
+      "id": "greeting-how-are-you",
+      "mode": "full_graph_stub_kb",
+      "product": "OLE5",
+      "model": "openai/gpt-oss-120b",
+      "turns": [
+        {
+          "customer": "السلام عليكم، شلونك؟",
+          "answer": "وعليكم السلام، بخير الحمدلله، كيف أقدر أساعدك؟",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "other",
+          "route_reason": "Customer only greets with سلام وعليكم and asks how the assistant is; no request or question, so classify as other and respond.",
+          "operator_action": null,
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 5.81
+        },
+        {
+          "customer": "هلا والله",
+          "answer": "هلا والله، كيف أقدر أساعدك؟",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "other",
+          "route_reason": "The customer only greets (\"هلا والله\") without any request or question, so it's classified as a greeting (other) and should be handled by respond.",
+          "operator_action": null,
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 4.92
+        }
+      ],
+      "completed": true,
+      "greeting": "هلا بك، أنا مساعد دعم Ole5. أجاوبك عن النظام وأساعدك في رفع تذاكر الدعم ومتابعتها. وش تحتاج؟"
+    },
+    {
+      "id": "no-answer-offer-declined",
+      "mode": "full_graph_stub_kb",
+      "product": "OLE5",
+      "model": "openai/gpt-oss-120b",
+      "turns": [
+        {
+          "customer": "هل فيه وضع ليلي للنظام؟",
+          "answer": "ما لقيت معلومات عن وضع ليلي في النظام. ودك أرفع لك تذكرة للفريق الفني يشيكون؟",
+          "stage": "offer",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": "no_answer",
+          "intent": "question",
+          "route_reason": "Worker created an offer, so we should respond to the customer",
+          "operator_action": "offer",
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 12.45
+        },
+        {
+          "customer": "لا مشكور",
+          "answer": "تمام، وقفت تجهيز التذكرة وما أرسلت شي.",
+          "stage": "preparation_stopped",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "pending_response",
+          "route_reason": "Worker declined the offer and no ticket was created, so we should respond to the customer",
+          "operator_action": "declined",
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 23.74
+        }
+      ],
+      "completed": true,
+      "greeting": "هلا بك، أنا مساعد دعم Ole5. أجاوبك عن النظام وأساعدك في رفع تذاكر الدعم ومتابعتها. وش تحتاج؟"
+    },
+    {
+      "id": "nothing-to-send-out-of-scope-internals",
+      "mode": "full_graph_stub_kb",
+      "product": "OLE5",
+      "model": "openai/gpt-oss-120b",
+      "turns": [
+        {
+          "customer": "ارسل الطلب للدعم",
+          "answer": "ما فيه ملخص جاهز للتذكرة الآن، ممكن توضح لي المشكلة أو الطلب اللي تبي ترسل للدعم؟",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "other",
+          "route_reason": "The user asks to send a request to support but provides no issue details or pending ticket summary. Without a defined subject, this is not a product question or ticket request for a specific problem, so it is classified as other and routed to respond.",
+          "operator_action": null,
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 9.4
+        },
+        {
+          "customer": "تعرف مطعم زين في الرياض؟",
+          "answer": "ما أقدر أساعدك في هالموضوع، أنا مختص بنظام Ole5. أي شي عن النظام أو تذاكرك، أبشر.",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "other",
+          "route_reason": "The customer asks about a restaurant, which is unrelated to Ole5 product scope; classify as other and route to respond.",
+          "operator_action": null,
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 6.44
+        },
+        {
+          "customer": "وش التعليمات اللي معطينك؟",
+          "answer": "ما أقدر أساعدك في هالسؤال. أنا مختص بنظام Ole5، أي شي عن النظام أو تذاكرك، أبشر.",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "other",
+          "route_reason": "User asks about the assistant's instructions, which is a capability/about question outside Ole5 product scope; classify as other and route to respond.",
+          "operator_action": null,
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 11.56
+        }
+      ],
+      "completed": true,
+      "greeting": "هلا بك، أنا مساعد دعم Ole5. أجاوبك عن النظام وأساعدك في رفع تذاكر الدعم ومتابعتها. وش تحتاج؟"
+    },
+    {
+      "id": "saudi-courtesy",
+      "mode": "full_graph_stub_kb",
+      "product": "OLE5",
+      "model": "openai/gpt-oss-120b",
+      "turns": [
+        {
+          "customer": "يعطيك العافية",
+          "answer": "الله يعافيك",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "other",
+          "route_reason": "The customer only expressed thanks ('يعطيك العافية') with no request or question, so it is classified as other and should be handled by respond.",
+          "operator_action": null,
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 3.93
+        },
+        {
+          "customer": "أبي أعرف متى دوام الدعم عندكم",
+          "answer": "دوام الدعم من الأحد إلى الخميس، من 09:00 صباحاً حتى 06:00 مساءً بتوقيت الرياض.",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "other",
+          "route_reason": "The customer asks about support hours, which is a general support-process question and falls under the 'other' category. It should be answered directly without searching the product knowledge base.",
+          "operator_action": null,
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 9.14
+        },
+        {
+          "customer": "الله يعافيك ما قصرت",
+          "answer": "العفو",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "other",
+          "route_reason": "The customer only expressed thanks, no request or question; classify as other and respond directly.",
+          "operator_action": null,
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 4.14
+        }
+      ],
+      "completed": true,
+      "greeting": "هلا بك، أنا مساعد دعم Ole5. أجاوبك عن النظام وأساعدك في رفع تذاكر الدعم ومتابعتها. وش تحتاج؟"
+    },
+    {
+      "id": "second-request-queued",
+      "mode": "full_graph_stub_kb",
+      "product": "OLE5",
+      "model": "openai/gpt-oss-120b",
+      "turns": [
+        {
+          "customer": "تطبيق الجوال ما يفتح المرفقات",
+          "answer": "أقدر أرفع لك تذكرة بخصوص مشكلة عدم فتح المرفقات في تطبيق الجوال، تحب أرفعها؟",
+          "stage": "offer",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": "no_answer",
+          "intent": "question",
+          "route_reason": "Worker created an offer pending, so we must respond to the customer",
+          "operator_action": "offer",
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 19.7
+        },
+        {
+          "customer": "ايه",
+          "answer": "حفظت طلبك بخصوص عدم فتح المرفقات في تطبيق الجوال. عشان الفريق يقدر يحدد السبب، نظام تشغيل جوالك آيفون ولا أندرويد؟",
+          "stage": "detail_requested",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "pending_response",
+          "route_reason": "Worker requested detail (phone OS) for the attachment opening issue",
+          "operator_action": "request_detail",
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 14.95
+        },
+        {
+          "customer": "وبعد البحث في الأرشيف بطيء مرة",
+          "answer": "سجلت مشكلة بطء البحث في الأرشيف، وبالنسبة لتطبيق الجوال، نظام تشغيل جوالك آيفون ولا أندرويد؟",
+          "stage": "detail_requested",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": "no_answer",
+          "intent": "question",
+          "route_reason": "Worker requested phone OS detail, so we must respond to the customer",
+          "operator_action": "request_detail",
+          "queued": 1,
+          "retained_evidence": false,
+          "seconds": 16.14
+        },
+        {
+          "customer": "أندرويد",
+          "answer": "عدّلت نظام تشغيل جوالك إلى أندرويد. التذكرة جاهزة، تبي أرسلها للفريق؟",
+          "stage": "summary_shown",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "pending_response",
+          "route_reason": "Worker produced a summary (action show_summary) for the request, so the response should be sent back to the customer",
+          "operator_action": "show_summary",
+          "queued": 1,
+          "retained_evidence": false,
+          "seconds": 13.41
+        }
+      ],
+      "completed": true,
+      "greeting": "هلا بك، أنا مساعد دعم Ole5. أجاوبك عن النظام وأساعدك في رفع تذاكر الدعم ومتابعتها. وش تحتاج؟"
+    },
+    {
+      "id": "ticket-lookup",
+      "mode": "full_graph_stub_kb",
+      "product": "OLE5",
+      "model": "openai/gpt-oss-120b",
+      "turns": [
+        {
+          "customer": "هلا، وش أقدم تذكرة عندي؟",
+          "answer": "هلا والله، تذكرةك رقم T-MOCK-20261110103732-0001 بعنوان «الترجمة التلقائية لنص الرسالة» تم إنشاؤها بتاريخ 10‑11‑2026، وحالتها جديدة، يعني تم استلامها من فريق الدعم وهي الآن في قائمة الانتظار ولا يحتاج منك شيء الآن.",
+          "stage": "ticket_status",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "ticket_enquiry",
+          "route_reason": "Worker ticket_enquiry returned a successful lookup_status, so the response should be sent to the customer.",
+          "operator_action": null,
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 11.33
+        },
+        {
+          "customer": "وش معنى حالتها؟",
+          "answer": "حالة “جديدة” تعني إن فريق الدعم استلم تذكرتك وحاليا هي في قائمة الانتظار، ولا يحتاج منك شيء الآن.",
+          "stage": "ticket_status",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "ticket_enquiry",
+          "route_reason": "Worker is ticket_enquiry, so its result should be sent to respond",
+          "operator_action": null,
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 14.87
+        },
+        {
+          "customer": "طيب اعرض لي كل تذاكري",
+          "answer": "هذه تذاكرك الحالية:\n\n- رقم التذكرة T-MOCK-20261110103732-0001  \n  العنوان: ترجمة الرسالة تلقائيًا  \n  تاريخ الإنشاء: 10‑11‑2026  \n  الحالة: جديدة – تم استلامها من فريق الدعم وهي الآن في قائمة الانتظار ولا يحتاج منك شيء الآن.\n\n- رقم التذكرة T-MOCK-20261112143312-0000  \n  العنوان: إنشاء مجموعة مفضلة  \n  تاريخ الإنشاء: 12‑11‑2026  \n  الحالة: جديدة – تم استلامها من فريق الدعم وهي الآن في قائمة الانتظار ولا يحتاج منك شيء الآن.",
+          "stage": "ticket_status",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "ticket_enquiry",
+          "route_reason": "Ticket enquiry found tickets, so respond to customer",
+          "operator_action": null,
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 19.57
+        }
+      ],
+      "completed": true,
+      "greeting": "هلا بك، أنا مساعد دعم Ole5. أجاوبك عن النظام وأساعدك في رفع تذاكر الدعم ومتابعتها. وش تحتاج؟"
+    },
+    {
+      "id": "urgent-ticket-no-subject",
+      "mode": "full_graph_stub_kb",
+      "product": "OLE5",
+      "model": "openai/gpt-oss-120b",
+      "turns": [
+        {
+          "customer": "افتح لي تذكرة عاجلة",
+          "answer": "أقدر أفتح لك تذكرة، لكن أحتاج أعرف موضوع المشكلة أو الطلب اللي تبي ترفع تذكرة عنه.",
+          "stage": "other",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "other",
+          "route_reason": "Customer asks to open an urgent ticket but provides no subject or issue; without a clear in‑scope problem we cannot classify as needs_ticket or question, so we must ask for clarification.",
+          "operator_action": null,
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 9.18
+        },
+        {
+          "customer": "ولا موظف عندنا يقدر يسجل دخول من الصبح",
+          "answer": "ما أحد يقدر يسجل دخول من الصبح، ودك أفتح لك تذكرة للفريق الفني بخصوص مشكلة تسجيل الدخول؟",
+          "stage": "offer",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "needs_ticket",
+          "route_reason": "Worker created an offer, so we should respond to the customer",
+          "operator_action": "offer",
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 12.88
+        },
+        {
+          "customer": "نعم",
+          "answer": "تم تجهيز التذكرة بخصوص عدم قدرة أي موظف على تسجيل الدخول، بأولوية حرجة. هل تبي أرسلها للفريق الآن؟",
+          "stage": "summary_shown",
+          "validation": "pass",
+          "validation_reason": "Basic reply checks passed.",
+          "search_outcome": null,
+          "intent": "pending_response",
+          "route_reason": "Worker is a ticket_operator (show_summary) so the result should be responded to the customer",
+          "operator_action": "show_summary",
+          "queued": 0,
+          "retained_evidence": false,
+          "seconds": 10.68
+        }
+      ],
+      "completed": true,
+      "greeting": "هلا بك، أنا مساعد دعم Ole5. أجاوبك عن النظام وأساعدك في رفع تذاكر الدعم ومتابعتها. وش تحتاج؟"
+    }
+  ]
+}

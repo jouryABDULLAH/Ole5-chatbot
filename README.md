@@ -77,6 +77,7 @@ Notes:
 
 - With `KB_BACKEND=ragent2` the first start loads the retrieval models in the background and logs `kb  ready` when searches can run.
 - Attachments are stored in `uploads/`. Every ticket created, mock or real, is recorded in `sheets/tickets.xlsx`; the mock keeps the ticket itself in memory.
+- `tickets.xlsx` and `attachments.xlsx` are local runtime data, ignored by Git. Missing runtime workbooks are created with empty headers on first use. Existing files are preserved. Back up these files and `uploads/` before moving a deployment. The customer and value workbooks remain versioned configuration.
 
 ## Tracing with Phoenix (optional)
 
@@ -90,7 +91,7 @@ Set `TRACING=true` in `.env`, restart the service, and open http://localhost:600
 
 ## Tests
 
-The unit tests run offline, with the model stubbed out:
+The unit tests run offline, with scripted models; an unscripted model-client call fails the test:
 
 ```bash
 pytest -q
@@ -98,11 +99,17 @@ pytest -q
 
 To be sure no real call is made, set the key to a dummy value for the run, for example `GROQ_API_KEY=invalid pytest -q` in bash.
 
-The router can also be checked against the real model on a fixed set of messages:
+The live evaluation covers routing, response guards, mirrored Arabic/English workflow stages, and multi-turn conversations. It uses temporary sheets and mock tickets. It writes a readable report with every response and a list of cases needing review:
 
 ```bash
-RUN_LIVE=1 pytest tests/test_router_live.py -s
+python scripts/evaluate_chat.py --output reports/my-evaluation
 ```
+
+Choose a new output directory for each run. A Groq key and network access are required; set the same `GROQ_API_BASE` / `GROQ_BASE_URL` as the deployment when comparing models or prompts. Fixed/stub evidence isolates response behavior; this suite does not measure production retrieval accuracy or certify native-speaker naturalness.
+
+The runner uses one worker by default to reduce shared model rate limits. Use `--rerun-from reports/my-evaluation/results.json` with a fresh `--output` to recheck flagged cases and save an HTML conversation comparison, or select scenarios with `--case-ids`. Undecided expectations remain unscored; they never count as passes.
+
+To compare an archived audit with the current prompts, use `scripts/compare_voice.py --before <transcripts.json> --output <new-folder>`. It saves the same customer messages with both replies in Markdown and HTML. Curated reports and combined transcripts can be committed; per-case logs, duplicate case files and source snapshots stay local.
 
 ## Project layout
 

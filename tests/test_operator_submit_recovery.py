@@ -25,6 +25,48 @@ def ready_state():
     return state
 
 
+@pytest.mark.parametrize("reported", ["offer", "already_submitted", "clarify", "workflow_failed"])
+def test_submission_receipt_wins_over_next_offer_or_old_ticket(monkeypatch, reported):
+    from ole5_chat.agent.turn_sheet import build_turn_sheet
+    state = ready_state()
+    state["pending_issues"] = [{"id": "issue-2", "description": "Slow archive search"}]
+    monkeypatch.setattr(tools.ticket_submit, "submit", lambda *args: ({"ticket_number": "TEST-1"}, []))
+    monkeypatch.setattr(tools.ticket_api, "ticket_client", lambda: object())
+    bound = {tool.name: tool for tool in tools.build_ticket_operator_tools(state)}
+    receipt = bound["submit_ticket"].invoke({"issue_id": "issue-1", "draft_version": 1})
+    report = json.dumps([{"name": "submit_ticket", "content": receipt}])
+    mistaken = OperatorCompletion(action=reported, reason="Next offer or old ticket")
+    assert _completion_check(state, report)(mistaken)
+    update = _apply_completion(state, mistaken, report)
+    sheet = build_turn_sheet({**state, **update}, "en")
+    assert sheet["stage"] == "submitted" and sheet["ticket_number"] == "TEST-1"
+    assert sheet["issue"] == "Translation question"
+    assert sheet["next_issue"] == "Slow archive search"
+    assert update["pending_customer_response"].issue_id == "issue-2"
+
+
+def test_cancelled_preparation_is_not_reported_as_an_older_submitted_ticket():
+    from ole5_chat.agent.turn_sheet import build_turn_sheet
+    state = ready_state()
+    state.update(active_issue={"id": "issue-2", "description": "Slow archive search"},
+                 pending_customer_response=PendingCustomerResponse(kind="offer", issue_id="issue-2"))
+    bound = {tool.name: tool for tool in tools.build_ticket_operator_tools(state)}
+    cancelled = bound["manage_issues"].invoke({"operation": "cancel_preparation", "issue_id": "issue-2"})
+    report = json.dumps([
+        {"name": "check_submitted_tickets", "content": json.dumps({"success": True, "tickets": [
+            {"ticket_number": "OLD-1", "title": "Mobile attachment issue"}]})},
+        {"name": "manage_issues", "content": cancelled},
+    ])
+    mistaken = OperatorCompletion(action="already_submitted", existing_ticket="OLD-1", reason="Old mobile issue")
+    assert _completion_check(state, report)(mistaken)
+    update = _apply_completion(state, mistaken, report)
+    sheet = build_turn_sheet({**state, **update}, "en")
+    assert sheet["stage"] == "preparation_stopped"
+    assert sheet["cancelled_issue"] == "Slow archive search"
+    assert not update["pending_customer_response"]
+    assert not update["ticket_operator_result"]["existing_ticket"]
+
+
 @pytest.mark.parametrize("mode", ["edit", "failed", "initial", "unchanged"])
 def test_confirmed_edits_reach_respond_only_after_existing_draft_is_saved(monkeypatch, mode):
     from ole5_chat.agent.turn_sheet import build_turn_sheet
