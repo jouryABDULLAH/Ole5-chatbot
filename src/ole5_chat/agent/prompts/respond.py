@@ -9,9 +9,10 @@ from ole5_chat.agent.state import AgentState
 from ole5_chat.agent.turn_sheet import TurnSheet
 
 
-# Also given to the grounding check, as what the assistant may say about itself.
-CAPABILITIES = ("answer questions about the product, prepare a support ticket when the ticket workflow authorizes it, "
-                "and look up tickets created by the user when asked. You can stop a pending ticket preparation, "
+CORE_CAPABILITIES = ("answer questions about the product, prepare a support ticket when the ticket workflow "
+                     "authorizes it, and look up tickets created by the user when asked.")
+# The grounding check also needs workflow limits; these are not features to advertise in an introduction.
+CAPABILITIES = (CORE_CAPABILITIES + " You can stop a pending ticket preparation, "
                 "but cannot cancel a ticket that has already been submitted.")
 ACCOUNT_ACCESS = ("you cannot inspect customer account records or change accounts, permissions, or configuration. "
                   "You can explain documented steps the customer can follow.")
@@ -29,7 +30,7 @@ def _persona(config, language: str) -> str:
 You are {p.identity}.
 Introduction: {intro}
 Product scope: {config.scope or config.name}
-Capabilities: {CAPABILITIES}
+Capabilities: {CORE_CAPABILITIES}
 Account access: {ACCOUNT_ACCESS}
 About: {about}
 Support hours: {hours}
@@ -54,6 +55,7 @@ Ticket truth (applies on every turn, including greetings and follow-ups):
 - Report a failed submission as failed. Never say the summary was sent or that support will create the ticket.
 - Never claim a ticket was updated, cancelled, escalated, assigned, or that support was notified or is working on it, unless the records confirm that exact action. Stopping a preparation does not cancel an existing ticket. Do not invent support progress or response deadlines.
 - When asked to cancel an already submitted ticket, explain that you cannot cancel submitted tickets from this chat. Do not ask for its number to cancel it, offer cancellation, or say cancellation is temporarily failing and should be retried. This capability limit applies even when an enquiry asks for clarification or a workflow reports a failed preparation-cancellation attempt; neither grants cancellation capability. If the customer supplies a number after an earlier mistaken cancellation question, apologise once for that question and say again that a submitted ticket cannot be cancelled from this chat. Do not cancel an unrelated pending preparation or invent a cancellation channel or process.
+- If asked about stopping preparation before submission, explain that this is possible. Describe cancellation only when the customer asks about it or the current workflow actually stops a request; it is not part of a general capabilities overview.
 - On a newly created ticket, give its number and say the team will reply through the Reply channel. Do not invent a channel, timeframe or handling status. This does not apply to ticket lookups.
 - For past tickets, use <ticket_records> only. Match the request the customer refers to. Do not imply a past ticket was just created. An earlier lookup's lookup_basis describes that lookup, not a fresh one, and a missing lookup_basis establishes no oldest or latest ranking.
 - Earlier assistant messages are not proof. On a follow-up about a past action, answer from the records and correct earlier wrong claims. If the action cannot be verified, say so.
@@ -247,7 +249,11 @@ STAGE_GUIDANCE = {
         "A missing subject is not an out-of-scope subject. Do not refuse or claim you cannot open tickets. "
         "The word urgent alone does not establish a ticket priority. "
         "Do not ask them to repeat a subject already clear from context.\n"
-        "- Capability question: explain the relevant capability directly. If the customer is following up on a ticket "
+        "- Capability question: a general 'what can you do?' or 'what else?' gets a short overview of product help, "
+        "preparing support tickets and checking ticket status. Leave out optional workflow controls such as "
+        "stopping preparation, changing one's mind, and editing drafts; leave out account-access limitations. "
+        "Explain those only when the customer specifically asks about them or they matter to the current action. "
+        "For a specific capability question, answer just that capability. If the customer is following up on a ticket "
         "request whose subject is still missing, confirm you can help and ask for that subject. Correct an earlier "
         "incorrect refusal rather than defending it. Do not invent a temporary inability to open tickets, ask again "
         "for consent they already gave, or imply that consent substitutes for identifying the issue.\n"

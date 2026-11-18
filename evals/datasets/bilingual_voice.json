@@ -76,8 +76,20 @@
       "expected": {
         "stage": "other",
         "language": "ar",
-        "max_questions": 1
-      }
+        "max_questions": 1,
+        "must_not": [
+          "أوقف",
+          "توقف",
+          "إلغاء",
+          "ألغي",
+          "غيرت رأيك",
+          "تغيير رأيك",
+          "إعدادات حساب",
+          "بياناتك مباشرة",
+          "تعديل حساب"
+        ]
+      },
+      "notes": "A general overview should present core support capabilities, without unsolicited workflow controls or account disclaimers."
     },
     {
       "id": "ar-hours",
@@ -1087,8 +1099,20 @@
       "expected": {
         "stage": "other",
         "language": "ar",
-        "max_questions": 1
-      }
+        "max_questions": 1,
+        "must_not": [
+          "أوقف",
+          "توقف",
+          "إلغاء",
+          "ألغي",
+          "غيرت رأيك",
+          "تغيير رأيك",
+          "إعدادات حساب",
+          "بياناتك مباشرة",
+          "تعديل حساب"
+        ]
+      },
+      "notes": "A general overview should present core support capabilities, without unsolicited workflow controls or account disclaimers."
     },
     {
       "id": "ar-rich_reply_channel",
@@ -1195,8 +1219,18 @@
       "expected": {
         "stage": "other",
         "language": "en",
-        "max_questions": 1
-      }
+        "max_questions": 1,
+        "must_not": [
+          "cancel",
+          "stop preparing",
+          "stop a ticket",
+          "change your mind",
+          "account settings",
+          "access your account",
+          "inspect your account"
+        ]
+      },
+      "notes": "A general overview should present core support capabilities, without unsolicited workflow controls or account disclaimers."
     },
     {
       "id": "en-hours",
@@ -2204,8 +2238,18 @@
       "expected": {
         "stage": "other",
         "language": "en",
-        "max_questions": 1
-      }
+        "max_questions": 1,
+        "must_not": [
+          "cancel",
+          "stop preparing",
+          "stop a ticket",
+          "change your mind",
+          "account settings",
+          "access your account",
+          "inspect your account"
+        ]
+      },
+      "notes": "A general overview should present core support capabilities, without unsolicited workflow controls or account disclaimers."
     },
     {
       "id": "en-rich_reply_channel",
@@ -2234,6 +2278,139 @@
           ]
         ]
       }
+    },
+    {
+      "id": "ar-capabilities-followup",
+      "category": "capabilities",
+      "input": {
+        "product": "OLE5",
+        "state": {
+          "language": "ar",
+          "intent": "other",
+          "messages": [
+            {
+              "role": "user",
+              "content": "طيب تقدر تعمل ايه تاني؟"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "stage": "other",
+        "language": "ar",
+        "max_questions": 1,
+        "must_not": [
+          "أوقف",
+          "توقف",
+          "إلغاء",
+          "ألغي",
+          "غيرت رأيك",
+          "تغيير رأيك",
+          "إعدادات حساب",
+          "بياناتك مباشرة",
+          "تعديل حساب"
+        ]
+      },
+      "notes": "A general overview should present core support capabilities, without unsolicited workflow controls or account disclaimers."
+    },
+    {
+      "id": "en-capabilities-followup",
+      "category": "capabilities",
+      "input": {
+        "product": "OLE5",
+        "state": {
+          "language": "en",
+          "intent": "other",
+          "messages": [
+            {
+              "role": "user",
+              "content": "Okay, what else can you do?"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "stage": "other",
+        "language": "en",
+        "max_questions": 1,
+        "must_not": [
+          "cancel",
+          "stop preparing",
+          "stop a ticket",
+          "change your mind",
+          "account settings",
+          "access your account",
+          "inspect your account"
+        ]
+      },
+      "notes": "A general overview should present core support capabilities, without unsolicited workflow controls or account disclaimers."
+    },
+    {
+      "id": "ar-preparation-control-question",
+      "category": "specific_capability",
+      "input": {
+        "product": "OLE5",
+        "state": {
+          "language": "ar",
+          "intent": "other",
+          "messages": [
+            {
+              "role": "user",
+              "content": "أقدر أوقف تجهيز التذكرة قبل ما أرسلها؟"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "stage": "other",
+        "language": "ar",
+        "max_questions": 1,
+        "must_have": [
+          [
+            "تقدر",
+            "ممكن",
+            "تستطيع"
+          ]
+        ],
+        "must_not": [
+          "ما تقدر",
+          "لا تستطيع"
+        ]
+      },
+      "notes": "A directly requested capability must still be explained accurately; do not hide preparation controls globally."
+    },
+    {
+      "id": "en-preparation-control-question",
+      "category": "specific_capability",
+      "input": {
+        "product": "OLE5",
+        "state": {
+          "language": "en",
+          "intent": "other",
+          "messages": [
+            {
+              "role": "user",
+              "content": "Can I stop preparing a ticket before I send it?"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "stage": "other",
+        "language": "en",
+        "max_questions": 1,
+        "must_have": [
+          [
+            "can",
+            "yes"
+          ]
+        ],
+        "must_not": [
+          "can't stop",
+          "cannot stop"
+        ]
+      },
+      "notes": "A directly requested capability must still be explained accurately; do not hide preparation controls globally."
     }
   ]
 }

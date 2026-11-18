@@ -1,0 +1,521 @@
+{
+  "metadata": {
+    "model": "openai/gpt-oss-120b",
+    "endpoint": "https://api.me-central-1.groqcloud.com",
+    "response_temperature": 0.1,
+    "structured_first_attempt_temperature": 0,
+    "kb": "fixed/stub",
+    "tickets": "mock",
+    "source_hashes": {
+      "evals/datasets/bilingual_voice.json": "7c4cd2785d601c923cd367ec634dce16e4d945051f69357f56c076b2cb4a9d26",
+      "products/ole5/chat.yaml": "fa6aa80c26254030ca300a175fe5ef15e1e766eb9aa064afb13536f73edfca20",
+      "products/rich/chat.yaml": "3ad062072c8d1084d18ec3269095d9ca221f5bef08beb0edf9709525f07af80d",
+      "src/ole5_chat/__init__.py": "8d284f78e432b8c7e4797f1ba383caa34f5a433b84a34be375a5a96493f5c5cb",
+      "src/ole5_chat/agent/__init__.py": "7908c87e62135f60b4ac3d1665170a74415697cc1067a72bc19b12140712f6a5",
+      "src/ole5_chat/agent/context.py": "226cbac27e9ace1c7df99be46df4739cec4a4b5581d48a2cd16c7d02bec25c42",
+      "src/ole5_chat/agent/contracts.py": "0e244d0cef3857079e8174447e1302cba722d11899ed15be333aeea3da9bfd8e",
+      "src/ole5_chat/agent/graph.py": "68a2fc8133713b95233daa78b92b32a1973201d049dedbb3953e2e1eb6895f71",
+      "src/ole5_chat/agent/guards.py": "48d56b9f20011c005379d0e4f16db87cf4e8d973996e5267c3a3960e5108305b",
+      "src/ole5_chat/agent/nodes/__init__.py": "017fa77561ef9c1007a46fb712319c83ba6f854b08014ac7c1f90ed2d6a69ebf",
+      "src/ole5_chat/agent/nodes/finalize.py": "2354093744fa5570fdc3e56ff206d089b5283bb2e67c2b7c699ad8f42091f4f1",
+      "src/ole5_chat/agent/nodes/respond.py": "d38fb82b277a5394b1169becbbba8f259a6b4c1ea34eb3b6749c4814b959b0b3",
+      "src/ole5_chat/agent/nodes/router.py": "b6b7adb92dfc8b01fe709aa35a6cf0b52cb484f3c8ae44e8e613d78329eb3f03",
+      "src/ole5_chat/agent/nodes/search.py": "c795524219adf11d27f79f14d34fee3a472d784c69dac3516038d8aae1281429",
+      "src/ole5_chat/agent/nodes/ticket_enquiry.py": "090fde12aeae5d9b1388493304fab9ea91b95a817839d28910fdd3404f193ea3",
+      "src/ole5_chat/agent/nodes/ticket_operator.py": "7936df909a266ba4445c4f6d15b35317b1692fe99c3f8a407d9293f94cd7cb08",
+      "src/ole5_chat/agent/nodes/validate.py": "6ec326da84684b68df660e751c82b12505063b5357e1ae87c27b5f88b9a3effb",
+      "src/ole5_chat/agent/prompts/__init__.py": "57165dd25cb049807af619adf9038d007c24e3190fba853a72137b4c75093b5c",
+      "src/ole5_chat/agent/prompts/guards.py": "c89b09c5fc8e4feabb4c5da0e13738b1fde96543d065c4aba1836522ee3534b6",
+      "src/ole5_chat/agent/prompts/respond.py": "5bc8a2c5cc80f51d24d8d01f274eb354b7e88ef90a2e156ea15190bf0822ba06",
+      "src/ole5_chat/agent/prompts/router.py": "788c919d42bffba4641d0766a67030f6b9784938113c9192e45464af4383eef1",
+      "src/ole5_chat/agent/prompts/search.py": "8c920fe71f9f1e5f7faa520010d4c4c24475e23609214133fdfcf44354f31919",
+      "src/ole5_chat/agent/prompts/ticket_enquiry.py": "94b55a5b9516e672d8729d1dc5fde0eca55c6e752bf6b4fcfbe9c4b0099fb725",
+      "src/ole5_chat/agent/prompts/ticket_operator.py": "5e476862d2cba2336b28da523f466f1e73d71496f9c66ce01484924741241b3a",
+      "src/ole5_chat/agent/session.py": "c381e2bb76d987abde5125dc2a841843652f54c8f0b807229dde22f6aea52ffb",
+      "src/ole5_chat/agent/state.py": "918046390e2a92f5e2db65732f9aa6f5f962f52272534818b1bb4001363b6e40",
+      "src/ole5_chat/agent/ticket_action_guard.py": "4170f83e50bd9a112d2db0f92fe080622c52f26a9cbe2eae2423b0634a715548",
+      "src/ole5_chat/agent/tools/__init__.py": "bac7273398677e7eaacb24532ae7fa6715f0f4a99ba6b3e0e88093c6d180602e",
+      "src/ole5_chat/agent/tools/ticket_operator.py": "4a89de251e40cfe6003bdbc5cca125d3d23c93d7d3b38888cd04a2dd4695ba41",
+      "src/ole5_chat/agent/turn_sheet.py": "5da246dc5da46b25e85bb8f5505ba87bd74f4acb10e94923725539e6f0978229",
+      "src/ole5_chat/api.py": "83fce18be00cc7b976b2cdc6e2f45b6c466e5de92a670b425e3ee9243518664b",
+      "src/ole5_chat/attachments.py": "2e6c938183ea4380565e097bd5667905f931ddd47389f28aed32f1f7bd5c5d44",
+      "src/ole5_chat/config.py": "005f98a05853c1e871434b87875646dc10519325e61973602495c1b3085f3baa",
+      "src/ole5_chat/identity.py": "e2ab63aff75b52d27ebe26c6e28121548be05e0e8e328d1cc96c3d844873bc11",
+      "src/ole5_chat/knowledge/__init__.py": "a681b500f4ed9d399fdbdada22e5d1cee84d910a5f9e2ab07e945ce87605fba6",
+      "src/ole5_chat/knowledge/contracts.py": "a7ccc7455d721a568a6364504c8308851c6e65e22bfca5bddb750a5a2f79e884",
+      "src/ole5_chat/knowledge/qdrant_login.py": "424464e7fc6c13e7c5c09d5dcaa649b3ee868e1953719d931175176d1bce8bb5",
+      "src/ole5_chat/knowledge/retriever.py": "aa06ff79922d7f19e786653fa66c19cf0d43b9e2e8645c50b705b2bdd2cf9748",
+      "src/ole5_chat/knowledge/search.py": "5c872276924253cb6f5f7ecd09ef81b316cb081b8538a8932b36d01ead81e5d1",
+      "src/ole5_chat/knowledge/stub.py": "4b1f84b33b5df1d546a0698414b2a22785d8ab4a66c7e9ef22d3796c7b0f692a",
+      "src/ole5_chat/knowledge/tool.py": "bd954a0d4b5299e6e118d49f70014e3548863a62148bfadb7f8e9fa86bf4b780",
+      "src/ole5_chat/llm.py": "645592dcfc3aee7f13f2250498d60bc0d52d38481bcb58518ba53c70347dc149",
+      "src/ole5_chat/main.py": "5bc81a2515a3609409d1626f9e5bb88e184abb83f378a45024a15ca6d325b77d",
+      "src/ole5_chat/products.py": "05a71deb461f782151078251d5e17283b2d8daf735e0a678a79dd57864a48766",
+      "src/ole5_chat/sessions.py": "7ff109420a338f8955897ed97092391e81c4e619ce6f1bc37d6007e4b05ec9c8",
+      "src/ole5_chat/sheets.py": "2fe403d29425ba6eb59d30d594d08a7014c7af048d067e5a7a80dc5d6aa35099",
+      "src/ole5_chat/support_core/__init__.py": "52d710875b17494c4bfd55badb108535ca1eca83f4013338e2232ea0f8f6e71a",
+      "src/ole5_chat/support_core/classify.py": "42ea987f574911f0f451891937f2598b3f96bf87bb9744ee7164715127a511e7",
+      "src/ole5_chat/support_core/contracts.py": "8ff6d68efc368afe705bc23fc5f914f5f06e214c0d6371a7c3b6edc88f28e05b",
+      "src/ole5_chat/support_core/detail_display.py": "dcbb5a9be2ac86be7482a54a35efa23621185f6e847a4a1557940dcc202b563b",
+      "src/ole5_chat/support_core/prompt.py": "2af03712039cdb77637e126fcea29c7ca9b7b28d0a0e5a4894f7e8a2ed306043",
+      "src/ole5_chat/support_core/state.py": "7f90d26c6b4b2d19160cc941630db2f2918c18256102ed60494df7a01acf0617",
+      "src/ole5_chat/support_core/validate.py": "271896c2232b61f8acecab59ca6252ce8e27bc23516ca99955ea9d42f625b49b",
+      "src/ole5_chat/tickets/__init__.py": "7ce9621abd8be9e91eb3aa2b6d3b5fb0fdcd64ca8dfde416424c1f8a325fdd0c",
+      "src/ole5_chat/tickets/client.py": "101a45ee3219f262bef78c71e54088f448509d4933406537797476fd9e95a408",
+      "src/ole5_chat/tickets/mock.py": "f0a263cb76a4c3ce4dc10eff8f43400f541ebbbae1f55f084be083d829b3ace4",
+      "src/ole5_chat/tickets/status.py": "bd158a42949f7d421bc56b9d3b0d3ac4a8175938fb72da1141f11fa2c6f6cc32",
+      "src/ole5_chat/tickets/submit.py": "059180ae69e8dd93335f6eed3511d47e6833adbb8ca6505a436ee3887d6b4e3b",
+      "src/ole5_chat/values.py": "9484f217204d2e78af9099e0e3be4bfaef0f82ad3b7ec27cfabf5a0111ccc3c4"
+    }
+  },
+  "cases": [
+    {
+      "suite": "bilingual_voice",
+      "id": "ar-capabilities",
+      "category": "capabilities",
+      "input": {
+        "product": "OLE5",
+        "state": {
+          "language": "ar",
+          "intent": "other",
+          "messages": [
+            {
+              "role": "user",
+              "content": "وش تقدر تساعدني فيه؟"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "stage": "other",
+        "language": "ar",
+        "max_questions": 1,
+        "must_not": [
+          "أوقف",
+          "توقف",
+          "إلغاء",
+          "ألغي",
+          "غيرت رأيك",
+          "تغيير رأيك",
+          "إعدادات حساب",
+          "بياناتك مباشرة",
+          "تعديل حساب"
+        ]
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "أقدر أساعدك في استخدام نظام Ole5، أشرح لك الإجراءات والوظايف، أرفع لك تذكرة دعم إذا واجهتك مشكلة، وأستعلم لك عن حالة تذاكرك.",
+        "language": "ar",
+        "stage": "other",
+        "validation": "pass",
+        "validation_reason": "Basic reply checks passed."
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 6.81
+    },
+    {
+      "suite": "bilingual_voice",
+      "id": "ar-capabilities-followup",
+      "category": "capabilities",
+      "input": {
+        "product": "OLE5",
+        "state": {
+          "language": "ar",
+          "intent": "other",
+          "messages": [
+            {
+              "role": "user",
+              "content": "طيب تقدر تعمل ايه تاني؟"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "stage": "other",
+        "language": "ar",
+        "max_questions": 1,
+        "must_not": [
+          "أوقف",
+          "توقف",
+          "إلغاء",
+          "ألغي",
+          "غيرت رأيك",
+          "تغيير رأيك",
+          "إعدادات حساب",
+          "بياناتك مباشرة",
+          "تعديل حساب"
+        ]
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "أقدر أساعدك في استخدام نظام Ole5: أشرح لك الإجراءات، أوجهك لحل المشكلات، وإذا ما انحلت أقدر أساعدك في رفع تذكرة دعم وأستعلم عن حالتها.",
+        "language": "ar",
+        "stage": "other",
+        "validation": "pass",
+        "validation_reason": "Basic reply checks passed."
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 10.67
+    },
+    {
+      "suite": "bilingual_voice",
+      "id": "ar-preparation-control-question",
+      "category": "specific_capability",
+      "input": {
+        "product": "OLE5",
+        "state": {
+          "language": "ar",
+          "intent": "other",
+          "messages": [
+            {
+              "role": "user",
+              "content": "أقدر أوقف تجهيز التذكرة قبل ما أرسلها؟"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "stage": "other",
+        "language": "ar",
+        "max_questions": 1,
+        "must_have": [
+          [
+            "تقدر",
+            "ممكن",
+            "تستطيع"
+          ]
+        ],
+        "must_not": [
+          "ما تقدر",
+          "لا تستطيع"
+        ]
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "نعم، تقدر توقف تجهيز التذكرة قبل ما تُرسلها. حالياً ما فيه أي تجهيز قيد تنفيذ، فما في شيء نوقفه الآن.",
+        "language": "ar",
+        "stage": "other",
+        "validation": "pass",
+        "validation_reason": "Basic reply checks passed."
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 22.56
+    },
+    {
+      "suite": "bilingual_voice",
+      "id": "ar-rich_capabilities",
+      "category": "rich_capabilities",
+      "input": {
+        "product": "RICH",
+        "state": {
+          "language": "ar",
+          "intent": "other",
+          "messages": [
+            {
+              "role": "user",
+              "content": "هلا، وش تسوي منصة RiCH؟"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "stage": "other",
+        "language": "ar",
+        "max_questions": 1,
+        "must_not": [
+          "أوقف",
+          "توقف",
+          "إلغاء",
+          "ألغي",
+          "غيرت رأيك",
+          "تغيير رأيك",
+          "إعدادات حساب",
+          "بياناتك مباشرة",
+          "تعديل حساب"
+        ]
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "منصة RiCH تمكّنك من إرسال رسائل SMS وتوليد رموز OTP لعملائك عبر بوابة الويب أو باستخدام الـ API. تقدر تدير حسابك، تراقب الإرسال، تتحقق من حالة الرسائل. بالإضافة إلى ذلك أقدر أساعدك في استخدام البوابة أو الـ API، أفتح لك تذكرة دعم إذا احتجت، وأتحقق من حالة أي تذكرة سبق إنشاؤها.",
+        "language": "ar",
+        "stage": "other",
+        "validation": "pass",
+        "validation_reason": "Basic reply checks passed."
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 10.72
+    },
+    {
+      "suite": "bilingual_voice",
+      "id": "ar-submitted_cancellation",
+      "category": "submitted_cancellation",
+      "input": {
+        "product": "OLE5",
+        "state": {
+          "language": "ar",
+          "intent": "other",
+          "messages": [
+            {
+              "role": "user",
+              "content": "ألغ التذكرة المرفوعة T-1001"
+            }
+          ],
+          "created_tickets": [
+            {
+              "ticket_number": "T-1001",
+              "title_customer": "التطبيق يقفل عند فتح المرفقات"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "stage": "other",
+        "language": "ar",
+        "max_questions": 0,
+        "must_have": [
+          [
+            "ما أقدر",
+            "ما اقدر",
+            "لا أستطيع",
+            "ما تقدر"
+          ]
+        ]
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "ما أقدر ألغي تذكرة تم رفعها من هنا. التذكرة T-1001 صارت في نظام الدعم، وفريق الدعم هو المسؤول عن أي تعديل أو إلغاء. إذا تحتاج إلغاء أو تعديل، تواصل معهم عبر القناة المعتادة أو افتح تذكرة جديدة توضح طلبك.",
+        "language": "ar",
+        "stage": "other",
+        "validation": "pass",
+        "validation_reason": "Basic reply checks passed."
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 10.93
+    },
+    {
+      "suite": "bilingual_voice",
+      "id": "en-capabilities",
+      "category": "capabilities",
+      "input": {
+        "product": "OLE5",
+        "state": {
+          "language": "en",
+          "intent": "other",
+          "messages": [
+            {
+              "role": "user",
+              "content": "What can you help me with?"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "stage": "other",
+        "language": "en",
+        "max_questions": 1,
+        "must_not": [
+          "cancel",
+          "stop preparing",
+          "stop a ticket",
+          "change your mind",
+          "account settings",
+          "access your account",
+          "inspect your account"
+        ]
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "I can help you troubleshoot Ole5 features, guide you through actions, prepare a support ticket when needed, and look up the status of any tickets you’ve opened.",
+        "language": "en",
+        "stage": "other",
+        "validation": "pass",
+        "validation_reason": "Basic reply checks passed."
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 9.35
+    },
+    {
+      "suite": "bilingual_voice",
+      "id": "en-capabilities-followup",
+      "category": "capabilities",
+      "input": {
+        "product": "OLE5",
+        "state": {
+          "language": "en",
+          "intent": "other",
+          "messages": [
+            {
+              "role": "user",
+              "content": "Okay, what else can you do?"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "stage": "other",
+        "language": "en",
+        "max_questions": 1,
+        "must_not": [
+          "cancel",
+          "stop preparing",
+          "stop a ticket",
+          "change your mind",
+          "account settings",
+          "access your account",
+          "inspect your account"
+        ]
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "I can answer questions about Ole5, help you troubleshoot actions, rules and failures, prepare a support ticket for you, and look up the status of any tickets you’ve opened. Let me know what you need help with.",
+        "language": "en",
+        "stage": "other",
+        "validation": "pass",
+        "validation_reason": "Basic reply checks passed."
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 3.95
+    },
+    {
+      "suite": "bilingual_voice",
+      "id": "en-preparation-control-question",
+      "category": "specific_capability",
+      "input": {
+        "product": "OLE5",
+        "state": {
+          "language": "en",
+          "intent": "other",
+          "messages": [
+            {
+              "role": "user",
+              "content": "Can I stop preparing a ticket before I send it?"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "stage": "other",
+        "language": "en",
+        "max_questions": 1,
+        "must_have": [
+          [
+            "can",
+            "yes"
+          ]
+        ],
+        "must_not": [
+          "can't stop",
+          "cannot stop"
+        ]
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "Yes, you can cancel a ticket while it’s being prepared, but there’s no ticket in preparation right now, so there’s nothing to stop.",
+        "language": "en",
+        "stage": "other",
+        "validation": "pass",
+        "validation_reason": "Basic reply checks passed."
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 20.48
+    },
+    {
+      "suite": "bilingual_voice",
+      "id": "en-rich_capabilities",
+      "category": "rich_capabilities",
+      "input": {
+        "product": "RICH",
+        "state": {
+          "language": "en",
+          "intent": "other",
+          "messages": [
+            {
+              "role": "user",
+              "content": "Hi, what can you help me with in RiCH?"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "stage": "other",
+        "language": "en",
+        "max_questions": 1,
+        "must_not": [
+          "cancel",
+          "stop preparing",
+          "stop a ticket",
+          "change your mind",
+          "account settings",
+          "access your account",
+          "inspect your account"
+        ]
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "Hello, I can guide you on using the RiCH portal and API, help you send SMS or OTP messages, troubleshoot delivery issues, and assist with creating or checking the status of support tickets.",
+        "language": "en",
+        "stage": "other",
+        "validation": "pass",
+        "validation_reason": "Basic reply checks passed."
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 7.86
+    },
+    {
+      "suite": "bilingual_voice",
+      "id": "en-submitted_cancellation",
+      "category": "submitted_cancellation",
+      "input": {
+        "product": "OLE5",
+        "state": {
+          "language": "en",
+          "intent": "other",
+          "messages": [
+            {
+              "role": "user",
+              "content": "Cancel the submitted ticket T-1001."
+            }
+          ],
+          "created_tickets": [
+            {
+              "ticket_number": "T-1001",
+              "title_customer": "The app closes when opening attachments"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "stage": "other",
+        "language": "en",
+        "max_questions": 0,
+        "must_have": [
+          [
+            "T-1001",
+            "submitted",
+            "submitted"
+          ]
+        ]
+      },
+      "model": "openai/gpt-oss-120b",
+      "result": {
+        "answer": "I’m sorry, but I can’t cancel a submitted ticket from here.",
+        "language": "en",
+        "stage": "other",
+        "validation": "pass",
+        "validation_reason": "Basic reply checks passed."
+      },
+      "failures": [],
+      "passed": true,
+      "seconds": 7.81
+    }
+  ]
+}
