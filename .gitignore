@@ -48,3 +48,5 @@ Thumbs.db
 /reports/**/cases/
 /reports/**/before_source/
 /reports/**/first_pass/source/
+
+docs
