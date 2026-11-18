@@ -81,6 +81,12 @@ def _apply_completion(state: AgentState, completion: OperatorCompletion, report:
     }
     tool_results = _tool_results(report)
     derived = _completion_from_tools(state, report)
+    # A completed submission or stopped preparation is an observed action, even when another issue is next.
+    # The interpreter must not replace that receipt with an offer or a match to an older ticket.
+    settled = ({derived.action} if derived.action in {"submitted", "submission_failed"}
+               else {"declined", "cancelled"} if derived.action in {"declined", "cancelled"} else None)
+    if settled and completion.action not in settled:
+        completion = derived
     draft_steps = [item["result"] for item in tool_results if item["name"] in {"save_ticket_draft", "skip_detail"}]
     draft_failed = derived.action == "workflow_failed" and bool(draft_steps) and not draft_steps[-1].get("success")
     # Tool results that give the active issue's next step win over clarify, workflow_failed and a bare queued. A draft
@@ -182,6 +188,8 @@ def _apply_completion(state: AgentState, completion: OperatorCompletion, report:
         })
     # After a submitted ticket the next queued issue is active: offer it in the same turn, as the old flow did.
     next_issue = (submission or {}).get("active_issue") if (submission or {}).get("success") else None
+    acted_issue = ((submission or {}).get("submitted_issue") if completion.action == "submitted"
+                   else cancelled if completion.action in {"declined", "cancelled"} and cancelled else issue) or {}
     if completion.action == "submitted" and next_issue:
         update["pending_customer_response"] = _pending("offer", next_issue)
     compatibility = {
@@ -198,9 +206,8 @@ def _apply_completion(state: AgentState, completion: OperatorCompletion, report:
         "ticket_operator_result": {
             "action": completion.action,
             "reason": completion.reason,
-            "issue_id": issue_id,
-            "issue": ((cancelled if completion.action in {"declined", "cancelled"} and cancelled else issue)
-                      or {}).get("description"),
+            "issue_id": acted_issue.get("id") if completion.action == "submitted" else issue_id,
+            "issue": acted_issue.get("description"),
             "requested_detail": completion.requested_detail,
             "existing_ticket": completion.existing_ticket,
             # Its title, so the reply can name the topic of the ticket that already covers the problem.
@@ -303,6 +310,11 @@ def _completion_check(working: AgentState, report: str, matches: set[str] | None
     queue_ids = [issue.get("id") for issue in working.get("pending_issues") or []]
 
     def check(completion: OperatorCompletion) -> str | None:
+        settled = ({expected.action} if expected.action in {"submitted", "submission_failed"}
+                   else {"declined", "cancelled"} if expected.action in {"declined", "cancelled"} else None)
+        if settled and completion.action not in settled:
+            return (f"The tool already completed {expected.action}; report that action. "
+                    "Any next queued issue is recorded separately; an older ticket does not replace this result.")
         if completion.action == "offer" and expected.action in {"request_detail", "show_summary"}:
             return (f"The draft tool result already gives {expected.action}. Return that action; offer means "
                     "asking whether to begin preparation, not asking to submit a prepared summary.")

@@ -13,7 +13,7 @@ from langchain_core.messages import HumanMessage
 from ole5_chat import llm, products
 from ole5_chat.agent import ticket_action_guard
 from ole5_chat.agent.contracts import Grounding, GroundingIssue
-from ole5_chat.agent.guards import NAMES, language_problem, plain, sentences
+from ole5_chat.agent.guards import NAMES, canonical_ticket_numbers, language_problem, plain, sentences
 from ole5_chat.agent.prompts.guards import grounding_prompt
 from ole5_chat.agent.prompts.respond import ACCOUNT_ACCESS, CAPABILITIES, _evidence, _ticket_records
 from ole5_chat.agent.state import AgentState
@@ -169,7 +169,16 @@ def validate_node(state: AgentState) -> dict:
         return {"reply": _safe_fallback(state), "validation_outcome": "fallback", "validation_reason": "Answered search had no retained evidence.",
                 "sources": [], "source_details": []}
 
-    cleaned = plain(reply)
+    operator = state.get("ticket_operator_result") or {}
+    records = [*state.get("created_tickets", []),
+               *((state.get("ticket_enquiry_result") or {}).get("tickets") or []),
+               *((state.get("last_lookup") or {}).get("tickets") or []),
+               (state.get("ticket_result") or {}).get("ticket") or {},
+               (operator.get("ticket_result") or {}).get("ticket") or {}]
+    numbers = [str(record["ticket_number"]) for record in records if record.get("ticket_number")]
+    if operator.get("existing_ticket"):
+        numbers.append(str(operator["existing_ticket"]))
+    cleaned = canonical_ticket_numbers(plain(reply), numbers)
     if cleaned != reply:
         log.info("validate  markdown=stripped")
         reply = cleaned

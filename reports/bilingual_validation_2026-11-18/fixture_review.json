@@ -1,0 +1,25 @@
+{
+  "case": "reg_respond/submitted",
+  "review": "The recorded response says إيميلك المسجل, a valid Saudi equivalent of registered email. The old substring list omitted this possessive form. Raw run results stay unchanged.",
+  "original_failures": [
+    "missing one of ['البريد', 'بريدك', 'الإيميل']"
+  ],
+  "updated_expected": {
+    "language": "ar",
+    "must_have": [
+      [
+        "T-1001"
+      ],
+      [
+        "البريد",
+        "بريدك",
+        "الإيميل",
+        "إيميلك",
+        "ايميلك"
+      ]
+    ],
+    "max_questions": 0
+  },
+  "rechecked_failures": [],
+  "method": "Deterministic rescore of the same saved response; no new model call."
+}

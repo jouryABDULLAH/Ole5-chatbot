@@ -1,0 +1,10 @@
+{
+  "products/ole5/chat.yaml": "4a7a07e3bce210aecbe11fa030bddb2054c4e7d692094afaadda72cec72dc18d",
+  "products/rich/chat.yaml": "ca4eb806e4e73cbca8b30e9a3e94fa7f817fb77e888136eed45f7eee84eb313f",
+  "src/ole5_chat/agent/prompts/respond.py": "8e2d5bbfd50b40b156e9fc96926237084f85ddbcf399ebd8f29174b959092580",
+  "src/ole5_chat/agent/prompts/router.py": "d60af2a7759d85479e6f667e36610d58b17e0865ba9ca21b5ad3016a5f6f3ca4",
+  "src/ole5_chat/agent/prompts/ticket_operator.py": "568934837053128c7d0ff9cd6c38acfcafcac69a83c6e6aa32afe6d3b47fe36c",
+  "src/ole5_chat/products.py": "8dd707d0476e435a5ab7313ec638fc1148fa3605c7ca0e3e354324af64225b23",
+  "src/ole5_chat/agent/turn_sheet.py": "f6220cd2448ddc89eb7d546daf10b65244f6c61d8aa8cd25cd05d88071f1f681",
+  "src/ole5_chat/agent/prompts/guards.py": "7fd888da8e0a59f000312557a8b54f0dfe7d402a940f08f3064f9cf5bd043017"
+}

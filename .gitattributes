@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Archived unified diffs require single-space context lines; preserve them verbatim.
+reports/**/*.patch -whitespace

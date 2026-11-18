@@ -1,0 +1,37 @@
+{
+  "focused_suite": {
+    "files": [
+      "tests/test_v2_respond_language.py",
+      "tests/test_v2_response_guards.py",
+      "tests/test_turn_sheet.py",
+      "tests/test_router_worker_context.py"
+    ],
+    "before": {
+      "passed": 38,
+      "failed": 9
+    },
+    "first_edit": {
+      "passed": 38,
+      "failed": 9
+    },
+    "existing_failures": "All 9 failures are in test_router_worker_context.py. Confirmed against an isolated copy with the original source restored. Assertions refer to labels from the older combined router prompt."
+  },
+  "full_suite": "An initial full-suite run was interrupted after making no progress beyond its first four tests; no full-suite pass is claimed.",
+  "final_edit": {
+    "focused_checks_passed": 38,
+    "files": [
+      "tests/test_v2_respond_language.py",
+      "tests/test_v2_response_guards.py",
+      "tests/test_turn_sheet.py"
+    ],
+    "diff_whitespace_check": "passed"
+  },
+  "artifact_integrity": {
+    "paired_messages": 51,
+    "cases": 20,
+    "source_hashes_match": true,
+    "original_baseline_preserved": true,
+    "file_links_exist": true
+  },
+  "live_guard_probes_passed": 2
+}

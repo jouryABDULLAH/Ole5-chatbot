@@ -18,6 +18,7 @@ Stage = Literal[
 class TurnSheet(TypedDict):
     stage: Stage
     language: str
+    voice_register: str
     customer_message: str | None    # this turn's message; None on a button turn
     button: str | None             # "submit" on a Submit-button turn (input_event), else None
     search: str                     # "answered with N passages" | "no answer" | "failed" | "not run"
@@ -129,6 +130,8 @@ def build_turn_sheet(state: AgentState, language: str) -> TurnSheet:
     return TurnSheet(
         stage=stage,
         language=language,
+        voice_register=(products.load(state["identity"].product).persona.arabic_register
+                        if language == "ar" else products.load(state["identity"].product).persona.english_register),
         customer_message=last.text if last is not None and last.type == "human" else None,
         button="submit" if state.get("input_event") == "submit" else None,
         search=(f"answered with {len(direct)} passages" if direct

@@ -1,0 +1,34 @@
+{
+  "date": "2026-11-18",
+  "offline": {
+    "command": "GROQ_API_KEY=invalid PYTHONPATH=src python -m pytest -q",
+    "passed": 259,
+    "failed": 0,
+    "warnings": [
+      "Two existing ldap3/pyasn1 deprecation warnings"
+    ],
+    "environment": "ole5-chat Conda environment, outside sandbox because sandboxed FastAPI TestClient hangs"
+  },
+  "ui": [
+    {
+      "command": "node tests/test_ticket_card.cjs",
+      "exit_code": 0
+    },
+    {
+      "command": "node tests/progress_ui.cjs",
+      "exit_code": 0
+    }
+  ],
+  "whitespace": {
+    "command": "git diff --check",
+    "exit_code": 0,
+    "note": "Archived unified .patch files preserve required context-line whitespace via .gitattributes."
+  },
+  "runtime_data": "tickets.xlsx and attachments.xlsx backed up; hashes unchanged after git rm --cached",
+  "final_workflow_replay": {
+    "case": "en-second-issue",
+    "passed": true,
+    "turns": 6,
+    "result": "final_queue_recheck/results.json"
+  }
+}
